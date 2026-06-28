@@ -68,45 +68,25 @@
     .brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
 
     .c2-logo {
-      width: 56px;
-      height: 38px;
+      width: 42px;
+      height: 42px;
       display: grid;
       place-items: center;
-      color: var(--blue-600);
+      color: #fff;
+      background: linear-gradient(135deg, var(--blue-900), var(--blue-700));
+      border-radius: 12px;
       font-weight: 950;
-      font-size: 1.45rem;
-      letter-spacing: -0.13em;
+      font-size: 1rem;
+      letter-spacing: -0.04em;
       position: relative;
       isolation: isolate;
       flex: 0 0 auto;
-    }
-
-    .c2-logo::before {
-      content: "";
-      position: absolute;
-      inset: 1px 3px 2px 0;
-      border: 3px solid var(--blue-600);
-      border-right-color: transparent;
-      border-radius: 999px;
-      z-index: -1;
-    }
-
-    .c2-logo::after {
-      content: "";
-      position: absolute;
-      right: 3px;
-      top: 7px;
-      width: 20px;
-      height: 20px;
-      border: 3px solid var(--blue-500);
-      border-left-color: transparent;
-      border-radius: 999px;
-      transform: rotate(-12deg);
-      z-index: -1;
+      box-shadow: 0 10px 24px rgba(0, 84, 209, 0.18);
     }
 
     .brand-text { display: flex; flex-direction: column; gap: 2px; line-height: 1; }
-    .brand-name { color: var(--blue-900); font-weight: 900; font-size: 1.02rem; letter-spacing: -0.03em; }
+    .brand-name { color: var(--blue-900); font-weight: 950; font-size: 1.08rem; letter-spacing: -0.035em; }
+    .brand .brand-sub { display: none; }
     .brand-sub { color: var(--muted); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
 
     .nav-tabs { display: flex; align-items: stretch; align-self: stretch; gap: 2px; }
@@ -223,6 +203,197 @@
     .template-icon { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: var(--blue-100); color: var(--blue-700); font-weight: 950; }
     .template-item span:last-child { color: var(--blue-900); font-weight: 850; font-size: 0.9rem; }
 
+    .sidebar-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 26, 58, 0.38);
+      z-index: 850;
+      opacity: 0;
+      pointer-events: none;
+      transition: 0.18s ease;
+    }
+
+    .sidebar-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .left-sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 340px;
+      max-width: 88vw;
+      height: 100vh;
+      background: #fff;
+      border-right: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      z-index: 900;
+      transform: translateX(-104%);
+      transition: 0.22s ease;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .left-sidebar.open {
+      transform: translateX(0);
+    }
+
+    .sidebar-head {
+      height: 82px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #fff, #fbfdff);
+    }
+
+    .sidebar-title {
+      color: var(--blue-900);
+      font-size: 1rem;
+      font-weight: 950;
+      letter-spacing: -0.02em;
+    }
+
+    .sidebar-close {
+      width: 38px;
+      height: 38px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--blue-800);
+      border-radius: 8px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      font-size: 1.1rem;
+      font-weight: 950;
+    }
+
+    .sidebar-close:hover {
+      background: var(--blue-050);
+      border-color: #aac8ef;
+    }
+
+    .sidebar-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      background: #f8fbff;
+    }
+
+    .sidebar-tab {
+      min-height: 40px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--muted);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 900;
+      transition: 0.16s ease;
+    }
+
+    .sidebar-tab:hover,
+    .sidebar-tab.active {
+      background: var(--blue-700);
+      border-color: var(--blue-700);
+      color: #fff;
+    }
+
+    .sidebar-content {
+      padding: 18px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .sidebar-panel {
+      display: none;
+    }
+
+    .sidebar-panel.active {
+      display: block;
+    }
+
+    .sidebar-section-title {
+      color: var(--blue-900);
+      font-size: 0.95rem;
+      font-weight: 950;
+      margin-bottom: 12px;
+    }
+
+    .sidebar-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .sidebar-link {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fbfdff;
+      color: var(--blue-900);
+      text-align: left;
+      cursor: pointer;
+      transition: 0.16s ease;
+      font-weight: 850;
+    }
+
+    .sidebar-link:hover {
+      border-color: #aac8ef;
+      background: var(--blue-050);
+      transform: translateY(-1px);
+    }
+
+    .sidebar-link-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      background: var(--blue-100);
+      color: var(--blue-700);
+      font-weight: 950;
+      flex: 0 0 auto;
+    }
+
+    .sidebar-link-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .sidebar-link-text strong {
+      color: var(--blue-900);
+      font-size: 0.9rem;
+    }
+
+    .sidebar-link-text small {
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 650;
+      line-height: 1.35;
+    }
+
+    .sidebar-note {
+      margin-top: 16px;
+      padding: 14px;
+      border-radius: 12px;
+      background: var(--blue-050);
+      border: 1px dashed #bcd3ef;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.5;
+    }
+
     .editor-screen { position: fixed; inset: 0; z-index: 1000; background: #fff; display: none; }
     .editor-screen.open { display: block; }
     #placeholder { width: 100%; height: 100%; }
@@ -256,6 +427,116 @@
 </head>
 <body>
   <div class="app">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <aside class="left-sidebar" id="leftSidebar" aria-label="Document workspace sidebar">
+      <div class="sidebar-head">
+        <div>
+          <div class="sidebar-title">Workspace Menu</div>
+          <div class="brand-sub">Templates · Settings · Workflows</div>
+        </div>
+        <button class="sidebar-close" type="button" id="closeSidebar" aria-label="Close sidebar">×</button>
+      </div>
+
+      <div class="sidebar-tabs">
+        <button class="sidebar-tab active" type="button" data-sidebar-tab="templates">Templates</button>
+        <button class="sidebar-tab" type="button" data-sidebar-tab="workflows">Workflows</button>
+        <button class="sidebar-tab" type="button" data-sidebar-tab="settings">Settings</button>
+      </div>
+
+      <div class="sidebar-content">
+        <div class="sidebar-panel active" id="sidebar-templates">
+          <div class="sidebar-section-title">Templates</div>
+          <div class="sidebar-list">
+            <button class="sidebar-link" type="button" data-new-type="docx">
+              <span class="sidebar-link-icon">W</span>
+              <span class="sidebar-link-text">
+                <strong>Agreement Template</strong>
+                <small>Create a reusable DOCX agreement.</small>
+              </span>
+            </button>
+            <button class="sidebar-link" type="button" data-new-type="xlsx">
+              <span class="sidebar-link-icon">X</span>
+              <span class="sidebar-link-text">
+                <strong>Cost Sheet Template</strong>
+                <small>Create a reusable XLSX tracker.</small>
+              </span>
+            </button>
+            <button class="sidebar-link" type="button" data-new-type="pptx">
+              <span class="sidebar-link-icon">P</span>
+              <span class="sidebar-link-text">
+                <strong>Presentation Template</strong>
+                <small>Create a reusable PPTX deck.</small>
+              </span>
+            </button>
+          </div>
+          <div class="sidebar-note">Use this area later for saved signing templates, field presets, signer roles, and reusable document packets.</div>
+        </div>
+
+        <div class="sidebar-panel" id="sidebar-workflows">
+          <div class="sidebar-section-title">Workflows</div>
+          <div class="sidebar-list">
+            <button class="sidebar-link" type="button" onclick="window.location.href='signing/new.html'">
+              <span class="sidebar-link-icon">✍</span>
+              <span class="sidebar-link-text">
+                <strong>New Signing Workflow</strong>
+                <small>Send a document for signature.</small>
+              </span>
+            </button>
+            <button class="sidebar-link" type="button">
+              <span class="sidebar-link-icon">1→2</span>
+              <span class="sidebar-link-text">
+                <strong>Sequential Signing</strong>
+                <small>Client signs first, then internal approval.</small>
+              </span>
+            </button>
+            <button class="sidebar-link" type="button">
+              <span class="sidebar-link-icon">⚡</span>
+              <span class="sidebar-link-text">
+                <strong>Fast Approval Flow</strong>
+                <small>Draft, approve, send, countersign, archive.</small>
+              </span>
+            </button>
+          </div>
+          <div class="sidebar-note">This gives the product a stronger $4k workflow-system feel instead of only being a document editor.</div>
+        </div>
+
+        <div class="sidebar-panel" id="sidebar-settings">
+          <div class="sidebar-section-title">Settings</div>
+          <div class="sidebar-list">
+            <button class="sidebar-link" type="button">
+              <span class="sidebar-link-icon">🏢</span>
+              <span class="sidebar-link-text">
+                <strong>Organization Settings</strong>
+                <small>Manage company name, branding, and workspace identity.</small>
+              </span>
+            </button>
+            <button class="sidebar-link" type="button">
+              <span class="sidebar-link-icon">👥</span>
+              <span class="sidebar-link-text">
+                <strong>User Access</strong>
+                <small>Manage admins, senders, viewers, and permissions.</small>
+              </span>
+            </button>
+            <button class="sidebar-link" type="button">
+              <span class="sidebar-link-icon">✉</span>
+              <span class="sidebar-link-text">
+                <strong>Email Settings</strong>
+                <small>Configure sender identity and notification behavior.</small>
+              </span>
+            </button>
+            <button class="sidebar-link" type="button">
+              <span class="sidebar-link-icon">🔒</span>
+              <span class="sidebar-link-text">
+                <strong>Security Settings</strong>
+                <small>Control audit trail, link expiration, and access rules.</small>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
     <header class="top-nav">
       <a href="welcome.html" class="brand" aria-label="Connexion Two dashboard home">
         <div class="c2-logo" aria-hidden="true">C2</div>
@@ -276,11 +557,11 @@
       <div class="top-actions">
         <div class="trial-left">7 Days Left</div>
         <button class="buy-btn" type="button">Buy Now</button>
-        <button class="icon-btn" type="button" aria-label="Tasks">☷</button>
+        <button class="icon-btn" type="button" id="openSidebar" aria-label="Open workspace menu">☷</button>
         <button class="icon-btn" type="button" aria-label="Help"><span class="notify-dot"></span>?</button>
         <button class="icon-btn" type="button" id="signout" aria-label="Sign out">↪</button>
         <div class="avatar">AP</div>
-        <button class="icon-btn mobile-menu" type="button" aria-label="Menu">☰</button>
+        <button class="icon-btn mobile-menu" type="button" id="openMobileSidebar" aria-label="Open workspace menu">☰</button>
       </div>
     </header>
 
@@ -568,6 +849,39 @@
       e.preventDefault();
       await sb.auth.signOut();
       window.location.replace(LOGIN_URL);
+    });
+
+    const leftSidebar = document.getElementById('leftSidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    const openSidebar = document.getElementById('openSidebar');
+    const openMobileSidebar = document.getElementById('openMobileSidebar');
+    const closeSidebar = document.getElementById('closeSidebar');
+
+    function showSidebar(){
+      leftSidebar.classList.add('open');
+      sidebarOverlay.classList.add('open');
+    }
+
+    function hideSidebar(){
+      leftSidebar.classList.remove('open');
+      sidebarOverlay.classList.remove('open');
+    }
+
+    openSidebar.addEventListener('click', showSidebar);
+    openMobileSidebar.addEventListener('click', showSidebar);
+    closeSidebar.addEventListener('click', hideSidebar);
+    sidebarOverlay.addEventListener('click', hideSidebar);
+
+    document.querySelectorAll('[data-sidebar-tab]').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.sidebarTab;
+
+        document.querySelectorAll('[data-sidebar-tab]').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.sidebar-panel').forEach(panel => panel.classList.remove('active'));
+
+        tab.classList.add('active');
+        document.getElementById('sidebar-' + target).classList.add('active');
+      });
     });
 
     (async ()=>{
