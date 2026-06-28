@@ -667,6 +667,185 @@
       background: var(--line);
     }
 
+    .nav-login-link {
+      font-size: 0.86rem;
+      font-weight: 700;
+    }
+
+    .hero-login-note {
+      margin-top: 14px;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .hero-login-note a {
+      color: var(--accent-dark);
+      font-weight: 800;
+    }
+
+    .auth-trial-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #efe7db;
+      color: var(--accent-dark);
+      border: 1px solid #dfd2bf;
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+
+    .dashboard-shell {
+      padding: 0 0 82px;
+    }
+
+    .dashboard-frame {
+      border-radius: 26px;
+      overflow: hidden;
+      box-shadow: 0 25px 70px rgba(16, 24, 32, 0.14);
+      border: 1px solid #d9d6e5;
+      background: #fff;
+    }
+
+    .dashboard-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 24px;
+      padding: 18px 28px;
+      background: #ffffff;
+      border-bottom: 1px solid #e5e1ec;
+    }
+
+    .dashboard-brand {
+      font-size: 1rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #2d1557;
+    }
+
+    .dashboard-top-actions {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .trial-counter {
+      color: #2d1557;
+      font-size: 0.92rem;
+      font-weight: 800;
+    }
+
+    .buy-now-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 0 22px;
+      background: #2d0a75;
+      color: white;
+      border-radius: 999px;
+      font-weight: 800;
+    }
+
+    .dashboard-icon-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 1px solid #ddd7ea;
+      background: #fff;
+      color: #5a4778;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .dashboard-note {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: #f4f0fa;
+      color: #3c246c;
+      padding: 18px 24px;
+      font-size: 0.98rem;
+      text-align: center;
+    }
+
+    .welcome-card {
+      background: linear-gradient(180deg, #4f0db8 0%, #30006d 100%);
+      padding: 64px 24px 72px;
+    }
+
+    .welcome-card-inner {
+      max-width: 980px;
+      margin: 0 auto;
+      text-align: center;
+      color: #fff;
+    }
+
+    .welcome-kicker {
+      font-size: 0.82rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      opacity: 0.8;
+      margin-bottom: 16px;
+      font-weight: 700;
+    }
+
+    .welcome-card h2 {
+      color: #fff;
+      font-size: clamp(2rem, 4vw, 3rem);
+      letter-spacing: -0.05em;
+      margin-bottom: 34px;
+    }
+
+    .welcome-actions {
+      display: flex;
+      justify-content: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
+    .welcome-action {
+      min-height: 60px;
+      padding: 0 24px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      font-size: 0.96rem;
+      font-weight: 800;
+      transition: 0.2s ease;
+    }
+
+    .start-action {
+      background: #d8d1ef;
+      color: #2d1557;
+      border: none;
+      cursor: pointer;
+    }
+
+    .outline-action {
+      color: white;
+      border: 1px solid rgba(255,255,255,0.35);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .outline-action:hover,
+    .start-action:hover,
+    .dashboard-icon-btn:hover,
+    .buy-now-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 28px rgba(0,0,0,0.16);
+    }
+
+
     @media (max-width: 920px) {
       .hero-grid,
       .problem-content,
@@ -682,6 +861,16 @@
 
       .nav-links {
         display: none;
+      }
+
+      .dashboard-topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .dashboard-top-actions {
+        width: 100%;
+        justify-content: flex-start;
       }
     }
 
@@ -714,6 +903,23 @@
       .nav-cta {
         width: 100%;
       }
+
+      .dashboard-note {
+        align-items: flex-start;
+      }
+
+      .welcome-card {
+        padding: 42px 18px 48px;
+      }
+
+      .welcome-actions {
+        flex-direction: column;
+      }
+
+      .welcome-action,
+      .buy-now-btn {
+        width: 100%;
+      }
     }
   </style>
 </head>
@@ -730,10 +936,10 @@
           <a href="#promise">Promise</a>
           <a href="#what-you-get">What You Get</a>
           <a href="#offer">Beta Offer</a>
-          <a href="#get-started">Login</a>
+          <a href="#get-started" class="nav-login-link">Login</a>
         </nav>
 
-        <a href="#get-started" class="nav-cta">Login / Book a discovery call</a>
+        <a href="#cta" class="nav-cta">Book a discovery call</a>
       </div>
     </header>
 
@@ -757,16 +963,19 @@
             </div>
 
             <div class="hero-actions">
-              <a href="#get-started" class="button">Login / Book a discovery call</a>
+              <a href="#cta" class="button">Book a discovery call</a>
               <a href="#what-you-get" class="button secondary">See what you get</a>
             </div>
+
+            <p class="hero-login-note">Already have access? <a href="#get-started">Log in</a></p>
           </div>
 
           <aside class="auth-card" id="get-started">
 
             <div id="step-auth">
-              <div class="auth-headline">Create your Connexion Two account</div>
-              <div class="auth-sub">Access your private document workflow portal.</div>
+              <div class="auth-trial-badge">7-day free trial · No credit card required</div>
+              <div class="auth-headline">Start your 7-day free trial</div>
+              <div class="auth-sub">Create your Connexion Two account and access your private document workflow portal.</div>
 
               <button class="google-btn" id="btn-google">
                 <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
@@ -794,12 +1003,12 @@
 
               <button class="submit-btn" id="btn-email-signup">
                 <span class="material-icons-round" style="font-size:18px;">lock_open</span>
-                Create Account
+                Start 7-Day Free Trial
               </button>
 
               <div class="form-note">
                 <span class="material-icons-round">verified_user</span>
-                Secure access · Private portal · Source-code handoff
+                Secure access · Private portal · Cancel anytime during trial
               </div>
 
               <p class="auth-switch">
@@ -836,7 +1045,7 @@
               </button>
 
               <p class="auth-switch">
-                No account yet? <a href="#" id="show-signup">Sign up</a>
+                No account yet? <a href="#" id="show-signup">Start your free trial</a>
               </p>
             </div>
 
@@ -900,7 +1109,7 @@
               <div class="auth-headline">Check your email</div>
 
               <p style="font-size:0.95rem;color:var(--muted);margin:10px 0 24px;line-height:1.7;">
-                We've sent a confirmation link to your inbox. Click it to verify your account, then sign in to access your portal.
+                We've sent a confirmation link to your inbox. Click it to verify your account, then sign in to start your 7-day free trial and access your portal.
               </p>
 
               <a href="#" id="back-to-login" class="button" style="justify-content:center;width:100%;">
@@ -915,6 +1124,53 @@
             </div>
 
           </aside>
+        </div>
+      </section>
+
+      <section class="dashboard-shell" id="logged-in-dashboard" style="display:none;">
+        <div class="container">
+          <div class="dashboard-frame">
+            <div class="dashboard-topbar">
+              <div class="dashboard-brand">Connexion Two Portal</div>
+              <div class="dashboard-top-actions">
+                <div class="trial-counter"><span id="trial-days-left">7</span> Days Left</div>
+                <a href="#offer" class="buy-now-btn">Buy Now</a>
+                <button class="dashboard-icon-btn" id="sign-out-btn" type="button" aria-label="Sign out">
+                  <span class="material-icons-round">logout</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="dashboard-note">
+              <span class="material-icons-round">info</span>
+              <span id="trial-note-text">Your 7-day free trial is active. Finish setup and start running your document workflows.</span>
+            </div>
+
+            <div class="welcome-card">
+              <div class="welcome-card-inner">
+                <div class="welcome-kicker">Private document workflow portal</div>
+                <h2 id="welcome-message">Welcome back</h2>
+                <div class="welcome-actions">
+                  <button class="welcome-action start-action" id="welcome-start-btn" type="button">
+                    <span>Start</span>
+                    <span class="material-icons-round">expand_more</span>
+                  </button>
+                  <a href="editor.html" class="welcome-action outline-action" id="action-signatures">
+                    <span class="material-icons-round">send</span>
+                    Get Signatures
+                  </a>
+                  <a href="editor.html" class="welcome-action outline-action" id="action-sign-document">
+                    <span class="material-icons-round">draw</span>
+                    Sign a Document
+                  </a>
+                  <a href="editor.html" class="welcome-action outline-action" id="action-template">
+                    <span class="material-icons-round">dashboard</span>
+                    Use a Template
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1235,6 +1491,7 @@
   );
 
   const APP_URL = 'editor.html';
+  const TRIAL_DAYS = 7;
 
   function showStep(id) {
     ['step-auth', 'step-login', 'step-profile', 'step-success'].forEach(stepId => {
@@ -1244,7 +1501,45 @@
   }
 
   function goToApp() {
-    window.location.replace(APP_URL);
+    window.location.href = APP_URL;
+  }
+
+  function getDisplayName(user) {
+    return user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'there';
+  }
+
+  function getTrialDaysLeft(user) {
+    const trialEndsAt = user?.user_metadata?.trial_ends_at;
+    if (!trialEndsAt) return TRIAL_DAYS;
+    const diff = new Date(trialEndsAt).getTime() - Date.now();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }
+
+  function showAuthCard() {
+    const authCard = document.getElementById('get-started');
+    const dashboard = document.getElementById('logged-in-dashboard');
+    if (authCard) authCard.style.display = '';
+    if (dashboard) dashboard.style.display = 'none';
+  }
+
+  function showLoggedInState(session) {
+    const authCard = document.getElementById('get-started');
+    const dashboard = document.getElementById('logged-in-dashboard');
+    const name = getDisplayName(session.user);
+    const daysLeft = getTrialDaysLeft(session.user);
+    const trialLabel = document.getElementById('trial-days-left');
+    const trialNote = document.getElementById('trial-note-text');
+    const welcomeMessage = document.getElementById('welcome-message');
+
+    if (authCard) authCard.style.display = 'none';
+    if (dashboard) dashboard.style.display = '';
+    if (welcomeMessage) welcomeMessage.textContent = `Welcome back, ${name}`;
+    if (trialLabel) trialLabel.textContent = daysLeft;
+    if (trialNote) {
+      trialNote.textContent = daysLeft > 0
+        ? `Your ${TRIAL_DAYS}-day free trial is active. You have ${daysLeft} day${daysLeft === 1 ? '' : 's'} left.`
+        : 'Your free trial has ended. Upgrade now to keep using your private document workflow portal.';
+    }
   }
 
   async function routeForSession(session) {
@@ -1255,9 +1550,14 @@
         .eq('id', session.user.id)
         .single();
 
-      if (data && data.trade) goToApp();
-      else showStep('step-profile');
+      if (data && data.trade) {
+        showLoggedInState(session);
+      } else {
+        showAuthCard();
+        showStep('step-profile');
+      }
     } catch (_) {
+      showAuthCard();
       showStep('step-profile');
     }
   }
@@ -1324,7 +1624,11 @@
       email,
       password,
       options: {
-        data: { full_name: name },
+        data: {
+          full_name: name,
+          trial_started_at: new Date().toISOString(),
+          trial_ends_at: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString()
+        },
         emailRedirectTo: window.location.href
       }
     });
@@ -1388,13 +1692,34 @@
     setLoading(button, false);
 
     if (error) return showError('profile-error', error.message);
+
+    const { data: sessionData } = await sb.auth.getSession();
+    if (sessionData.session) showLoggedInState(sessionData.session);
+  });
+
+
+  document.getElementById('welcome-start-btn')?.addEventListener('click', goToApp);
+  document.getElementById('action-signatures')?.addEventListener('click', event => {
+    event.preventDefault();
     goToApp();
+  });
+  document.getElementById('action-sign-document')?.addEventListener('click', event => {
+    event.preventDefault();
+    goToApp();
+  });
+  document.getElementById('action-template')?.addEventListener('click', event => {
+    event.preventDefault();
+    goToApp();
+  });
+  document.getElementById('sign-out-btn')?.addEventListener('click', async () => {
+    await sb.auth.signOut();
   });
 
   sb.auth.onAuthStateChange((event, session) => {
     if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
       routeForSession(session);
     } else if (event === 'SIGNED_OUT') {
+      showAuthCard();
       showStep('step-auth');
     }
   });
