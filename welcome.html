@@ -538,7 +538,7 @@
     </aside>
 
     <header class="top-nav">
-      <a href="welcome.html" class="brand" aria-label="Connexion Two dashboard home">
+      <a href="/welcome" class="brand" aria-label="Connexion Two dashboard home">
         <div class="c2-logo" aria-hidden="true">C2</div>
         <div class="brand-text">
           <div class="brand-name">Connexion Two</div>
@@ -547,7 +547,7 @@
       </a>
 
       <nav class="nav-tabs" aria-label="Main navigation">
-        <a href="welcome.html">Home</a>
+        <a href="/welcome">Home</a>
         <a href="signing/new.html">Agreements</a>
         <a href="templates/new.html">Templates</a>
         <a href="#">Reports</a>
@@ -667,13 +667,19 @@
     const SB_URL = 'https://xbwuvaxtnylqvagdvpxp.supabase.co';
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc';
     const BUCKET = 'documents';
-    const LOGIN_URL = 'index.html';
+    const LOGIN_URL = 'https://www.connexiontwo.com/';
+    const WELCOME_URL = 'https://www.connexiontwo.com/welcome';
     const TEMPLATES = { docx: 'blank.docx', xlsx: 'blank.xlsx', pptx: 'blank.pptx' };
     const sb = supabase.createClient(SB_URL, SB_KEY);
     let editor = null;
     let userId = null;
     let allFiles = [];
     const screen = document.getElementById('editorScreen');
+
+    // Safety guard: if this page ever opens on the old Bison domain, move it back to Connexion Two.
+    if (window.location.hostname.includes('bisondoc.com')) {
+      window.location.replace(WELCOME_URL);
+    }
 
     function userPath(name){ return userId + '/' + name; }
 
@@ -711,7 +717,14 @@
 
     async function requireSession(){
       const { data:{ session } } = await sb.auth.getSession();
-      if(!session){ window.location.replace(LOGIN_URL); return null; }
+      if(!session){
+        // If OAuth just returned here, Supabase may need a moment to hydrate the session.
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const { data:{ session: retrySession } } = await sb.auth.getSession();
+        if(!retrySession){ window.location.replace(LOGIN_URL); return null; }
+        userId = retrySession.user.id;
+        return retrySession;
+      }
       userId = session.user.id;
       return session;
     }
