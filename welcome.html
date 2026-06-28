@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connexion Two | Dashboard</title>
+  <style>
+    :root {
+      --blue-900: #061a3a;
+      --blue-800: #082b61;
+      --blue-700: #0054d1;
+      --blue-600: #0068ff;
+      --blue-500: #1683ff;
+      --blue-100: #eaf3ff;
+      --blue-050: #f5f9ff;
+      --text: #111827;
+      --muted: #5f6b7a;
+      --line: #d9e2ef;
+      --panel: #ffffff;
+      --bg: #f7f9fc;
+      --shadow: 0 22px 70px rgba(6, 26, 58, 0.10);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, Arial, Helvetica, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; }
+
+    .app {
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 88% 16%, rgba(0, 104, 255, 0.08), transparent 30%),
+        linear-gradient(180deg, #ffffff 0%, #f7f9fc 48%, #f2f6fb 100%);
+    }
+
+    .top-nav {
+      height: 82px;
+      display: grid;
+      grid-template-columns: 258px 1fr auto;
+      align-items: center;
+      gap: 24px;
+      padding: 0 28px;
+      background: rgba(255,255,255,0.94);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      min-width: 0;
+    }
+
+    .c2-logo {
+      width: 56px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      color: var(--blue-600);
+      font-weight: 950;
+      font-size: 1.45rem;
+      letter-spacing: -0.13em;
+      position: relative;
+      isolation: isolate;
+    }
+
+    .c2-logo::before {
+      content: "";
+      position: absolute;
+      inset: 1px 3px 2px 0;
+      border: 3px solid var(--blue-600);
+      border-right-color: transparent;
+      border-radius: 999px;
+      z-index: -1;
+    }
+
+    .c2-logo::after {
+      content: "";
+      position: absolute;
+      right: 3px;
+      top: 7px;
+      width: 20px;
+      height: 20px;
+      border: 3px solid var(--blue-500);
+      border-left-color: transparent;
+      border-radius: 999px;
+      transform: rotate(-12deg);
+      z-index: -1;
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      line-height: 1;
+    }
+
+    .brand-name {
+      color: var(--blue-900);
+      font-weight: 900;
+      font-size: 1.02rem;
+      letter-spacing: -0.03em;
+    }
+
+    .brand-sub {
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .nav-tabs {
+      display: flex;
+      align-items: stretch;
+      align-self: stretch;
+      gap: 2px;
+    }
+
+    .nav-tabs a {
+      display: flex;
+      align-items: center;
+      padding: 0 22px;
+      color: #475569;
+      font-size: 0.98rem;
+      font-weight: 800;
+      border-bottom: 3px solid transparent;
+      transition: 0.18s ease;
+    }
+
+    .nav-tabs a:hover,
+    .nav-tabs a.active {
+      color: var(--blue-700);
+      border-bottom-color: var(--blue-700);
+      background: linear-gradient(180deg, transparent, rgba(0,104,255,0.045));
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .trial-left {
+      color: var(--blue-800);
+      font-size: 0.96rem;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .buy-btn {
+      height: 44px;
+      padding: 0 20px;
+      border: 1px solid var(--blue-700);
+      border-radius: 8px;
+      background: var(--blue-700);
+      color: white;
+      font-size: 0.95rem;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 10px 22px rgba(0, 84, 209, 0.22);
+    }
+
+    .icon-btn {
+      width: 42px;
+      height: 42px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--blue-800);
+      border-radius: 8px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      font-size: 1.15rem;
+      font-weight: 900;
+      position: relative;
+    }
+
+    .icon-btn:hover,
+    .buy-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 28px rgba(6, 26, 58, 0.12);
+    }
+
+    .notify-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #e11d48;
+      position: absolute;
+      top: 8px;
+      right: 8px;
+    }
+
+    .avatar {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--blue-100), #d8ebff);
+      color: var(--blue-800);
+      display: grid;
+      place-items: center;
+      font-size: 0.98rem;
+      font-weight: 900;
+      border: 1px solid #c7dcf8;
+    }
+
+    .system-strip {
+      min-height: 58px;
+      background: #f3f7fc;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: #25364f;
+      font-size: 0.95rem;
+      padding: 12px 24px;
+    }
+
+    .info-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid var(--blue-800);
+      color: var(--blue-800);
+      display: grid;
+      place-items: center;
+      font-size: 0.82rem;
+      font-weight: 950;
+      flex: 0 0 auto;
+    }
+
+    .system-strip a { color: var(--blue-700); text-decoration: underline; font-weight: 800; }
+
+    .hero-panel {
+      min-height: 390px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 28px 66px;
+      background:
+        linear-gradient(120deg, rgba(0, 84, 209, 0.96), rgba(0, 104, 255, 0.92) 52%, rgba(14, 131, 255, 0.92)),
+        radial-gradient(circle at 22% 18%, rgba(255,255,255,0.26), transparent 26%);
+      position: relative;
+      overflow: hidden;
+      color: #fff;
+    }
+
+    .hero-panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(90deg, transparent 0%, black 20%, black 80%, transparent 100%);
+      opacity: 0.5;
+    }
+
+    .hero-panel::after {
+      content: "";
+      position: absolute;
+      right: -120px;
+      top: -120px;
+      width: 380px;
+      height: 380px;
+      border: 44px solid rgba(255,255,255,0.12);
+      border-radius: 50%;
+    }
+
+    .hero-inner {
+      width: min(1080px, 100%);
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .welcome-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border: 1px solid rgba(255,255,255,0.28);
+      background: rgba(255,255,255,0.10);
+      border-radius: 999px;
+      font-size: 0.77rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      margin-bottom: 22px;
+    }
+
+    .status-light {
+      width: 8px;
+      height: 8px;
+      background: #6ee7b7;
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px rgba(110, 231, 183, 0.18);
+    }
+
+    h1 {
+      font-size: clamp(2rem, 4.2vw, 3.25rem);
+      line-height: 1;
+      letter-spacing: -0.055em;
+      font-weight: 650;
+      margin-bottom: 36px;
+    }
+
+    .main-actions {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-bottom: 30px;
+    }
+
+    .primary-action,
+    .outline-action {
+      min-height: 58px;
+      border-radius: 8px;
+      padding: 0 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-size: 0.98rem;
+      font-weight: 900;
+      cursor: pointer;
+      transition: 0.18s ease;
+    }
+
+    .primary-action {
+      background: white;
+      color: var(--blue-800);
+      border: 1px solid rgba(255,255,255,0.85);
+    }
+
+    .outline-action {
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.36);
+      backdrop-filter: blur(8px);
+    }
+
+    .primary-action:hover,
+    .outline-action:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 30px rgba(6, 26, 58, 0.22);
+    }
+
+    .action-icon {
+      font-size: 1.35rem;
+      line-height: 1;
+      font-weight: 900;
+    }
+
+    .secondary-actions {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(170px, 1fr));
+      gap: 14px;
+      margin: 42px auto 0;
+      max-width: 980px;
+    }
+
+    .quick-card {
+      background: rgba(255,255,255,0.13);
+      border: 1px solid rgba(255,255,255,0.22);
+      border-radius: 12px;
+      padding: 18px;
+      color: white;
+      text-align: left;
+      backdrop-filter: blur(10px);
+      transition: 0.18s ease;
+    }
+
+    .quick-card:hover {
+      background: rgba(255,255,255,0.18);
+      transform: translateY(-2px);
+    }
+
+    .quick-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 9px;
+      background: rgba(255,255,255,0.16);
+      display: grid;
+      place-items: center;
+      font-weight: 950;
+      font-size: 1.2rem;
+      margin-bottom: 13px;
+    }
+
+    .quick-title {
+      font-weight: 950;
+      font-size: 0.96rem;
+      margin-bottom: 5px;
+    }
+
+    .quick-desc {
+      color: rgba(255,255,255,0.76);
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+
+    .workspace {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 34px 28px 58px;
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 28px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 12px 38px rgba(6, 26, 58, 0.06);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 20px 22px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      background: linear-gradient(180deg, #fff, #fbfdff);
+    }
+
+    .panel-title {
+      color: var(--blue-900);
+      font-size: 1.02rem;
+      font-weight: 950;
+      letter-spacing: -0.02em;
+    }
+
+    .view-all {
+      color: var(--blue-700);
+      font-size: 0.9rem;
+      font-weight: 900;
+    }
+
+    .empty-state {
+      padding: 44px 26px;
+      text-align: center;
+    }
+
+    .empty-icon {
+      width: 76px;
+      height: 76px;
+      border-radius: 18px;
+      background: var(--blue-100);
+      color: var(--blue-700);
+      display: grid;
+      place-items: center;
+      margin: 0 auto 18px;
+      font-size: 2rem;
+      font-weight: 950;
+    }
+
+    .empty-state h2 {
+      color: var(--blue-900);
+      font-size: 1.28rem;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+
+    .empty-state p {
+      color: var(--muted);
+      max-width: 520px;
+      margin: 0 auto 22px;
+      line-height: 1.65;
+      font-size: 0.96rem;
+    }
+
+    .mini-btn {
+      min-height: 44px;
+      padding: 0 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid var(--blue-700);
+      border-radius: 8px;
+      background: var(--blue-700);
+      color: white;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .side-stack { display: grid; gap: 18px; }
+    .side-card { padding: 22px; }
+
+    .usage-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .usage-row:last-child { border-bottom: 0; }
+    .usage-row strong { color: var(--blue-900); }
+
+    .progress-track {
+      height: 8px;
+      background: #edf3fb;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 16px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 24%;
+      background: linear-gradient(90deg, var(--blue-700), var(--blue-500));
+      border-radius: 999px;
+    }
+
+    .template-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .template-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fbfdff;
+      transition: 0.16s ease;
+    }
+
+    .template-item:hover { border-color: #aac8ef; background: var(--blue-050); }
+
+    .template-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: var(--blue-100);
+      color: var(--blue-700);
+      font-weight: 950;
+    }
+
+    .template-item span:last-child {
+      color: var(--blue-900);
+      font-weight: 850;
+      font-size: 0.9rem;
+    }
+
+    .mobile-menu { display: none; }
+
+    @media (max-width: 1120px) {
+      .top-nav { grid-template-columns: auto 1fr auto; }
+      .nav-tabs a { padding: 0 14px; font-size: 0.92rem; }
+      .secondary-actions { grid-template-columns: repeat(2, minmax(170px, 1fr)); }
+      .workspace { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 780px) {
+      .top-nav {
+        height: auto;
+        min-height: 76px;
+        grid-template-columns: 1fr auto;
+        padding: 12px 16px;
+      }
+
+      .nav-tabs { display: none; }
+      .trial-left, .buy-btn { display: none; }
+      .avatar { width: 42px; height: 42px; }
+      .mobile-menu { display: grid; }
+      .system-strip { justify-content: flex-start; }
+      .hero-panel { padding: 44px 16px 52px; }
+      .main-actions { flex-direction: column; align-items: stretch; }
+      .primary-action, .outline-action { width: 100%; }
+      .secondary-actions { grid-template-columns: 1fr; }
+      .workspace { padding: 22px 16px 42px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="top-nav">
+      <a href="#" class="brand" aria-label="Connexion Two dashboard home">
+        <div class="c2-logo" aria-hidden="true">C2</div>
+        <div class="brand-text">
+          <div class="brand-name">Connexion Two</div>
+          <div class="brand-sub">Document OS</div>
+        </div>
+      </a>
+
+      <nav class="nav-tabs" aria-label="Main navigation">
+        <a href="#" class="active">Home</a>
+        <a href="#">Agreements</a>
+        <a href="#">Templates</a>
+        <a href="#">Reports</a>
+        <a href="#">Admin</a>
+      </nav>
+
+      <div class="top-actions">
+        <div class="trial-left">7 Days Left</div>
+        <button class="buy-btn" type="button">Buy Now</button>
+        <button class="icon-btn" type="button" aria-label="Tasks">☷</button>
+        <button class="icon-btn" type="button" aria-label="Help"><span class="notify-dot"></span>?</button>
+        <div class="avatar">AP</div>
+        <button class="icon-btn mobile-menu" type="button" aria-label="Menu">☰</button>
+      </div>
+    </header>
+
+    <div class="system-strip">
+      <span class="info-dot">i</span>
+      <span>Your workspace is ready. You have <strong>4 invites</strong> available. <a href="#">Invite now.</a></span>
+    </div>
+
+    <main>
+      <section class="hero-panel">
+        <div class="hero-inner">
+          <div class="welcome-label"><span class="status-light"></span> Private document workflow system</div>
+          <h1>Welcome back, Aaron P</h1>
+
+          <div class="main-actions">
+            <button class="primary-action" type="button" onclick="location.href='signing/new.html'">
+              <span>Start</span>
+              <span class="action-icon">⌄</span>
+            </button>
+            <a class="outline-action" href="signing/new.html">
+              <span class="action-icon">▷</span>
+              Create Document for Signing
+            </a>
+            <a class="outline-action" href="templates/new.html">
+              <span class="action-icon">▦</span>
+              Create Template
+            </a>
+          </div>
+
+          <div class="secondary-actions" aria-label="Create new files">
+            <a class="quick-card" href="editor.html?new=docx">
+              <div class="quick-icon">W</div>
+              <div class="quick-title">Create DOCX File</div>
+              <div class="quick-desc">Draft agreements, proposals, forms, and supporting documents.</div>
+            </a>
+            <a class="quick-card" href="editor.html?new=xlsx">
+              <div class="quick-icon">X</div>
+              <div class="quick-title">Create XLSX File</div>
+              <div class="quick-desc">Build pricing sheets, trackers, and simple spreadsheets.</div>
+            </a>
+            <a class="quick-card" href="documents/upload.html">
+              <div class="quick-icon">⇧</div>
+              <div class="quick-title">Upload Document</div>
+              <div class="quick-desc">Upload a PDF, DOCX, or XLSX and add it to a workflow.</div>
+            </a>
+            <a class="quick-card" href="documents/library.html">
+              <div class="quick-icon">□</div>
+              <div class="quick-title">Open Library</div>
+              <div class="quick-desc">Review documents, signed records, and reusable templates.</div>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Recent Work</div>
+            <a href="documents/library.html" class="view-all">View all</a>
+          </div>
+          <div class="empty-state">
+            <div class="empty-icon">▤</div>
+            <h2>No documents started yet</h2>
+            <p>Create a signing document, build a reusable template, or draft a DOCX/XLSX file to begin your private workflow.</p>
+            <button class="mini-btn" type="button" onclick="location.href='signing/new.html'"><span>+</span> Create first document</button>
+          </div>
+        </div>
+
+        <aside class="side-stack">
+          <div class="panel side-card">
+            <div class="panel-title">Trial & Usage</div>
+            <div class="usage-row"><span>Trial status</span><strong>7 days left</strong></div>
+            <div class="usage-row"><span>Documents sent</span><strong>0</strong></div>
+            <div class="usage-row"><span>Templates</span><strong>0</strong></div>
+            <div class="usage-row"><span>Storage</span><strong>0 MB</strong></div>
+            <div class="progress-track"><div class="progress-fill"></div></div>
+          </div>
+
+          <div class="panel side-card">
+            <div class="panel-title">Starter Templates</div>
+            <div class="template-list">
+              <a class="template-item" href="templates/new.html?starter=service-agreement"><span class="template-icon">S</span><span>Service Agreement</span></a>
+              <a class="template-item" href="templates/new.html?starter=vendor"><span class="template-icon">V</span><span>Vendor Agreement</span></a>
+              <a class="template-item" href="templates/new.html?starter=approval"><span class="template-icon">A</span><span>Internal Approval Form</span></a>
+            </div>
+          </div>
+        </aside>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
