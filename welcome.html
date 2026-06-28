@@ -2,295 +2,638 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Connexion Two | Welcome</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://docs.bisondoc.com/web-apps/apps/api/documents/api.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connexion Two | Dashboard</title>
   <style>
     :root {
-      --blue-950:#041124;
-      --blue-900:#061a3a;
-      --blue-800:#082b61;
-      --blue-700:#0054d1;
-      --blue-600:#0068ff;
-      --blue-500:#1683ff;
-      --blue-100:#eaf3ff;
-      --blue-050:#f5f9ff;
-      --text:#111827;
-      --muted:#5f6b7a;
-      --line:#d9e2ef;
-      --panel:#ffffff;
-      --bg:#f7f9fc;
-      --shadow:0 22px 70px rgba(6,26,58,.10);
-      --shadow-soft:0 12px 38px rgba(6,26,58,.06);
-      --word:#185abd;
-      --cell:#107c41;
-      --slide:#c43e1c;
-      --pdf:#d93025;
-      --gray:#64748b;
-      --danger:#dc2626;
-      --success:#0f9f6e;
+      --blue-900: #061a3a;
+      --blue-800: #082b61;
+      --blue-700: #0054d1;
+      --blue-600: #0068ff;
+      --blue-500: #1683ff;
+      --blue-100: #eaf3ff;
+      --blue-050: #f5f9ff;
+      --text: #111827;
+      --muted: #5f6b7a;
+      --line: #d9e2ef;
+      --panel: #ffffff;
+      --bg: #f7f9fc;
+      --shadow: 0 22px 70px rgba(6, 26, 58, 0.10);
     }
 
-    * { box-sizing:border-box; margin:0; padding:0; }
-    html, body { min-height:100%; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      background:var(--bg);
-      color:var(--text);
-      font-family:Inter, Arial, Helvetica, sans-serif;
-      -webkit-font-smoothing:antialiased;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, Arial, Helvetica, sans-serif;
+      -webkit-font-smoothing: antialiased;
     }
-    a { color:inherit; text-decoration:none; }
-    button, input { font:inherit; }
+
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; }
 
     .app {
-      min-height:100vh;
+      min-height: 100vh;
       background:
-        radial-gradient(circle at 88% 16%, rgba(0,104,255,.08), transparent 30%),
-        linear-gradient(180deg,#ffffff 0%,#f7f9fc 48%,#f2f6fb 100%);
+        radial-gradient(circle at 88% 16%, rgba(0, 104, 255, 0.08), transparent 30%),
+        linear-gradient(180deg, #ffffff 0%, #f7f9fc 48%, #f2f6fb 100%);
     }
 
     .top-nav {
-      height:82px;
-      display:grid;
-      grid-template-columns:258px 1fr auto;
-      align-items:center;
-      gap:24px;
-      padding:0 28px;
-      background:rgba(255,255,255,.94);
-      border-bottom:1px solid var(--line);
-      backdrop-filter:blur(14px);
-      position:sticky;
-      top:0;
-      z-index:50;
+      height: 82px;
+      display: grid;
+      grid-template-columns: 258px 1fr auto;
+      align-items: center;
+      gap: 24px;
+      padding: 0 28px;
+      background: rgba(255,255,255,0.94);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+      position: sticky;
+      top: 0;
+      z-index: 20;
     }
-    .brand { display:flex; align-items:center; gap:13px; min-width:0; }
-    .c2-logo {
-      width:56px; height:38px; display:grid; place-items:center;
-      color:var(--blue-600); font-weight:950; font-size:1.45rem; letter-spacing:-.13em;
-      position:relative; isolation:isolate;
-    }
-    .c2-logo::before {
-      content:""; position:absolute; inset:1px 3px 2px 0;
-      border:3px solid var(--blue-600); border-right-color:transparent;
-      border-radius:999px; z-index:-1;
-    }
-    .c2-logo::after {
-      content:""; position:absolute; right:3px; top:7px; width:20px; height:20px;
-      border:3px solid var(--blue-500); border-left-color:transparent;
-      border-radius:999px; transform:rotate(-12deg); z-index:-1;
-    }
-    .brand-text { display:flex; flex-direction:column; gap:2px; line-height:1; }
-    .brand-name { color:var(--blue-900); font-weight:900; font-size:1.02rem; letter-spacing:-.03em; }
-    .brand-sub { color:var(--muted); font-size:.72rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
 
-    .nav-tabs { display:flex; align-items:stretch; align-self:stretch; gap:2px; }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      min-width: 0;
+    }
+
+    .c2-logo {
+      width: 56px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      color: var(--blue-600);
+      font-weight: 950;
+      font-size: 1.45rem;
+      letter-spacing: -0.13em;
+      position: relative;
+      isolation: isolate;
+    }
+
+    .c2-logo::before {
+      content: "";
+      position: absolute;
+      inset: 1px 3px 2px 0;
+      border: 3px solid var(--blue-600);
+      border-right-color: transparent;
+      border-radius: 999px;
+      z-index: -1;
+    }
+
+    .c2-logo::after {
+      content: "";
+      position: absolute;
+      right: 3px;
+      top: 7px;
+      width: 20px;
+      height: 20px;
+      border: 3px solid var(--blue-500);
+      border-left-color: transparent;
+      border-radius: 999px;
+      transform: rotate(-12deg);
+      z-index: -1;
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      line-height: 1;
+    }
+
+    .brand-name {
+      color: var(--blue-900);
+      font-weight: 900;
+      font-size: 1.02rem;
+      letter-spacing: -0.03em;
+    }
+
+    .brand-sub {
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .nav-tabs {
+      display: flex;
+      align-items: stretch;
+      align-self: stretch;
+      gap: 2px;
+    }
+
     .nav-tabs a {
-      display:flex; align-items:center; padding:0 22px; color:#475569;
-      font-size:.98rem; font-weight:850; border-bottom:3px solid transparent; transition:.18s ease;
+      display: flex;
+      align-items: center;
+      padding: 0 22px;
+      color: #475569;
+      font-size: 0.98rem;
+      font-weight: 800;
+      border-bottom: 3px solid transparent;
+      transition: 0.18s ease;
     }
-    .nav-tabs a:hover, .nav-tabs a.active {
-      color:var(--blue-700); border-bottom-color:var(--blue-700);
-      background:linear-gradient(180deg,transparent,rgba(0,104,255,.045));
+
+    .nav-tabs a:hover,
+    .nav-tabs a.active {
+      color: var(--blue-700);
+      border-bottom-color: var(--blue-700);
+      background: linear-gradient(180deg, transparent, rgba(0,104,255,0.045));
     }
-    .top-actions { display:flex; align-items:center; gap:12px; }
-    .trial-left { color:var(--blue-800); font-size:.96rem; font-weight:900; white-space:nowrap; }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .trial-left {
+      color: var(--blue-800);
+      font-size: 0.96rem;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
     .buy-btn {
-      height:44px; padding:0 20px; border:1px solid var(--blue-700); border-radius:8px;
-      background:var(--blue-700); color:white; font-size:.95rem; font-weight:900; cursor:pointer;
-      box-shadow:0 10px 22px rgba(0,84,209,.22);
+      height: 44px;
+      padding: 0 20px;
+      border: 1px solid var(--blue-700);
+      border-radius: 8px;
+      background: var(--blue-700);
+      color: white;
+      font-size: 0.95rem;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 10px 22px rgba(0, 84, 209, 0.22);
     }
-    .icon-btn, .top-link {
-      height:42px; min-width:42px; border:1px solid var(--line); background:#fff; color:var(--blue-800);
-      border-radius:8px; display:grid; place-items:center; font-size:.94rem; font-weight:900; cursor:pointer;
-      padding:0 12px;
+
+    .icon-btn {
+      width: 42px;
+      height: 42px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--blue-800);
+      border-radius: 8px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      font-size: 1.15rem;
+      font-weight: 900;
+      position: relative;
     }
-    .icon-btn:hover, .top-link:hover, .buy-btn:hover { transform:translateY(-1px); box-shadow:0 12px 28px rgba(6,26,58,.12); }
+
+    .icon-btn:hover,
+    .buy-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 28px rgba(6, 26, 58, 0.12);
+    }
+
+    .notify-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #e11d48;
+      position: absolute;
+      top: 8px;
+      right: 8px;
+    }
+
     .avatar {
-      width:46px; height:46px; border-radius:50%; background:linear-gradient(135deg,var(--blue-100),#d8ebff);
-      color:var(--blue-800); display:grid; place-items:center; font-size:.98rem; font-weight:900; border:1px solid #c7dcf8;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--blue-100), #d8ebff);
+      color: var(--blue-800);
+      display: grid;
+      place-items: center;
+      font-size: 0.98rem;
+      font-weight: 900;
+      border: 1px solid #c7dcf8;
     }
 
     .system-strip {
-      min-height:58px; background:#f3f7fc; border-bottom:1px solid var(--line);
-      display:flex; align-items:center; justify-content:center; gap:10px; color:#25364f;
-      font-size:.95rem; padding:12px 24px; text-align:center;
+      min-height: 58px;
+      background: #f3f7fc;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: #25364f;
+      font-size: 0.95rem;
+      padding: 12px 24px;
     }
+
     .info-dot {
-      width:24px; height:24px; border-radius:50%; border:2px solid var(--blue-800); color:var(--blue-800);
-      display:grid; place-items:center; font-size:.82rem; font-weight:950; flex:0 0 auto;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid var(--blue-800);
+      color: var(--blue-800);
+      display: grid;
+      place-items: center;
+      font-size: 0.82rem;
+      font-weight: 950;
+      flex: 0 0 auto;
     }
-    .system-strip a { color:var(--blue-700); text-decoration:underline; font-weight:900; }
+
+    .system-strip a { color: var(--blue-700); text-decoration: underline; font-weight: 800; }
 
     .hero-panel {
-      min-height:410px;
-      display:flex; align-items:center; justify-content:center;
-      padding:60px 28px 68px;
+      min-height: 390px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 28px 66px;
       background:
-        linear-gradient(120deg, rgba(0,84,209,.96), rgba(0,104,255,.92) 52%, rgba(14,131,255,.92)),
-        radial-gradient(circle at 22% 18%, rgba(255,255,255,.26), transparent 26%);
-      position:relative; overflow:hidden; color:#fff;
+        linear-gradient(120deg, rgba(0, 84, 209, 0.96), rgba(0, 104, 255, 0.92) 52%, rgba(14, 131, 255, 0.92)),
+        radial-gradient(circle at 22% 18%, rgba(255,255,255,0.26), transparent 26%);
+      position: relative;
+      overflow: hidden;
+      color: #fff;
     }
+
     .hero-panel::before {
-      content:""; position:absolute; inset:0;
+      content: "";
+      position: absolute;
+      inset: 0;
       background-image:
-        linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px);
-      background-size:48px 48px;
-      mask-image:linear-gradient(90deg,transparent 0%,black 20%,black 80%,transparent 100%);
-      opacity:.5;
+        linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(90deg, transparent 0%, black 20%, black 80%, transparent 100%);
+      opacity: 0.5;
     }
+
     .hero-panel::after {
-      content:""; position:absolute; right:-120px; top:-120px; width:380px; height:380px;
-      border:44px solid rgba(255,255,255,.12); border-radius:50%;
+      content: "";
+      position: absolute;
+      right: -120px;
+      top: -120px;
+      width: 380px;
+      height: 380px;
+      border: 44px solid rgba(255,255,255,0.12);
+      border-radius: 50%;
     }
-    .hero-inner { width:min(1080px,100%); text-align:center; position:relative; z-index:1; }
+
+    .hero-inner {
+      width: min(1080px, 100%);
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
     .welcome-label {
-      display:inline-flex; align-items:center; gap:8px; padding:8px 14px;
-      border:1px solid rgba(255,255,255,.28); background:rgba(255,255,255,.10);
-      border-radius:999px; font-size:.77rem; font-weight:900; text-transform:uppercase; letter-spacing:.14em; margin-bottom:22px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border: 1px solid rgba(255,255,255,0.28);
+      background: rgba(255,255,255,0.10);
+      border-radius: 999px;
+      font-size: 0.77rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      margin-bottom: 22px;
     }
-    .status-light { width:8px; height:8px; background:#6ee7b7; border-radius:50%; box-shadow:0 0 0 4px rgba(110,231,183,.18); }
-    h1 { font-size:clamp(2rem,4.2vw,3.25rem); line-height:1; letter-spacing:-.055em; font-weight:650; margin-bottom:18px; }
-    .hero-copy { max-width:790px; margin:0 auto 34px; color:rgba(255,255,255,.82); line-height:1.65; font-size:1rem; }
 
-    .main-actions { display:flex; justify-content:center; flex-wrap:wrap; gap:14px; margin-bottom:16px; }
-    .primary-action, .outline-action {
-      min-height:58px; border-radius:8px; padding:0 22px;
-      display:inline-flex; align-items:center; justify-content:center; gap:10px;
-      font-size:.98rem; font-weight:900; cursor:pointer; transition:.18s ease;
+    .status-light {
+      width: 8px;
+      height: 8px;
+      background: #6ee7b7;
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px rgba(110, 231, 183, 0.18);
     }
-    .primary-action { background:white; color:var(--blue-800); border:1px solid rgba(255,255,255,.85); }
-    .outline-action { background:rgba(255,255,255,.08); color:#fff; border:1px solid rgba(255,255,255,.36); backdrop-filter:blur(8px); }
-    .primary-action:hover, .outline-action:hover, .quick-card:hover { transform:translateY(-2px); box-shadow:0 15px 30px rgba(6,26,58,.22); }
-    .action-icon { font-size:1.35rem; line-height:1; font-weight:900; }
 
-    .secondary-actions { display:grid; grid-template-columns:repeat(4,minmax(170px,1fr)); gap:14px; margin:42px auto 0; max-width:980px; }
+    h1 {
+      font-size: clamp(2rem, 4.2vw, 3.25rem);
+      line-height: 1;
+      letter-spacing: -0.055em;
+      font-weight: 650;
+      margin-bottom: 36px;
+    }
+
+    .main-actions {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-bottom: 30px;
+    }
+
+    .primary-action,
+    .outline-action {
+      min-height: 58px;
+      border-radius: 8px;
+      padding: 0 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-size: 0.98rem;
+      font-weight: 900;
+      cursor: pointer;
+      transition: 0.18s ease;
+    }
+
+    .primary-action {
+      background: white;
+      color: var(--blue-800);
+      border: 1px solid rgba(255,255,255,0.85);
+    }
+
+    .outline-action {
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.36);
+      backdrop-filter: blur(8px);
+    }
+
+    .primary-action:hover,
+    .outline-action:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 30px rgba(6, 26, 58, 0.22);
+    }
+
+    .action-icon {
+      font-size: 1.35rem;
+      line-height: 1;
+      font-weight: 900;
+    }
+
+    .secondary-actions {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(170px, 1fr));
+      gap: 14px;
+      margin: 42px auto 0;
+      max-width: 980px;
+    }
+
     .quick-card {
-      background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.22); border-radius:12px;
-      padding:18px; color:white; text-align:left; backdrop-filter:blur(10px); transition:.18s ease; cursor:pointer;
+      background: rgba(255,255,255,0.13);
+      border: 1px solid rgba(255,255,255,0.22);
+      border-radius: 12px;
+      padding: 18px;
+      color: white;
+      text-align: left;
+      backdrop-filter: blur(10px);
+      transition: 0.18s ease;
     }
-    .quick-icon { width:40px; height:40px; border-radius:9px; background:rgba(255,255,255,.16); display:grid; place-items:center; font-weight:950; font-size:1.2rem; margin-bottom:13px; }
-    .quick-title { font-weight:950; font-size:.96rem; margin-bottom:5px; }
-    .quick-desc { color:rgba(255,255,255,.76); font-size:.82rem; line-height:1.45; }
 
-    .workspace { max-width:1360px; margin:0 auto; padding:34px 28px 58px; display:grid; grid-template-columns:1fr 360px; gap:28px; }
-    .panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow-soft); overflow:hidden; }
-    .panel-header { padding:20px 22px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:14px; background:linear-gradient(180deg,#fff,#fbfdff); }
-    .panel-title { color:var(--blue-900); font-size:1.02rem; font-weight:950; letter-spacing:-.02em; }
-    .panel-sub { color:var(--muted); font-size:.86rem; margin-top:4px; }
-    .panel-body { padding:22px; }
-    .side-stack { display:grid; gap:18px; }
-    .side-card { padding:22px; }
-
-    .cmdbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
-    .btn { display:inline-flex; align-items:center; gap:8px; border:1px solid var(--line); background:#fff; color:var(--text); font-size:.9rem; font-weight:850; padding:9px 16px; border-radius:8px; cursor:pointer; transition:.15s; }
-    .btn:hover { background:var(--blue-050); border-color:#aac8ef; }
-    .btn-primary { background:var(--blue-700); border-color:var(--blue-700); color:#fff; box-shadow:0 8px 18px rgba(0,84,209,.18); }
-    .btn-primary:hover { background:var(--blue-600); border-color:var(--blue-600); }
-    .spacer { flex:1; }
-    .search { position:relative; }
-    .search input { height:42px; width:260px; max-width:46vw; border:1px solid var(--line); background:#fff; border-radius:8px; padding:0 14px 0 38px; font-size:.92rem; outline:none; transition:.15s; }
-    .search input:focus { border-color:var(--blue-600); box-shadow:0 0 0 3px rgba(0,104,255,.14); }
-    .search .si { position:absolute; left:13px; top:50%; transform:translateY(-50%); color:var(--gray); font-size:1rem; pointer-events:none; }
-
-    .menu-anchor { position:relative; }
-    .menu { position:absolute; top:66px; left:0; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); padding:7px; min-width:250px; z-index:80; display:none; text-align:left; }
-    .panel .menu { top:44px; }
-    .menu.open { display:block; }
-    .menu-item { display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:9px; cursor:pointer; font-size:.92rem; font-weight:900; color:var(--text); }
-    .menu-item:hover { background:var(--blue-050); }
-    .menu-item small { display:block; font-weight:600; color:var(--muted); font-size:.78rem; margin-top:2px; }
-    .mi-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:950; font-size:.8rem; flex-shrink:0; }
-
-    .sec-head { display:flex; align-items:baseline; gap:10px; margin:26px 0 14px; }
-    .sec-head h2 { font-size:.95rem; font-weight:950; color:var(--blue-900); }
-    .sec-head .count { color:var(--muted); font-size:.84rem; font-weight:700; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; }
-    .file { position:relative; background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px; cursor:pointer; transition:.15s; }
-    .file:hover { box-shadow:var(--shadow-soft); border-color:#aac8ef; transform:translateY(-2px); }
-    .file .ftop { display:flex; align-items:flex-start; gap:12px; }
-    .ficon { width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:950; font-size:.78rem; flex-shrink:0; letter-spacing:.3px; }
-    .fmeta { min-width:0; flex:1; }
-    .fname { font-size:.9rem; font-weight:850; line-height:1.35; word-break:break-word; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-    .fsub { margin-top:6px; font-size:.78rem; color:var(--muted); }
-    .fdel { position:absolute; top:10px; right:10px; width:30px; height:30px; border:none; background:transparent; border-radius:7px; color:var(--gray); cursor:pointer; display:flex; align-items:center; justify-content:center; opacity:0; transition:.12s; font-size:1rem; }
-    .file:hover .fdel { opacity:1; }
-    .fdel:hover { background:#fee2e2; color:var(--danger); }
-    .empty { text-align:center; color:var(--muted); background:#fbfdff; border:1px dashed var(--line); border-radius:14px; padding:54px 20px; }
-    .empty .big { font-size:46px; margin-bottom:10px; }
-    .empty .t { font-size:1rem; font-weight:950; color:var(--blue-900); margin-bottom:4px; }
-    .empty .s { font-size:.86rem; }
-    .loading { color:var(--muted); font-size:.9rem; padding:18px 2px; }
-
-    .usage-row { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 0; border-bottom:1px solid var(--line); color:var(--muted); font-size:.94rem; }
-    .usage-row:last-child { border-bottom:0; }
-    .usage-row strong { color:var(--blue-900); }
-    .progress-track { height:8px; background:#edf3fb; border-radius:999px; overflow:hidden; margin-top:16px; }
-    .progress-fill { height:100%; width:24%; background:linear-gradient(90deg,var(--blue-700),var(--blue-500)); border-radius:999px; }
-    .template-list { display:grid; gap:10px; margin-top:14px; }
-    .template-item { display:flex; align-items:center; gap:12px; padding:13px; border:1px solid var(--line); border-radius:10px; background:#fbfdff; transition:.16s; cursor:pointer; }
-    .template-item:hover { border-color:#aac8ef; background:var(--blue-050); }
-    .template-icon { width:32px; height:32px; border-radius:8px; display:grid; place-items:center; background:var(--blue-100); color:var(--blue-700); font-weight:950; }
-    .template-item span:last-child { color:var(--blue-900); font-weight:850; font-size:.9rem; }
-    .note-card p { color:var(--muted); line-height:1.65; font-size:.94rem; margin-top:12px; }
-
-    .editor-screen { position:fixed; inset:0; z-index:1000; background:#fff; display:none; }
-    .editor-screen.open { display:block; }
-    #placeholder { width:100%; height:100%; }
-    #logoBlock { position:absolute; top:0; left:0; width:165px; height:30px; z-index:1001; background:transparent; cursor:default; }
-
-    @media (max-width:1120px) {
-      .top-nav { grid-template-columns:auto 1fr auto; }
-      .nav-tabs a { padding:0 14px; font-size:.92rem; }
-      .secondary-actions { grid-template-columns:repeat(2,minmax(170px,1fr)); }
-      .workspace { grid-template-columns:1fr; }
+    .quick-card:hover {
+      background: rgba(255,255,255,0.18);
+      transform: translateY(-2px);
     }
-    @media (max-width:780px) {
-      .top-nav { height:auto; min-height:76px; grid-template-columns:1fr auto; padding:12px 16px; }
-      .nav-tabs { display:none; }
-      .trial-left,.buy-btn { display:none; }
-      .hero-panel { padding:44px 16px 52px; }
-      .main-actions { flex-direction:column; align-items:stretch; }
-      .primary-action,.outline-action,.btn { width:100%; }
-      .secondary-actions { grid-template-columns:1fr; }
-      .workspace { padding:22px 16px 42px; }
-      .cmdbar { align-items:stretch; }
-      .search input { width:100%; max-width:none; }
-      .spacer { display:none; }
+
+    .quick-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 9px;
+      background: rgba(255,255,255,0.16);
+      display: grid;
+      place-items: center;
+      font-weight: 950;
+      font-size: 1.2rem;
+      margin-bottom: 13px;
+    }
+
+    .quick-title {
+      font-weight: 950;
+      font-size: 0.96rem;
+      margin-bottom: 5px;
+    }
+
+    .quick-desc {
+      color: rgba(255,255,255,0.76);
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+
+    .workspace {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 34px 28px 58px;
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 28px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 12px 38px rgba(6, 26, 58, 0.06);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 20px 22px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      background: linear-gradient(180deg, #fff, #fbfdff);
+    }
+
+    .panel-title {
+      color: var(--blue-900);
+      font-size: 1.02rem;
+      font-weight: 950;
+      letter-spacing: -0.02em;
+    }
+
+    .view-all {
+      color: var(--blue-700);
+      font-size: 0.9rem;
+      font-weight: 900;
+    }
+
+    .empty-state {
+      padding: 44px 26px;
+      text-align: center;
+    }
+
+    .empty-icon {
+      width: 76px;
+      height: 76px;
+      border-radius: 18px;
+      background: var(--blue-100);
+      color: var(--blue-700);
+      display: grid;
+      place-items: center;
+      margin: 0 auto 18px;
+      font-size: 2rem;
+      font-weight: 950;
+    }
+
+    .empty-state h2 {
+      color: var(--blue-900);
+      font-size: 1.28rem;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+
+    .empty-state p {
+      color: var(--muted);
+      max-width: 520px;
+      margin: 0 auto 22px;
+      line-height: 1.65;
+      font-size: 0.96rem;
+    }
+
+    .mini-btn {
+      min-height: 44px;
+      padding: 0 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid var(--blue-700);
+      border-radius: 8px;
+      background: var(--blue-700);
+      color: white;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .side-stack { display: grid; gap: 18px; }
+    .side-card { padding: 22px; }
+
+    .usage-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .usage-row:last-child { border-bottom: 0; }
+    .usage-row strong { color: var(--blue-900); }
+
+    .progress-track {
+      height: 8px;
+      background: #edf3fb;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 16px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 24%;
+      background: linear-gradient(90deg, var(--blue-700), var(--blue-500));
+      border-radius: 999px;
+    }
+
+    .template-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .template-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fbfdff;
+      transition: 0.16s ease;
+    }
+
+    .template-item:hover { border-color: #aac8ef; background: var(--blue-050); }
+
+    .template-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: var(--blue-100);
+      color: var(--blue-700);
+      font-weight: 950;
+    }
+
+    .template-item span:last-child {
+      color: var(--blue-900);
+      font-weight: 850;
+      font-size: 0.9rem;
+    }
+
+    .mobile-menu { display: none; }
+
+    @media (max-width: 1120px) {
+      .top-nav { grid-template-columns: auto 1fr auto; }
+      .nav-tabs a { padding: 0 14px; font-size: 0.92rem; }
+      .secondary-actions { grid-template-columns: repeat(2, minmax(170px, 1fr)); }
+      .workspace { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 780px) {
+      .top-nav {
+        height: auto;
+        min-height: 76px;
+        grid-template-columns: 1fr auto;
+        padding: 12px 16px;
+      }
+
+      .nav-tabs { display: none; }
+      .trial-left, .buy-btn { display: none; }
+      .avatar { width: 42px; height: 42px; }
+      .mobile-menu { display: grid; }
+      .system-strip { justify-content: flex-start; }
+      .hero-panel { padding: 44px 16px 52px; }
+      .main-actions { flex-direction: column; align-items: stretch; }
+      .primary-action, .outline-action { width: 100%; }
+      .secondary-actions { grid-template-columns: 1fr; }
+      .workspace { padding: 22px 16px 42px; }
     }
   </style>
 </head>
 <body>
   <div class="app">
     <header class="top-nav">
-      <a href="/welcome" class="brand" aria-label="Connexion Two dashboard home">
+      <a href="#" class="brand" aria-label="Connexion Two dashboard home">
         <div class="c2-logo" aria-hidden="true">C2</div>
         <div class="brand-text">
           <div class="brand-name">Connexion Two</div>
           <div class="brand-sub">Document OS</div>
         </div>
       </a>
+
       <nav class="nav-tabs" aria-label="Main navigation">
-        <a href="/welcome" class="active">Home</a>
-        <a href="/signing">Agreements</a>
-        <a href="/templates">Templates</a>
-        <a href="#document-library">Documents</a>
-        <a href="/admin">Admin</a>
+        <a href="#" class="active">Home</a>
+        <a href="#">Agreements</a>
+        <a href="#">Templates</a>
+        <a href="#">Reports</a>
+        <a href="#">Admin</a>
       </nav>
+
       <div class="top-actions">
         <div class="trial-left">7 Days Left</div>
         <button class="buy-btn" type="button">Buy Now</button>
         <button class="icon-btn" type="button" aria-label="Tasks">☷</button>
-        <button class="icon-btn" type="button" aria-label="Help">?</button>
-        <a href="#" class="top-link" id="signout">Sign out</a>
+        <button class="icon-btn" type="button" aria-label="Help"><span class="notify-dot"></span>?</button>
         <div class="avatar">AP</div>
+        <button class="icon-btn mobile-menu" type="button" aria-label="Menu">☰</button>
       </div>
     </header>
 
     <div class="system-strip">
       <span class="info-dot">i</span>
-      <span>Your workspace is ready. Create signing workflows, templates, DOCX files, XLSX spreadsheets, and presentation-style files in one place. <a href="#document-library">Open documents.</a></span>
+      <span>Your workspace is ready. You have <strong>4 invites</strong> available. <a href="#">Invite now.</a></span>
     </div>
 
     <main>
@@ -298,299 +641,82 @@
         <div class="hero-inner">
           <div class="welcome-label"><span class="status-light"></span> Private document workflow system</div>
           <h1>Welcome back, Aaron P</h1>
-          <p class="hero-copy">Start a signature request, build a reusable template, or create browser-based office files. Connexion Two now includes the Bison Docs document editor functionality inside the same welcome framework.</p>
+
           <div class="main-actions">
-            <div class="menu-anchor">
-              <button class="primary-action" id="startBtn" type="button"><span>Start</span><span class="action-icon">⌄</span></button>
-              <div class="menu" id="startMenu">
-                <div class="menu-item" onclick="location.href='/document-creation'"><div class="mi-icon" style="background:var(--blue-700)">S</div><div>Create Document for Signing<small>Send PDF for secure signature</small></div></div>
-                <div class="menu-item" onclick="location.href='/templates'"><div class="mi-icon" style="background:var(--blue-500)">T</div><div>Create Template<small>Build reusable workflows</small></div></div>
-                <div class="menu-item" data-type="docx"><div class="mi-icon" style="background:var(--word)">W</div><div>Create DOCX File<small>Word-style document</small></div></div>
-                <div class="menu-item" data-type="xlsx"><div class="mi-icon" style="background:var(--cell)">X</div><div>Create XLSX File<small>Excel-style spreadsheet</small></div></div>
-                <div class="menu-item" data-type="pptx"><div class="mi-icon" style="background:var(--slide)">P</div><div>Create Presentation<small>PowerPoint-style deck</small></div></div>
-              </div>
-            </div>
-            <a class="outline-action" href="/document-creation"><span class="action-icon">▷</span>Create Document for Signing</a>
-            <a class="outline-action" href="/templates"><span class="action-icon">▦</span>Create Template</a>
-            <button class="outline-action" id="uploadBtnHero" type="button"><span class="action-icon">⇧</span>Upload File</button>
+            <button class="primary-action" type="button" onclick="location.href='signing/new.html'">
+              <span>Start</span>
+              <span class="action-icon">⌄</span>
+            </button>
+            <a class="outline-action" href="signing/new.html">
+              <span class="action-icon">▷</span>
+              Create Document for Signing
+            </a>
+            <a class="outline-action" href="templates/new.html">
+              <span class="action-icon">▦</span>
+              Create Template
+            </a>
           </div>
 
           <div class="secondary-actions" aria-label="Create new files">
-            <button class="quick-card" type="button" onclick="createNew('docx')">
+            <a class="quick-card" href="editor.html?new=docx">
               <div class="quick-icon">W</div>
               <div class="quick-title">Create DOCX File</div>
               <div class="quick-desc">Draft agreements, proposals, forms, and supporting documents.</div>
-            </button>
-            <button class="quick-card" type="button" onclick="createNew('xlsx')">
+            </a>
+            <a class="quick-card" href="editor.html?new=xlsx">
               <div class="quick-icon">X</div>
               <div class="quick-title">Create XLSX File</div>
               <div class="quick-desc">Build pricing sheets, trackers, and simple spreadsheets.</div>
-            </button>
-            <button class="quick-card" type="button" onclick="createNew('pptx')">
-              <div class="quick-icon">P</div>
-              <div class="quick-title">Create Presentation</div>
-              <div class="quick-desc">Build presentation-style decks for capability statements and reports.</div>
-            </button>
-            <button class="quick-card" type="button" onclick="document.getElementById('fileInput').click()">
+            </a>
+            <a class="quick-card" href="documents/upload.html">
               <div class="quick-icon">⇧</div>
-              <div class="quick-title">Upload Existing File</div>
-              <div class="quick-desc">Upload DOCX, XLSX, PPTX, PDF, CSV, and other compatible files.</div>
-            </button>
+              <div class="quick-title">Upload Document</div>
+              <div class="quick-desc">Upload a PDF, DOCX, or XLSX and add it to a workflow.</div>
+            </a>
+            <a class="quick-card" href="documents/library.html">
+              <div class="quick-icon">□</div>
+              <div class="quick-title">Open Library</div>
+              <div class="quick-desc">Review documents, signed records, and reusable templates.</div>
+            </a>
           </div>
         </div>
       </section>
 
-      <section class="workspace" id="document-library">
+      <section class="workspace">
         <div class="panel">
           <div class="panel-header">
-            <div>
-              <div class="panel-title">Document Library</div>
-              <div class="panel-sub">Create, upload, open, edit, search, and delete files from your private storage.</div>
-            </div>
-            <div class="search">
-              <span class="si">⌕</span>
-              <input type="text" id="search" placeholder="Search documents">
-            </div>
+            <div class="panel-title">Recent Work</div>
+            <a href="documents/library.html" class="view-all">View all</a>
           </div>
-          <div class="panel-body">
-            <div class="cmdbar">
-              <div class="menu-anchor">
-                <button class="btn btn-primary" id="newBtn" type="button"><span class="ic">＋</span> New</button>
-                <div class="menu" id="newMenu">
-                  <div class="menu-item" data-type="docx"><div class="mi-icon" style="background:var(--word)">W</div><div>Document<small>Word-style DOCX document</small></div></div>
-                  <div class="menu-item" data-type="xlsx"><div class="mi-icon" style="background:var(--cell)">X</div><div>Spreadsheet<small>Excel-style XLSX sheet</small></div></div>
-                  <div class="menu-item" data-type="pptx"><div class="mi-icon" style="background:var(--slide)">P</div><div>Presentation<small>PowerPoint-style deck</small></div></div>
-                </div>
-              </div>
-              <button class="btn" id="uploadBtn" type="button"><span class="ic">⬆</span> Upload</button>
-              <input type="file" id="fileInput" style="display:none" accept=".docx,.xlsx,.pptx,.doc,.xls,.ppt,.odt,.ods,.odp,.txt,.csv,.pdf">
-              <div class="spacer"></div>
-            </div>
-            <div class="sec-head"><h2>Files</h2><span class="count" id="count"></span></div>
-            <div id="fileList"><div class="loading">Loading…</div></div>
+          <div class="empty-state">
+            <div class="empty-icon">▤</div>
+            <h2>No documents started yet</h2>
+            <p>Create a signing document, build a reusable template, or draft a DOCX/XLSX file to begin your private workflow.</p>
+            <button class="mini-btn" type="button" onclick="location.href='signing/new.html'"><span>+</span> Create first document</button>
           </div>
         </div>
 
         <aside class="side-stack">
           <div class="panel side-card">
-            <div class="panel-title">Office Tools</div>
-            <div class="template-list">
-              <button class="template-item" type="button" onclick="createNew('docx')"><span class="template-icon" style="color:var(--word)">W</span><span>Create DOCX</span></button>
-              <button class="template-item" type="button" onclick="createNew('xlsx')"><span class="template-icon" style="color:var(--cell)">X</span><span>Create XLSX</span></button>
-              <button class="template-item" type="button" onclick="createNew('pptx')"><span class="template-icon" style="color:var(--slide)">P</span><span>Create Presentation</span></button>
-              <button class="template-item" type="button" onclick="document.getElementById('fileInput').click()"><span class="template-icon">⇧</span><span>Upload File</span></button>
-            </div>
-          </div>
-          <div class="panel side-card">
             <div class="panel-title">Trial & Usage</div>
             <div class="usage-row"><span>Trial status</span><strong>7 days left</strong></div>
-            <div class="usage-row"><span>Document files</span><strong id="sideFileCount">—</strong></div>
-            <div class="usage-row"><span>Storage</span><strong>Private bucket</strong></div>
+            <div class="usage-row"><span>Documents sent</span><strong>0</strong></div>
+            <div class="usage-row"><span>Templates</span><strong>0</strong></div>
+            <div class="usage-row"><span>Storage</span><strong>0 MB</strong></div>
             <div class="progress-track"><div class="progress-fill"></div></div>
           </div>
-          <div class="panel side-card note-card">
-            <div class="panel-title">Built into your workflow</div>
-            <p>The Bison Docs editor functions are now inside Connexion Two: DOCX, XLSX, presentation files, uploads, storage, search, delete, and browser-based editing.</p>
+
+          <div class="panel side-card">
+            <div class="panel-title">Starter Templates</div>
+            <div class="template-list">
+              <a class="template-item" href="templates/new.html?starter=service-agreement"><span class="template-icon">S</span><span>Service Agreement</span></a>
+              <a class="template-item" href="templates/new.html?starter=vendor"><span class="template-icon">V</span><span>Vendor Agreement</span></a>
+              <a class="template-item" href="templates/new.html?starter=approval"><span class="template-icon">A</span><span>Internal Approval Form</span></a>
+            </div>
           </div>
         </aside>
       </section>
     </main>
   </div>
-
-  <div class="editor-screen" id="editorScreen">
-    <div id="placeholder"></div>
-    <div id="logoBlock"></div>
-  </div>
-
-  <script>
-    const SB_URL = 'https://xbwuvaxtnylqvagdvpxp.supabase.co';
-    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc';
-    const BUCKET = 'documents';
-    const LOGIN_URL = 'index.html';
-    const TEMPLATES = { docx: 'blank.docx', xlsx: 'blank.xlsx', pptx: 'blank.pptx' };
-    const sb = supabase.createClient(SB_URL, SB_KEY);
-    let editor = null;
-    let userId = null;
-    let allFiles = [];
-    const screen = document.getElementById('editorScreen');
-
-    function userPath(name){ return userId + '/' + name; }
-
-    const WORD=['doc','docx','docm','dot','dotx','odt','ott','rtf','txt','html','htm'];
-    const CELL=['xls','xlsx','xlsm','xlt','xltx','ods','ots','csv'];
-    const SLIDE=['ppt','pptx','pptm','pps','ppsx','pot','potx','odp','otp'];
-    function fileStyle(ext){
-      ext=(ext||'').toLowerCase();
-      if(CELL.includes(ext))  return {c:'var(--cell)',  t:'XLS'};
-      if(SLIDE.includes(ext)) return {c:'var(--slide)', t:'PPT'};
-      if(ext==='pdf')         return {c:'var(--pdf)',   t:'PDF'};
-      if(WORD.includes(ext))  return {c:'var(--word)',  t:'DOC'};
-      return {c:'var(--gray)', t:(ext||'?').slice(0,3).toUpperCase()};
-    }
-    function fmtSize(b){
-      if(b==null) return '';
-      if(b<1024) return b+' B';
-      if(b<1048576) return (b/1024).toFixed(0)+' KB';
-      return (b/1048576).toFixed(1)+' MB';
-    }
-    function fmtDate(iso){
-      if(!iso) return '';
-      const d=new Date(iso);
-      return d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
-    }
-
-    async function requireSession(){
-      const { data:{ session } } = await sb.auth.getSession();
-      if(!session){ window.location.replace(LOGIN_URL); return null; }
-      userId = session.user.id;
-      return session;
-    }
-
-    async function loadFiles(){
-      const list = document.getElementById('fileList');
-      const { data, error } = await sb.storage.from(BUCKET).list(userId, { sortBy:{ column:'updated_at', order:'desc' } });
-      if(error){ list.innerHTML = '<div class="loading">Could not load files.</div>'; return; }
-      allFiles = (data||[]).filter(f => f.id && !f.name.startsWith('.'));
-      render();
-    }
-
-    function render(){
-      const list = document.getElementById('fileList');
-      const q = (document.getElementById('search').value||'').trim().toLowerCase();
-      const files = q ? allFiles.filter(f => f.name.toLowerCase().includes(q)) : allFiles;
-      document.getElementById('count').textContent = allFiles.length ? allFiles.length + (allFiles.length===1?' item':' items') : '';
-      const side = document.getElementById('sideFileCount');
-      if(side) side.textContent = String(allFiles.length || 0);
-
-      if(!files.length){
-        list.innerHTML = q
-          ? '<div class="empty"><div class="big">🔍</div><div class="t">No matches</div><div class="s">Nothing matches that search.</div></div>'
-          : '<div class="empty"><div class="big">📂</div><div class="t">No documents yet</div><div class="s">Use <b>+ New</b> or <b>Upload</b> to add your first file.</div></div>';
-        return;
-      }
-
-      const grid = document.createElement('div');
-      grid.className = 'grid';
-      files.forEach(f => {
-        const ext = (f.name.split('.').pop()||'');
-        const st = fileStyle(ext);
-        const size = fmtSize(f.metadata && f.metadata.size);
-        const date = fmtDate(f.updated_at || f.created_at);
-        const meta = [date, size].filter(Boolean).join(' · ');
-
-        const card = document.createElement('div');
-        card.className = 'file';
-        card.innerHTML =
-          '<button class="fdel" title="Delete">🗑</button>' +
-          '<div class="ftop">' +
-            '<div class="ficon" style="background:'+st.c+'">'+st.t+'</div>' +
-            '<div class="fmeta"><div class="fname"></div><div class="fsub">'+meta+'</div></div>' +
-          '</div>';
-        card.querySelector('.fname').textContent = f.name;
-        card.addEventListener('click', () => openDoc(f.name));
-        card.querySelector('.fdel').addEventListener('click', (e) => { e.stopPropagation(); deleteFile(f.name); });
-        grid.appendChild(card);
-      });
-      list.innerHTML = '';
-      list.appendChild(grid);
-    }
-
-    async function deleteFile(name){
-      if(!confirm('Delete "'+name+'"?\n\nThis permanently removes the file and cannot be undone.')) return;
-      const { error } = await sb.storage.from(BUCKET).remove([userPath(name)]);
-      if(error){ alert('Could not delete: '+error.message); return; }
-      allFiles = allFiles.filter(f => f.name !== name);
-      render();
-    }
-
-    async function openDoc(name){
-      screen.classList.add('open');
-      const { data:{ session } } = await sb.auth.getSession();
-      if(!session){ window.location.replace(LOGIN_URL); return; }
-      const res = await fetch('/api/onlyoffice-config?file=' + encodeURIComponent(userPath(name)), {
-        headers:{ Authorization:'Bearer ' + session.access_token }
-      });
-      if(!res.ok){ alert('Could not open document.'); closeEditor(); return; }
-      const config = await res.json();
-      config.width='100%'; config.height='100%';
-      config.type = (window.innerWidth<=768) ? 'mobile' : 'desktop';
-      config.events = { onRequestClose: closeEditor };
-      if(editor){ editor.destroyEditor(); editor=null; }
-      editor = new DocsAPI.DocEditor('placeholder', config);
-    }
-
-    function closeEditor(){
-      if(editor){ editor.destroyEditor(); editor=null; }
-      screen.classList.remove('open');
-      loadFiles();
-    }
-
-    function uniqueName(fileName){
-      const taken = new Set(allFiles.map(f => f.name.toLowerCase()));
-      if(!taken.has(fileName.toLowerCase())) return fileName;
-      const dot = fileName.lastIndexOf('.');
-      const base = dot > 0 ? fileName.slice(0, dot) : fileName;
-      const ext  = dot > 0 ? fileName.slice(dot) : '';
-      let i = 1, candidate;
-      do { candidate = base + ' (' + i + ')' + ext; i++; } while(taken.has(candidate.toLowerCase()));
-      return candidate;
-    }
-
-    async function createNew(type){
-      if(!userId) {
-        const session = await requireSession();
-        if(!session) return;
-      }
-      let name = prompt('Name your new file:', 'Untitled');
-      if(!name) return;
-      name = name.replace(/[^a-zA-Z0-9 _-]/g,'').trim();
-      if(!name) return;
-      const fileName = uniqueName(name + '.' + type);
-      const { error } = await sb.storage.from(BUCKET).copy(TEMPLATES[type], userPath(fileName));
-      if(error){ alert('Could not create file: '+error.message); return; }
-      openDoc(fileName);
-    }
-
-    function wireMenu(buttonId, menuId){
-      const btn = document.getElementById(buttonId);
-      const menu = document.getElementById(menuId);
-      if(!btn || !menu) return;
-      btn.addEventListener('click', (e)=>{ e.stopPropagation(); menu.classList.toggle('open'); });
-      menu.querySelectorAll('.menu-item[data-type]').forEach(mi=>{
-        mi.addEventListener('click', (e)=>{ e.stopPropagation(); menu.classList.remove('open'); createNew(mi.dataset.type); });
-      });
-    }
-    wireMenu('startBtn','startMenu');
-    wireMenu('newBtn','newMenu');
-    document.addEventListener('click', ()=> document.querySelectorAll('.menu.open').forEach(m => m.classList.remove('open')));
-
-    document.getElementById('uploadBtn').addEventListener('click', ()=> document.getElementById('fileInput').click());
-    document.getElementById('uploadBtnHero').addEventListener('click', ()=> document.getElementById('fileInput').click());
-    document.getElementById('fileInput').addEventListener('change', async (e)=>{
-      const file = e.target.files[0];
-      if(!file) return;
-      if(!userId) {
-        const session = await requireSession();
-        if(!session) return;
-      }
-      const finalName = uniqueName(file.name);
-      const { error } = await sb.storage.from(BUCKET).upload(userPath(finalName), file, { upsert:false });
-      e.target.value = '';
-      if(error){ alert('Upload failed: '+error.message); return; }
-      openDoc(finalName);
-    });
-
-    document.getElementById('search').addEventListener('input', render);
-    document.getElementById('signout').addEventListener('click', async (e)=>{
-      e.preventDefault();
-      await sb.auth.signOut();
-      window.location.replace(LOGIN_URL);
-    });
-
-    (async ()=>{
-      const session = await requireSession();
-      if(session) loadFiles();
-    })();
-  </script>
 </body>
 </html>
