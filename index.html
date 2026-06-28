@@ -950,7 +950,8 @@
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc'
     );
 
-    const APP_URL = 'connexion-two-dashboard-intel-blue.html';
+    const WELCOME_URL = 'https://www.connexiontwo.com/welcome';
+    const APP_URL = WELCOME_URL;
     const TRIAL_DAYS = 7;
 
     function showStep(id) {
@@ -1024,7 +1025,7 @@
     document.getElementById('back-to-login')?.addEventListener('click', event => { event.preventDefault(); showStep('step-login'); });
 
     async function googleSignIn() {
-      const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } });
+      const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: WELCOME_URL } });
       if (error) alert('Google sign-in failed: ' + error.message);
     }
 
@@ -1051,7 +1052,7 @@
             trial_ends_at: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
             referral_bonus_days: 7
           },
-          emailRedirectTo: window.location.href
+          emailRedirectTo: WELCOME_URL
         }
       });
       setLoading(button, false);
