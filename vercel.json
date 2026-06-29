@@ -1,38 +1,4 @@
 {
   "cleanUrls": true,
-  "trailingSlash": false,
-  "rewrites": [
-    {
-      "source": "/document-creation",
-      "destination": "/document-creation.html"
-    },
-    {
-      "source": "/welcome-2",
-      "destination": "/welcome-2.html"
-    },
-    {
-      "source": "/sign-2",
-      "destination": "/sign-2.html"
-    },
-    {
-      "source": "/templates",
-      "destination": "/templates.html"
-    },
-    {
-      "source": "/agreements",
-      "destination": "/agreements.html"
-    },
-    {
-      "source": "/pay-now",
-      "destination": "/pay-now.html"
-    },
-    {
-      "source": "/plans",
-      "destination": "/plans.html"
-    },
-    {
-      "source": "/welcome",
-      "destination": "/welcome.html"
-    }
-  ]
-} 
+  "trailingSlash": false
+}
