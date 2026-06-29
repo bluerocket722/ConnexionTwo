@@ -21,6 +21,8 @@
   --line-dark: #c8d4e3;
   --panel: #ffffff;
   --bg: #f7f9fc;
+  --green: #0f9f6e;
+  --amber: #b7791f;
   --shadow: 0 18px 55px rgba(6, 26, 58, 0.10);
   --soft-shadow: 0 10px 30px rgba(6, 26, 58, 0.06);
   --radius: 14px;
@@ -181,7 +183,11 @@ button, input, select { font: inherit; }
   font-weight: 900;
   background: #e8ebf1;
   border: 1px solid transparent;
+  cursor: pointer;
+  margin-bottom: 8px;
 }
+.sidebar-item.active { background: #fff; border-color: var(--line-dark); box-shadow: var(--soft-shadow); }
+.sidebar-item .count-pill { margin-left: auto; min-width: 26px; height: 24px; padding: 0 8px; border-radius: 999px; background: var(--blue-100); color: var(--blue-800); display: inline-flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 950; }
 .sidebar-icon {
   width: 24px;
   height: 24px;
@@ -191,6 +197,10 @@ button, input, select { font: inherit; }
 }
 .sidebar-icon svg { width: 23px; height: 23px; stroke: currentColor; stroke-width: 1.9; fill: none; }
 .content { padding: 48px 40px 64px; overflow: auto; }
+.content-top { display:flex; align-items:center; justify-content:space-between; margin-bottom: 18px; gap: 16px; flex-wrap: wrap; }
+.page-title { font-size: clamp(1.6rem, 2.4vw, 2rem); color: var(--blue-900); letter-spacing: -0.04em; font-weight: 650; }
+.access-btn { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 16px; border:1px solid var(--line-dark); border-radius:8px; background:#fff; color:var(--blue-900); font-weight:850; cursor:pointer; }
+.access-btn svg { width:18px; height:18px; stroke: var(--blue-900); stroke-width:2; fill:none; }
 .toolbar {
   display: flex;
   align-items: center;
@@ -244,13 +254,13 @@ button, input, select { font: inherit; }
 }
 .table-head, .table-row {
   display: grid;
-  grid-template-columns: 44px 1.5fr 0.8fr 0.8fr 0.5fr;
+  grid-template-columns: 44px 1.5fr 1fr 0.8fr 0.5fr;
   align-items: center;
   gap: 20px;
   padding: 0 26px;
 }
 .table-head { min-height: 58px; color: var(--blue-900); font-size: 0.78rem; font-weight: 950; text-transform: uppercase; border-bottom: 1px solid var(--line); }
-.table-row { min-height: 76px; border-bottom: 1px solid var(--line); color: var(--blue-900); font-size: 0.98rem; }
+.table-row { min-height: 84px; border-bottom: 1px solid var(--line); color: var(--blue-900); font-size: 0.98rem; }
 .table-row:hover { background: var(--blue-050); }
 .radio-dot { width: 26px; height: 26px; border: 3px solid #8791a1; border-radius: 50%; }
 .item-title { font-weight: 650; }
@@ -266,6 +276,22 @@ button, input, select { font: inherit; }
   font-weight: 850;
   cursor: pointer;
 }
+
+/* Signing-progress cell */
+.status-cell { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.status-badge { display: inline-flex; align-items: center; gap: 7px; align-self: flex-start; padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 900; letter-spacing: 0.01em; }
+.status-badge .dot { width: 8px; height: 8px; border-radius: 50%; }
+.badge-completed { background: #e4f7ee; color: var(--green); }
+.badge-completed .dot { background: var(--green); }
+.badge-progress { background: #fff3df; color: var(--amber); }
+.badge-progress .dot { background: var(--amber); }
+.badge-draft { background: #eef1f6; color: var(--muted); }
+.badge-draft .dot { background: var(--muted); }
+.mini-track { width: 150px; max-width: 100%; height: 6px; background: #e6ebf3; border-radius: 999px; overflow: hidden; }
+.mini-fill { height: 100%; background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-radius: 999px; transition: width .3s ease; }
+.mini-fill.done { background: linear-gradient(90deg, #0f9f6e, #34c98a); }
+.status-sub { color: var(--muted); font-size: 0.78rem; }
+
 .empty-state {
   display: grid;
   grid-template-columns: minmax(240px, 390px) minmax(280px, 1fr);
@@ -338,7 +364,7 @@ button, input, select { font: inherit; }
   .content { padding: 28px 18px 44px; }
   .get-started { justify-content: flex-start; flex-wrap: wrap; }
   .table-head { display: none; }
-  .table-row { grid-template-columns: 34px 1fr; min-height: auto; padding: 18px; }
+  .table-row { grid-template-columns: 34px 1fr; min-height: auto; padding: 18px; gap: 12px; }
   .table-row > div:nth-child(n+3) { grid-column: 2; }
   .empty-state { grid-template-columns: 1fr; padding: 30px 24px; }
   .document-art { margin: 0 auto; height: 260px; }
@@ -379,14 +405,17 @@ button, input, select { font: inherit; }
           <button class="sidebar-item active" type="button" data-folder="inbox">
             <span class="sidebar-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h5l2 3h2l2-3h5"></path><path d="M5 5h14l2 8v6H3v-6z"></path></svg></span>
             <span>Inbox</span>
+            <span class="count-pill" data-count="inbox">0</span>
           </button>
           <button class="sidebar-item" type="button" data-folder="sent">
             <span class="sidebar-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l17 8-17 8 4-8z"></path><path d="M8 12h13"></path></svg></span>
-            <span>Sent</span>
+            <span>Awaiting Signature</span>
+            <span class="count-pill" data-count="sent">0</span>
           </button>
           <button class="sidebar-item" type="button" data-folder="completed">
             <span class="sidebar-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.6 2.6L16.5 9"></path></svg></span>
             <span>Completed</span>
+            <span class="count-pill" data-count="completed">0</span>
           </button>
         </div>
       </div>
@@ -405,7 +434,7 @@ button, input, select { font: inherit; }
         <button class="clear-btn" type="button" id="clearSearch">Clear All</button>
       </div>
       <section class="table-card">
-        <div class="table-head"><div></div><div>Name</div><div>Status</div><div>Updated</div><div></div></div>
+        <div class="table-head"><div></div><div>Name</div><div>Signing Progress</div><div>Updated</div><div></div></div>
         <div id="agreementRows"><div class="loading">Loading agreements...</div></div>
         <div class="empty-state hidden" id="emptyState">
           <div class="document-art"></div>
@@ -428,43 +457,110 @@ const LOGIN_URL = 'https://www.connexiontwo.com/';
 const sb = supabase.createClient(SB_URL, SB_KEY);
 let allAgreements = [];
 let currentFolder = 'inbox';
+
 function fmtDate(value) { if(!value) return ''; return new Date(value).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }); }
 function escapeHtml(value) { return String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
 async function requireSession() {
   const { data: { session } } = await sb.auth.getSession();
   if(!session) { window.location.replace(LOGIN_URL); return null; }
   return session;
 }
+
+// Read the signing-progress view (preferred). Falls back to the raw table.
 async function loadAgreements() {
   const rows = document.getElementById('agreementRows');
-  let result = await sb.from('signer_documents').select('id,title,status,created_at,updated_at,current_pdf_url,final_pdf_url').order('created_at', { ascending:false });
+  let result = await sb.from('v_agreement_progress')
+    .select('doc_id,title,status,created_at,updated_at,completed_at,total_signers,signed_count,current_signer_order,current_signer_name,current_signer_email')
+    .order('updated_at', { ascending:false });
+
   if(result.error) {
-    result = await sb.from('documents').select('id,title,name,status,created_at,updated_at').order('created_at', { ascending:false });
+    // Fallback if the view hasn't been created yet.
+    result = await sb.from('signer_documents')
+      .select('doc_id,title,status,created_at,updated_at,final_pdf_url')
+      .order('created_at', { ascending:false });
   }
-  if(result.error) { rows.innerHTML = '<div class="error">Could not load agreements. Connect this page to your agreement table.</div>'; return; }
-  allAgreements = result.data || [];
+  if(result.error) {
+    rows.innerHTML = '<div class="error">Could not load agreements. Run the agreements SQL in Supabase to create the tables and the v_agreement_progress view.</div>';
+    return;
+  }
+  allAgreements = (result.data || []).map(normalize);
   renderAgreements();
 }
+
+function normalize(a) {
+  const total = Number(a.total_signers || 0);
+  const signed = Number(a.signed_count || 0);
+  const statusRaw = String(a.status || '').toLowerCase();
+  const completed = statusRaw.includes('complete') || (total > 0 && signed >= total) || !!a.completed_at;
+  let phase;            // 'completed' | 'progress' | 'draft'
+  if(completed) phase = 'completed';
+  else if(statusRaw.includes('progress') || signed > 0 || total > 0) phase = 'progress';
+  else phase = 'draft';
+  return {
+    doc_id: a.doc_id,
+    title: a.title || 'Untitled Agreement',
+    updated: a.updated_at || a.created_at,
+    total, signed, phase,
+    current_order: a.current_signer_order,
+    current_name: a.current_signer_name || '',
+  };
+}
+
+function inFolder(a) {
+  if(currentFolder === 'completed') return a.phase === 'completed';
+  if(currentFolder === 'sent')      return a.phase === 'progress';
+  return true; // inbox = everything
+}
+
 function folderLabel(folder) {
-  return folder === 'sent' ? 'Sent' : folder === 'completed' ? 'Completed' : 'Inbox';
+  return folder === 'sent' ? 'Awaiting Signature' : folder === 'completed' ? 'Completed' : 'Inbox';
 }
-function agreementMatchesFolder(a) {
-  const status = String(a.status || '').toLowerCase();
-  if(currentFolder === 'completed') return status.includes('complete') || status.includes('signed');
-  if(currentFolder === 'sent') return !status.includes('complete') && !status.includes('signed');
-  return !status.includes('complete') && !status.includes('signed');
-}
+
 function updateFolderUI() {
   const label = folderLabel(currentFolder);
   document.getElementById('folderTitle').textContent = label;
   document.getElementById('searchInput').placeholder = `Search ${label} and Folders`;
   document.querySelectorAll('[data-folder]').forEach(btn => btn.classList.toggle('active', btn.dataset.folder === currentFolder));
 }
+
+function updateCounts() {
+  const inbox = allAgreements.length;
+  const sent = allAgreements.filter(a => a.phase === 'progress').length;
+  const completed = allAgreements.filter(a => a.phase === 'completed').length;
+  const set = (k,v) => { const el = document.querySelector(`[data-count="${k}"]`); if(el) el.textContent = v; };
+  set('inbox', inbox); set('sent', sent); set('completed', completed);
+}
+
+function progressCell(a) {
+  if(a.phase === 'completed') {
+    return `<div class="status-cell">
+      <span class="status-badge badge-completed"><span class="dot"></span>Completed</span>
+      <div class="mini-track"><div class="mini-fill done" style="width:100%"></div></div>
+      <span class="status-sub">${a.total ? 'All '+a.total+' signer'+(a.total===1?'':'s')+' signed' : 'Done'}</span>
+    </div>`;
+  }
+  if(a.phase === 'progress') {
+    const pct = a.total ? Math.round((a.signed / a.total) * 100) : 0;
+    const who = a.current_name ? ` · with ${escapeHtml(a.current_name)}` : (a.current_order ? ` · signer ${a.current_order}` : '');
+    return `<div class="status-cell">
+      <span class="status-badge badge-progress"><span class="dot"></span>In Progress</span>
+      <div class="mini-track"><div class="mini-fill" style="width:${pct}%"></div></div>
+      <span class="status-sub">Signed ${a.signed} of ${a.total}${who}</span>
+    </div>`;
+  }
+  return `<div class="status-cell">
+    <span class="status-badge badge-draft"><span class="dot"></span>Draft</span>
+    <span class="status-sub">Not sent yet</span>
+  </div>`;
+}
+
 function renderAgreements() {
   updateFolderUI();
+  updateCounts();
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
-  const foldered = allAgreements.filter(agreementMatchesFolder);
-  const filtered = q ? foldered.filter(a => String(a.title || a.name || '').toLowerCase().includes(q)) : foldered;
+  const foldered = allAgreements.filter(inFolder);
+  const filtered = q ? foldered.filter(a => a.title.toLowerCase().includes(q)) : foldered;
   const rows = document.getElementById('agreementRows');
   const empty = document.getElementById('emptyState');
   if(!filtered.length) { rows.innerHTML = ''; empty.classList.remove('hidden'); return; }
@@ -472,13 +568,17 @@ function renderAgreements() {
   rows.innerHTML = filtered.map(a => `
     <div class="table-row">
       <div><div class="radio-dot"></div></div>
-      <div><div class="item-title">${escapeHtml(a.title || a.name || 'Untitled Agreement')}</div><div class="item-sub">Agreement</div></div>
-      <div>${escapeHtml(a.status || 'Draft')}</div>
-      <div>${fmtDate(a.updated_at || a.created_at)}</div>
-      <div><button class="row-action" type="button" onclick="openAgreement('${a.id}')">Open</button></div>
+      <div><div class="item-title">${escapeHtml(a.title)}</div><div class="item-sub">Agreement</div></div>
+      <div>${progressCell(a)}</div>
+      <div>${fmtDate(a.updated)}</div>
+      <div><button class="row-action" type="button" data-open="${escapeHtml(a.doc_id)}">Open</button></div>
     </div>`).join('');
+  rows.querySelectorAll('[data-open]').forEach(btn =>
+    btn.addEventListener('click', () => openAgreement(btn.dataset.open)));
 }
+
 function openAgreement(id) { window.location.href = '/document-creation?id=' + encodeURIComponent(id); }
+
 document.getElementById('searchInput').addEventListener('input', renderAgreements);
 document.getElementById('clearSearch').addEventListener('click', () => { document.getElementById('searchInput').value=''; renderAgreements(); });
 document.querySelectorAll('[data-folder]').forEach(btn => {
@@ -488,6 +588,7 @@ document.querySelectorAll('[data-folder]').forEach(btn => {
     renderAgreements();
   });
 });
+
 (async()=>{ const session = await requireSession(); if(session) loadAgreements(); })();
 </script>
 </body>
