@@ -368,22 +368,41 @@ button, input, select { font: inherit; }
   <div class="progress-track"><div class="progress-fill"></div></div>
   <a class="get-started-link" href="#">1/5 actions completed</a>
   <span class="get-started-link" style="text-decoration:none;">What's next?</span>
-  <a class="get-started-action" href="/templates">Create Template</a>
+  <a class="get-started-action" href="/document-creation">Send a Document</a>
 </section>
   <div class="layout">
     <aside class="sidebar">
-      <a class="sidebar-primary" href="/document-creation">Send a Document</a>
+      <a class="sidebar-primary" href="/document-creation">Start Now</a>
       <div class="sidebar-section">
-        <div class="sidebar-heading">Agreements</div>
-        <div class="sidebar-item"><span class="sidebar-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"></path><path d="M15 3v4h4"></path><path d="M8.5 12h7"></path><path d="M8.5 16h7"></path></svg></span><span>My Agreements</span></div>
+        <div class="sidebar-heading">Envelopes</div>
+        <div class="sidebar-nav" role="tablist" aria-label="Agreement folders">
+          <button class="sidebar-item active" type="button" data-folder="inbox">
+            <span class="sidebar-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h5l2 3h2l2-3h5"></path><path d="M5 5h14l2 8v6H3v-6z"></path></svg></span>
+            <span>Inbox</span>
+          </button>
+          <button class="sidebar-item" type="button" data-folder="sent">
+            <span class="sidebar-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l17 8-17 8 4-8z"></path><path d="M8 12h13"></path></svg></span>
+            <span>Sent</span>
+          </button>
+          <button class="sidebar-item" type="button" data-folder="completed">
+            <span class="sidebar-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.6 2.6L16.5 9"></path></svg></span>
+            <span>Completed</span>
+          </button>
+        </div>
       </div>
     </aside>
     <main class="content">
+      <div class="content-top">
+        <h1 class="page-title" id="folderTitle">Inbox</h1>
+        <button class="access-btn" type="button">Shared Access <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+      </div>
       <div class="toolbar">
-        <div class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M16 16l5 5"></path></svg><input id="searchInput" type="search" placeholder="Search Agreements" /></div>
-        <button class="filter-btn" type="button">Date</button>
+        <div class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M16 16l5 5"></path></svg><input id="searchInput" type="search" placeholder="Search Inbox and Folders" /></div>
+        <button class="filter-btn" type="button">Date: Last 6 Months</button>
         <button class="filter-btn" type="button">Status</button>
-        <button class="clear-btn" type="button" id="clearSearch">Clear</button>
+        <button class="filter-btn" type="button">Sender</button>
+        <button class="filter-btn" type="button">Filters</button>
+        <button class="clear-btn" type="button" id="clearSearch">Clear All</button>
       </div>
       <section class="table-card">
         <div class="table-head"><div></div><div>Name</div><div>Status</div><div>Updated</div><div></div></div>
@@ -408,6 +427,7 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const LOGIN_URL = 'https://www.connexiontwo.com/';
 const sb = supabase.createClient(SB_URL, SB_KEY);
 let allAgreements = [];
+let currentFolder = 'inbox';
 function fmtDate(value) { if(!value) return ''; return new Date(value).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }); }
 function escapeHtml(value) { return String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 async function requireSession() {
@@ -425,9 +445,26 @@ async function loadAgreements() {
   allAgreements = result.data || [];
   renderAgreements();
 }
+function folderLabel(folder) {
+  return folder === 'sent' ? 'Sent' : folder === 'completed' ? 'Completed' : 'Inbox';
+}
+function agreementMatchesFolder(a) {
+  const status = String(a.status || '').toLowerCase();
+  if(currentFolder === 'completed') return status.includes('complete') || status.includes('signed');
+  if(currentFolder === 'sent') return !status.includes('complete') && !status.includes('signed');
+  return !status.includes('complete') && !status.includes('signed');
+}
+function updateFolderUI() {
+  const label = folderLabel(currentFolder);
+  document.getElementById('folderTitle').textContent = label;
+  document.getElementById('searchInput').placeholder = `Search ${label} and Folders`;
+  document.querySelectorAll('[data-folder]').forEach(btn => btn.classList.toggle('active', btn.dataset.folder === currentFolder));
+}
 function renderAgreements() {
+  updateFolderUI();
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
-  const filtered = q ? allAgreements.filter(a => String(a.title || a.name || '').toLowerCase().includes(q)) : allAgreements;
+  const foldered = allAgreements.filter(agreementMatchesFolder);
+  const filtered = q ? foldered.filter(a => String(a.title || a.name || '').toLowerCase().includes(q)) : foldered;
   const rows = document.getElementById('agreementRows');
   const empty = document.getElementById('emptyState');
   if(!filtered.length) { rows.innerHTML = ''; empty.classList.remove('hidden'); return; }
@@ -444,6 +481,13 @@ function renderAgreements() {
 function openAgreement(id) { window.location.href = '/document-creation?id=' + encodeURIComponent(id); }
 document.getElementById('searchInput').addEventListener('input', renderAgreements);
 document.getElementById('clearSearch').addEventListener('click', () => { document.getElementById('searchInput').value=''; renderAgreements(); });
+document.querySelectorAll('[data-folder]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentFolder = btn.dataset.folder;
+    document.getElementById('searchInput').value = '';
+    renderAgreements();
+  });
+});
 (async()=>{ const session = await requireSession(); if(session) loadAgreements(); })();
 </script>
 </body>
