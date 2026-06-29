@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Connexion Two | Documents</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://docs.bisondoc.com/web-apps/apps/api/documents/api.js"></script>
   <style>
     :root {
       --blue-900: #061a3a;
@@ -669,6 +668,7 @@
     const BUCKET = 'documents';
     const LOGIN_URL = 'https://www.connexiontwo.com/';
     const WELCOME_URL = 'https://www.connexiontwo.com/welcome';
+    const DOCS_API_SRC = 'https://docs.bisondoc.com/web-apps/apps/api/documents/api.js';
     const TEMPLATES = { docx: 'blank.docx', xlsx: 'blank.xlsx', pptx: 'blank.pptx' };
     const sb = supabase.createClient(SB_URL, SB_KEY);
     let editor = null;
@@ -785,10 +785,37 @@
       render();
     }
 
+    function ensureDocsApi(){
+      return new Promise((resolve, reject) => {
+        if (window.DocsAPI && window.DocsAPI.DocEditor) {
+          resolve();
+          return;
+        }
+
+        const existing = document.querySelector('script[data-docs-api="true"]');
+        if (existing) {
+          existing.addEventListener('load', resolve, { once: true });
+          existing.addEventListener('error', () => reject(new Error('Could not load document editor.')), { once: true });
+          return;
+        }
+
+        const script = document.createElement('script');
+        script.src = DOCS_API_SRC;
+        script.async = true;
+        script.dataset.docsApi = 'true';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('Could not load document editor.'));
+        document.head.appendChild(script);
+      });
+    }
+
     async function openDoc(name){
       screen.classList.add('open');
       const { data:{ session } } = await sb.auth.getSession();
       if(!session){ window.location.replace(LOGIN_URL); return; }
+      try { await ensureDocsApi(); }
+      catch (err) { alert(err.message || 'Could not load document editor.'); closeEditor(); return; }
+
       const res = await fetch('/api/onlyoffice-config?file=' + encodeURIComponent(userPath(name)), {
         headers:{ Authorization:'Bearer ' + session.access_token }
       });
