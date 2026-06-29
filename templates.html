@@ -68,7 +68,7 @@ button, input, select { font: inherit; }
 
 /* TABLE */
 .table-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
-.table-head, .table-row { display: grid; grid-template-columns: 1.7fr 0.9fr 0.7fr 70px; align-items: center; gap: 18px; padding: 0 22px; }
+.table-head, .table-row { display: grid; grid-template-columns: 1.6fr 0.8fr 0.6fr 150px; align-items: center; gap: 18px; padding: 0 22px; }
 .table-head { height: 44px; color: var(--faint); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--line); background: #fafcff; }
 .table-row { min-height: 68px; border-bottom: 1px solid var(--line); transition: .12s ease; }
 .table-row:last-child { border-bottom: none; }
@@ -204,9 +204,13 @@ function renderTemplates() {
       </div>
       <div><span class="cat-pill">${escapeHtml(t.category || 'General')}</span></div>
       <div class="row-updated">${fmtDate(t.updated_at || t.created_at)}</div>
-      <div><button class="row-action" type="button" data-use="${escapeHtml(t.id)}">Use</button></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="row-action" type="button" style="background:#fff;border:1px solid var(--line);color:var(--blue-700);" data-edit="${escapeHtml(t.id)}">Fields</button>
+        <button class="row-action" type="button" data-use="${escapeHtml(t.id)}">Use</button>
+      </div>
     </div>`).join('');
   rows.querySelectorAll('[data-use]').forEach(btn => btn.addEventListener('click', () => useTemplate(btn.dataset.use)));
+  rows.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => { window.location.href='/template-editor?id='+encodeURIComponent(btn.dataset.edit); }));
 }
 
 function useTemplate(id) { window.location.href = '/document-creation?template=' + encodeURIComponent(id); }
@@ -221,7 +225,8 @@ async function createTemplateFromFile(file) {
   if(upload.error) { alert('Upload failed: ' + upload.error.message); return; }
   const insert = await sb.from('document_templates').insert({ name, category:'General', file_path:path, file_name:file.name }).select().single();
   if(insert.error) { alert('Template record failed: ' + insert.error.message); return; }
-  await loadTemplates();
+  // jump into the field editor so they can place signature/date/etc. fields
+  window.location.href = '/template-editor?id=' + encodeURIComponent(insert.data.id);
 }
 
 document.getElementById('createTemplateBtn').addEventListener('click', startCreateTemplate);
