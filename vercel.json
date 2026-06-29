@@ -19,8 +19,12 @@
       "destination": "/templates.html"
     },
     {
+      "source": "/agreements",
+      "destination": "/agreements.html"
+    },
+    {
       "source": "/welcome",
       "destination": "/welcome.html"
     }
   ]
-}
+} 
