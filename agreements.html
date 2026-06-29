@@ -7,467 +7,301 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
-  --blue-950: #041124;
-  --blue-900: #061a3a;
-  --blue-800: #082b61;
-  --blue-700: #0054d1;
-  --blue-600: #0068ff;
-  --blue-500: #1683ff;
-  --blue-100: #eaf3ff;
-  --blue-050: #f5f9ff;
-  --ink: #0f172a;
+  --ink: #0f1b2d;
   --muted: #5f6b7a;
-  --line: #d9e2ef;
-  --line-dark: #c8d4e3;
-  --panel: #ffffff;
+  --faint: #93a0b3;
+  --line: #dce5f0;
   --bg: #f7f9fc;
+  --surface: #ffffff;
+  /* Connexion Two home-page blues */
+  --indigo-700: #0054d1;
+  --indigo-600: #0068ff;
+  --indigo-500: #1683ff;
+  --indigo-050: #eaf3ff;
+  --violet: #061a3a;
   --green: #0f9f6e;
+  --green-050: #e7f7f0;
   --amber: #b7791f;
-  --shadow: 0 18px 55px rgba(6, 26, 58, 0.10);
-  --soft-shadow: 0 10px 30px rgba(6, 26, 58, 0.06);
-  --radius: 14px;
+  --amber-050: #fdf3e3;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(6,26,58,.04), 0 8px 28px rgba(6,26,58,.06);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { min-height: 100%; }
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family: Inter, Arial, Helvetica, sans-serif;
+  font-family: Inter, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+  font-size: 14px;
 }
 a { color: inherit; text-decoration: none; }
 button, input, select { font: inherit; }
-.app {
-  min-height: 100vh;
-  background:
-    radial-gradient(circle at 88% 0%, rgba(0, 104, 255, 0.12), transparent 28%),
-    linear-gradient(180deg, #ffffff 0%, #f7f9fc 48%, #f2f6fb 100%);
-}
+
+/* ── TOP NAV ── */
 .top-nav {
-  height: 76px;
-  display: grid;
-  grid-template-columns: 260px 1fr auto;
-  gap: 24px;
+  height: 60px;
+  display: flex;
   align-items: center;
-  padding: 0 28px;
-  background: #ffffff;
+  gap: 28px;
+  padding: 0 24px;
+  background: rgba(255,255,255,.88);
+  backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
-  position: sticky;
-  top: 0;
-  z-index: 50;
+  position: sticky; top: 0; z-index: 50;
 }
-.brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.brand { display: flex; align-items: center; gap: 10px; }
 .c2-logo {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, var(--blue-900), var(--blue-700));
-  color: #fff;
-  font-weight: 950;
-  letter-spacing: -0.04em;
-  box-shadow: 0 10px 24px rgba(0, 84, 209, 0.18);
+  width: 32px; height: 32px;
+  border-radius: 9px;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, var(--violet), var(--indigo-700));
+  color: #fff; font-weight: 800; font-size: .8rem; letter-spacing: -.03em;
 }
-.brand-name { color: var(--blue-900); font-weight: 950; font-size: 1.08rem; letter-spacing: -0.035em; line-height: 1; }
-.brand-sub { color: var(--muted); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 4px; }
-.nav-tabs { display: flex; height: 100%; align-items: stretch; gap: 4px; }
+.brand-name { font-weight: 800; font-size: 1rem; letter-spacing: -.02em; color: var(--violet); }
+.nav-tabs { display: flex; align-items: center; gap: 4px; margin-left: 8px; }
 .nav-tabs a {
-  display: flex;
-  align-items: center;
-  padding: 0 28px;
-  border-bottom: 4px solid transparent;
-  color: #41506a;
-  font-weight: 850;
-  font-size: 1rem;
-  transition: 0.18s ease;
+  padding: 7px 14px; border-radius: 8px;
+  color: var(--muted); font-weight: 600; font-size: .9rem;
+  transition: .15s ease;
 }
-.nav-tabs a:hover,
-.nav-tabs a.active {
-  color: var(--blue-900);
-  border-bottom-color: var(--blue-700);
-  background: linear-gradient(180deg, transparent, rgba(0,104,255,0.04));
-}
-.top-actions { display: flex; align-items: center; gap: 14px; }
-.trial-left { color: var(--blue-900); font-weight: 900; white-space: nowrap; }
+.nav-tabs a:hover { color: var(--ink); background: var(--indigo-050); }
+.nav-tabs a.active { color: var(--indigo-700); background: var(--indigo-050); }
+.top-actions { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+.trial-left { color: var(--muted); font-weight: 600; font-size: .85rem; }
 .buy-btn {
-  height: 46px;
-  padding: 0 22px;
-  border-radius: 999px;
-  background: var(--blue-900);
-  border: 1px solid var(--blue-900);
-  color: #fff;
-  font-weight: 950;
-  cursor: pointer;
-  box-shadow: 0 12px 24px rgba(6, 26, 58, 0.18);
+  height: 36px; padding: 0 16px; border-radius: 8px;
+  background: var(--indigo-700); border: none; color: #fff;
+  font-weight: 700; font-size: .87rem; cursor: pointer;
+  transition: .15s ease;
 }
+.buy-btn:hover { background: var(--violet); }
 .avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--blue-100);
-  color: var(--blue-800);
-  border: 1px solid #c8dcf8;
-  font-weight: 950;
+  width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--indigo-050); color: var(--indigo-700);
+  font-weight: 800; font-size: .8rem;
 }
-.get-started {
-  min-height: 114px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 34px;
-  padding: 20px 28px;
-  background: #eef3f9;
-  border-bottom: 1px solid var(--line);
-  color: var(--blue-900);
+
+/* ── LAYOUT ── */
+.layout { display: grid; grid-template-columns: 244px 1fr; min-height: calc(100vh - 60px); }
+.sidebar { padding: 22px 14px; border-right: 1px solid var(--line); }
+.new-btn {
+  width: 100%; height: 42px; margin-bottom: 22px;
+  border: none; border-radius: 10px; cursor: pointer;
+  background: linear-gradient(135deg, var(--indigo-600), var(--violet));
+  color: #fff; font-weight: 700; font-size: .9rem;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: 0 8px 20px rgba(0,84,209,.22);
+  transition: .15s ease;
 }
-.get-started-title { font-size: clamp(1.8rem, 3vw, 2.25rem); font-weight: 550; letter-spacing: -0.05em; }
-.progress-track { width: 270px; height: 6px; background: #ccd6e4; border-radius: 999px; overflow: hidden; }
-.progress-fill { width: 22%; height: 100%; background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-radius: 999px; }
-.get-started-link { font-size: 1.05rem; text-decoration: underline; text-underline-offset: 4px; font-weight: 800; }
-.get-started-action {
-  min-height: 48px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 22px;
-  border: 1px solid #8aa0bd;
-  border-radius: 8px;
-  color: var(--blue-900);
-  background: #fff;
-  font-weight: 800;
-  cursor: pointer;
+.new-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(0,84,209,.28); }
+.side-label { color: var(--faint); font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; padding: 0 12px; margin-bottom: 8px; }
+.side-item {
+  width: 100%; min-height: 40px;
+  display: flex; align-items: center; gap: 11px;
+  padding: 0 12px; margin-bottom: 2px;
+  border: none; border-radius: 8px; cursor: pointer;
+  background: transparent; color: var(--muted);
+  font-weight: 600; font-size: .9rem; text-align: left;
+  transition: .14s ease;
 }
-.layout { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 190px); }
-.sidebar {
-  background: #f4f6fa;
-  border-right: 1px solid var(--line);
-  padding: 24px 0;
+.side-item:hover { background: #eef3fb; color: var(--ink); }
+.side-item.active { background: var(--indigo-050); color: var(--indigo-700); font-weight: 700; }
+.side-item svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.8; fill: none; flex: 0 0 auto; }
+.side-item .count-pill {
+  margin-left: auto; min-width: 22px; height: 20px; padding: 0 7px;
+  border-radius: 999px; background: #e6ecf5; color: var(--muted);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: .72rem; font-weight: 800;
 }
-.sidebar-primary {
-  width: calc(100% - 38px);
-  margin: 0 auto 26px;
-  min-height: 58px;
-  border: none;
-  border-radius: 8px;
-  background: var(--blue-900);
-  color: #fff;
-  font-weight: 950;
-  font-size: 1rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.sidebar-section { padding: 0 18px; }
-.sidebar-heading {
-  color: #42526b;
-  font-size: 0.78rem;
-  font-weight: 950;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin: 0 0 14px;
-  padding: 0 10px;
-}
-.sidebar-item {
-  min-height: 62px;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 0 18px;
-  border-radius: 8px;
-  color: var(--blue-900);
-  font-weight: 900;
-  background: #e8ebf1;
-  border: 1px solid transparent;
-  cursor: pointer;
-  margin-bottom: 8px;
-}
-.sidebar-item.active { background: #fff; border-color: var(--line-dark); box-shadow: var(--soft-shadow); }
-.sidebar-item .count-pill { margin-left: auto; min-width: 26px; height: 24px; padding: 0 8px; border-radius: 999px; background: var(--blue-100); color: var(--blue-800); display: inline-flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 950; }
-.sidebar-icon {
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  color: var(--blue-900);
-}
-.sidebar-icon svg { width: 23px; height: 23px; stroke: currentColor; stroke-width: 1.9; fill: none; }
-.content { padding: 48px 40px 64px; overflow: auto; }
-.content-top { display:flex; align-items:center; justify-content:space-between; margin-bottom: 18px; gap: 16px; flex-wrap: wrap; }
-.page-title { font-size: clamp(1.6rem, 2.4vw, 2rem); color: var(--blue-900); letter-spacing: -0.04em; font-weight: 650; }
-.access-btn { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 16px; border:1px solid var(--line-dark); border-radius:8px; background:#fff; color:var(--blue-900); font-weight:850; cursor:pointer; }
-.access-btn svg { width:18px; height:18px; stroke: var(--blue-900); stroke-width:2; fill:none; }
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 22px;
-  flex-wrap: wrap;
-}
-.search { position: relative; width: min(430px, 100%); }
+.side-item.active .count-pill { background: var(--indigo-700); color: #fff; }
+
+/* ── CONTENT ── */
+.content { padding: 28px 32px 56px; overflow: auto; }
+.content-top { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; }
+.page-title { font-size: 1.5rem; font-weight: 800; letter-spacing: -.03em; color: var(--violet); }
+.page-count { color: var(--faint); font-size: .9rem; font-weight: 600; }
+
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+.search { position: relative; flex: 1; min-width: 220px; max-width: 420px; }
 .search input {
-  width: 100%;
-  height: 52px;
-  border: 1px solid #91a0b5;
-  border-radius: 8px;
-  background: #fff;
-  color: var(--blue-900);
-  padding: 0 16px 0 50px;
-  outline: none;
-  font-size: 1rem;
+  width: 100%; height: 40px;
+  border: 1px solid var(--line); border-radius: 9px;
+  background: var(--surface); padding: 0 14px 0 40px;
+  outline: none; font-size: .9rem; transition: .15s ease;
 }
-.search input:focus { border-color: var(--blue-700); box-shadow: 0 0 0 4px rgba(0, 84, 209, 0.10); }
-.search svg {
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 23px;
-  height: 23px;
-  stroke: var(--blue-900);
-  stroke-width: 2;
-  fill: none;
+.search input:focus { border-color: var(--indigo-500); box-shadow: 0 0 0 3px rgba(0,104,255,.14); }
+.search svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 17px; height: 17px; stroke: var(--faint); stroke-width: 2; fill: none; }
+.filter-select, .filter-btn {
+  height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--surface); color: var(--muted); font-weight: 600; font-size: .87rem; cursor: pointer;
+  transition: .15s ease;
 }
-.filter-btn, .clear-btn {
-  height: 52px;
-  min-width: 116px;
-  padding: 0 18px;
-  border: 1px solid #91a0b5;
-  border-radius: 8px;
-  background: #fff;
-  color: var(--blue-900);
-  font-weight: 780;
-  cursor: pointer;
-}
-.clear-btn { background: #f1f3f7; border-color: transparent; margin-left: auto; }
-.table-card {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 0;
-  box-shadow: var(--soft-shadow);
-  overflow: hidden;
-  min-height: 420px;
-}
+.filter-select { padding-right: 30px; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235f6b7a' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 11px center; }
+.filter-select:hover, .filter-btn:hover { border-color: var(--indigo-500); color: var(--ink); }
+.filter-select:focus { outline: none; border-color: var(--indigo-500); box-shadow: 0 0 0 3px rgba(0,104,255,.14); }
+
+/* ── TABLE ── */
+.table-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
 .table-head, .table-row {
   display: grid;
-  grid-template-columns: 44px 1.5fr 1fr 0.8fr 0.5fr;
-  align-items: center;
-  gap: 20px;
-  padding: 0 26px;
+  grid-template-columns: 1.6fr 1.1fr 0.7fr 70px;
+  align-items: center; gap: 18px;
+  padding: 0 22px;
 }
-.table-head { min-height: 58px; color: var(--blue-900); font-size: 0.78rem; font-weight: 950; text-transform: uppercase; border-bottom: 1px solid var(--line); }
-.table-row { min-height: 84px; border-bottom: 1px solid var(--line); color: var(--blue-900); font-size: 0.98rem; }
-.table-row:hover { background: var(--blue-050); }
-.radio-dot { width: 26px; height: 26px; border: 3px solid #8791a1; border-radius: 50%; }
-.item-title { font-weight: 650; }
-.item-sub { color: var(--muted); font-size: 0.82rem; margin-top: 4px; }
+.table-head { height: 44px; color: var(--faint); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--line); background: #fafcff; }
+.col-updated { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+.col-updated svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.4; fill: none; transition: transform .15s ease; }
+.col-updated.asc svg { transform: rotate(180deg); }
+.table-row { min-height: 70px; border-bottom: 1px solid var(--line); transition: .12s ease; }
+.table-row:last-child { border-bottom: none; }
+.table-row:hover { background: #f6f9ff; }
+.doc-cell { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.doc-icon { width: 36px; height: 36px; flex: 0 0 auto; border-radius: 9px; background: var(--indigo-050); display: grid; place-items: center; }
+.doc-icon svg { width: 18px; height: 18px; stroke: var(--indigo-700); stroke-width: 1.8; fill: none; }
+.doc-meta { min-width: 0; }
+.item-title { font-weight: 700; font-size: .93rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-sub { color: var(--faint); font-size: .76rem; margin-top: 2px; }
+.row-updated { color: var(--muted); font-size: .85rem; }
 .row-action {
-  justify-self: start;
-  border: 1px solid var(--line-dark);
-  background: #fff;
-  color: var(--blue-900);
-  border-radius: 8px;
-  min-height: 38px;
-  padding: 0 14px;
-  font-weight: 850;
-  cursor: pointer;
+  justify-self: end; border: 1px solid var(--line); background: var(--surface);
+  color: var(--indigo-700); border-radius: 8px; height: 32px; padding: 0 14px;
+  font-weight: 700; font-size: .82rem; cursor: pointer; transition: .14s ease;
 }
+.row-action:hover { background: var(--indigo-050); border-color: var(--indigo-050); }
 
-/* Signing-progress cell */
+/* status / progress */
 .status-cell { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.status-badge { display: inline-flex; align-items: center; gap: 7px; align-self: flex-start; padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 900; letter-spacing: 0.01em; }
-.status-badge .dot { width: 8px; height: 8px; border-radius: 50%; }
-.badge-completed { background: #e4f7ee; color: var(--green); }
+.status-badge { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 3px 9px; border-radius: 999px; font-size: .73rem; font-weight: 800; }
+.status-badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+.badge-completed { background: var(--green-050); color: var(--green); }
 .badge-completed .dot { background: var(--green); }
-.badge-progress { background: #fff3df; color: var(--amber); }
+.badge-progress { background: var(--amber-050); color: var(--amber); }
 .badge-progress .dot { background: var(--amber); }
 .badge-draft { background: #eef1f6; color: var(--muted); }
-.badge-draft .dot { background: var(--muted); }
-.mini-track { width: 150px; max-width: 100%; height: 6px; background: #e6ebf3; border-radius: 999px; overflow: hidden; }
-.mini-fill { height: 100%; background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-radius: 999px; transition: width .3s ease; }
+.badge-draft .dot { background: var(--faint); }
+.mini-track { width: 140px; max-width: 100%; height: 5px; background: #e6ecf5; border-radius: 999px; overflow: hidden; }
+.mini-fill { height: 100%; background: linear-gradient(90deg, var(--indigo-700), var(--indigo-500)); border-radius: 999px; transition: width .3s ease; }
 .mini-fill.done { background: linear-gradient(90deg, #0f9f6e, #34c98a); }
-.status-sub { color: var(--muted); font-size: 0.78rem; }
+.status-sub { color: var(--faint); font-size: .76rem; }
 
-.empty-state {
-  display: grid;
-  grid-template-columns: minmax(240px, 390px) minmax(280px, 1fr);
-  align-items: center;
-  gap: 52px;
-  padding: 30px 70px 50px;
-  min-height: 390px;
-}
-.document-art {
-  width: 300px;
-  max-width: 100%;
-  height: 330px;
-  border-radius: 8px;
-  background: linear-gradient(180deg, #f3f7ff, #eaf1ff);
-  border: 1px solid #d7e2f4;
-  position: relative;
-  box-shadow: 0 20px 40px rgba(6,26,58,0.06);
-  margin-left: auto;
-}
-.document-art::before,
-.document-art::after { content: ""; position: absolute; left: 42px; right: 42px; height: 8px; border-radius: 99px; background: #cfdcf8; }
-.document-art::before { top: 54px; box-shadow: 0 32px 0 #cfdcf8, 0 64px 0 #cfdcf8, 0 96px 0 #cfdcf8, 0 128px 0 #cfdcf8; }
-.document-art::after { bottom: 76px; width: 110px; right: auto; border: 3px solid var(--blue-700); background: transparent; height: 20px; border-radius: 2px; }
-.empty-copy h2 { font-size: clamp(2rem, 3vw, 2.6rem); color: var(--blue-900); line-height: 1.05; letter-spacing: -0.055em; font-weight: 550; margin-bottom: 16px; }
-.empty-copy p { color: var(--blue-900); max-width: 660px; line-height: 1.65; font-size: 1rem; margin-bottom: 28px; }
-.primary-cta {
-  min-height: 58px;
-  padding: 0 24px;
-  border-radius: 8px;
-  border: 1px solid var(--blue-900);
-  background: var(--blue-900);
-  color: #fff;
-  font-weight: 950;
-  font-size: 1rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.secondary-link { margin-left: 18px; color: var(--blue-700); font-weight: 850; }
-.pagination {
-  min-height: 70px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 26px;
-  background: #fff;
-  color: var(--blue-900);
-  font-weight: 850;
-}
-.page-size {
-  height: 48px;
-  min-width: 140px;
-  border: 1px solid #91a0b5;
-  border-radius: 8px;
-  padding: 0 16px;
-  color: var(--blue-900);
-  background: #fff;
-  font-weight: 850;
-}
-.loading, .error { padding: 40px; color: var(--muted); }
-.hidden { display: none !important; }
-@media (max-width: 1000px) {
-  .top-nav { grid-template-columns: 1fr auto; height: auto; min-height: 76px; }
-  .nav-tabs { grid-column: 1 / -1; overflow-x: auto; height: 56px; }
-  .top-actions { align-self: start; }
+/* empty / loading */
+.empty-state { display: none; flex-direction: column; align-items: center; text-align: center; padding: 64px 24px; }
+.empty-state.show { display: flex; }
+.empty-icon { width: 64px; height: 64px; border-radius: 16px; background: var(--indigo-050); display: grid; place-items: center; margin-bottom: 18px; }
+.empty-icon svg { width: 30px; height: 30px; stroke: var(--indigo-700); stroke-width: 1.6; fill: none; }
+.empty-state h2 { font-size: 1.15rem; font-weight: 800; letter-spacing: -.02em; margin-bottom: 6px; color: var(--violet); }
+.empty-state p { color: var(--muted); max-width: 380px; line-height: 1.6; margin-bottom: 20px; }
+.empty-cta { height: 42px; padding: 0 22px; border-radius: 9px; background: var(--indigo-700); color: #fff; border: none; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; }
+.empty-cta:hover { background: var(--violet); }
+.loading { padding: 36px 24px; color: var(--muted); text-align: center; }
+.error { padding: 36px 24px; color: #b91c1c; text-align: center; }
+
+@media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
-  .sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
-  .sidebar-primary { width: calc(100% - 32px); }
-  .content { padding: 28px 18px 44px; }
-  .get-started { justify-content: flex-start; flex-wrap: wrap; }
+  .sidebar { display: none; }
+  .content { padding: 22px 16px 44px; }
   .table-head { display: none; }
-  .table-row { grid-template-columns: 34px 1fr; min-height: auto; padding: 18px; gap: 12px; }
-  .table-row > div:nth-child(n+3) { grid-column: 2; }
-  .empty-state { grid-template-columns: 1fr; padding: 30px 24px; }
-  .document-art { margin: 0 auto; height: 260px; }
-  .clear-btn { margin-left: 0; }
+  .table-row { grid-template-columns: 1fr auto; gap: 10px; padding: 16px; }
+  .table-row .status-cell { grid-column: 1 / -1; }
+  .row-updated { display: none; }
 }
 </style>
 </head>
 <body>
-<div class="app">
   <header class="top-nav">
-  <a href="/welcome" class="brand" aria-label="Connexion Two home">
-    <div class="c2-logo">C2</div>
-    <div><div class="brand-name">Connexion Two</div><div class="brand-sub">Document Workflow System</div></div>
-  </a>
-  <nav class="nav-tabs" aria-label="Main navigation">
-    <a href="/document-creation" class="active">Agreements</a>
-    <a href="/templates" class="">Templates</a>
-  </nav>
-  <div class="top-actions">
-    <div class="trial-left">14 Days Left</div>
-    <button class="buy-btn" type="button">Buy Now</button>
-    <div class="avatar">AP</div>
-  </div>
-</header>
-  <section class="get-started">
-  <div class="get-started-title">Get started</div>
-  <div class="progress-track"><div class="progress-fill"></div></div>
-  <a class="get-started-link" href="#">1/5 actions completed</a>
-  <span class="get-started-link" style="text-decoration:none;">What's next?</span>
-  <a class="get-started-action" href="/document-creation">Send a Document</a>
-</section>
+    <a href="/welcome" class="brand" aria-label="Connexion Two home">
+      <div class="c2-logo">C2</div>
+      <div class="brand-name">Connexion Two</div>
+    </a>
+    <nav class="nav-tabs" aria-label="Main navigation">
+      <a href="/document-creation" class="active">Agreements</a>
+      <a href="/templates">Templates</a>
+    </nav>
+    <div class="top-actions">
+      <span class="trial-left">14 days left</span>
+      <button class="buy-btn" type="button">Upgrade</button>
+      <div class="avatar">AP</div>
+    </div>
+  </header>
+
   <div class="layout">
     <aside class="sidebar">
-      <a class="sidebar-primary" href="/document-creation">Start Now</a>
-      <div class="sidebar-section">
-        <div class="sidebar-heading">Envelopes</div>
-        <div class="sidebar-nav" role="tablist" aria-label="Agreement folders">
-          <button class="sidebar-item active" type="button" data-folder="inbox">
-            <span class="sidebar-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h5l2 3h2l2-3h5"></path><path d="M5 5h14l2 8v6H3v-6z"></path></svg></span>
-            <span>Inbox</span>
-            <span class="count-pill" data-count="inbox">0</span>
-          </button>
-          <button class="sidebar-item" type="button" data-folder="sent">
-            <span class="sidebar-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l17 8-17 8 4-8z"></path><path d="M8 12h13"></path></svg></span>
-            <span>Awaiting Signature</span>
-            <span class="count-pill" data-count="sent">0</span>
-          </button>
-          <button class="sidebar-item" type="button" data-folder="completed">
-            <span class="sidebar-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.6 2.6L16.5 9"></path></svg></span>
-            <span>Completed</span>
-            <span class="count-pill" data-count="completed">0</span>
-          </button>
-        </div>
-      </div>
+      <button class="new-btn" type="button" onclick="window.location.href='/document-creation'">
+        <svg viewBox="0 0 24 24" width="17" height="17" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 5v14M5 12h14"/></svg>
+        New Agreement
+      </button>
+      <div class="side-label">Folders</div>
+      <button class="side-item active" type="button" data-folder="inbox">
+        <svg viewBox="0 0 24 24"><path d="M4 13h5l2 3h2l2-3h5"/><path d="M5 5h14l2 8v6H3v-6z"/></svg>
+        <span>All</span><span class="count-pill" data-count="inbox">0</span>
+      </button>
+      <button class="side-item" type="button" data-folder="sent">
+        <svg viewBox="0 0 24 24"><path d="M4 4l17 8-17 8 4-8z"/><path d="M8 12h13"/></svg>
+        <span>Awaiting Signature</span><span class="count-pill" data-count="sent">0</span>
+      </button>
+      <button class="side-item" type="button" data-folder="completed">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.6 2.6L16.5 9"/></svg>
+        <span>Completed</span><span class="count-pill" data-count="completed">0</span>
+      </button>
     </aside>
+
     <main class="content">
       <div class="content-top">
-        <h1 class="page-title" id="folderTitle">Inbox</h1>
-        <button class="access-btn" type="button">Shared Access <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+        <h1 class="page-title" id="folderTitle">All Agreements</h1>
+        <span class="page-count" id="pageCount"></span>
       </div>
+
       <div class="toolbar">
-        <div class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M16 16l5 5"></path></svg><input id="searchInput" type="search" placeholder="Search Inbox and Folders" /></div>
-        <button class="filter-btn" type="button">Date: Last 6 Months</button>
-        <button class="filter-btn" type="button">Status</button>
-        <button class="filter-btn" type="button">Sender</button>
-        <button class="filter-btn" type="button">Filters</button>
-        <button class="clear-btn" type="button" id="clearSearch">Clear All</button>
-      </div>
-      <section class="table-card">
-        <div class="table-head"><div></div><div>Name</div><div>Signing Progress</div><div>Updated</div><div></div></div>
-        <div id="agreementRows"><div class="loading">Loading agreements...</div></div>
-        <div class="empty-state hidden" id="emptyState">
-          <div class="document-art"></div>
-          <div class="empty-copy">
-            <h2>Send your first document for signature</h2>
-            <p>Upload an agreement, add recipients, place signing fields, and send it from your Connexion Two workspace.</p>
-            <a class="primary-cta" href="/document-creation">Send a Document</a>
-            <a class="secondary-link" href="/templates">Use a template</a>
-          </div>
+        <div class="search">
+          <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M16 16l5 5"/></svg>
+          <input id="searchInput" type="search" placeholder="Search agreements" />
         </div>
-        <div class="pagination"><select class="page-size"><option>25 / Page</option><option>50 / Page</option></select><div>Page 1</div></div>
+        <select class="filter-select" id="dateRange" aria-label="Date range">
+          <option value="7">Last 7 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="180">Last 6 months</option>
+          <option value="365">Last year</option>
+          <option value="0">All time</option>
+        </select>
+        <button class="filter-btn" type="button" id="clearSearch">Clear</button>
+      </div>
+
+      <section class="table-card">
+        <div class="table-head">
+          <div>Name</div>
+          <div>Signing Progress</div>
+          <div class="col-updated" id="sortUpdated" title="Sort by date">Updated <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+          <div></div>
+        </div>
+        <div id="agreementRows"><div class="loading">Loading agreements…</div></div>
+        <div class="empty-state" id="emptyState">
+          <div class="empty-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/></svg></div>
+          <h2>No agreements in this range</h2>
+          <p>Nothing matches the current folder, search, and date range. Try widening the date range or sending a new document.</p>
+          <button class="empty-cta" type="button" onclick="window.location.href='/document-creation'">Send a Document</button>
+        </div>
       </section>
     </main>
   </div>
-</div>
+
 <script>
-const SB_URL = 'https://xbwuvaxtnylqvagdvpxp.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc';
-const LOGIN_URL = 'https://www.connexiontwo.com/';
+const SB_URL = 'https://rfdvogakvyodixgpvqvz.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
 const sb = supabase.createClient(SB_URL, SB_KEY);
 let allAgreements = [];
 let currentFolder = 'inbox';
+let rangeDays = 30;      // default: last 30 days
+let sortAsc = false;     // default: newest first
 
 function fmtDate(value) { if(!value) return ''; return new Date(value).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }); }
 function escapeHtml(value) { return String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-async function requireSession() {
-  const { data: { session } } = await sb.auth.getSession();
-  if(!session) { window.location.replace(LOGIN_URL); return null; }
-  return session;
-}
-
-// Read the signing-progress view (preferred). Falls back to the raw table.
+// Read the signing-progress view; fall back to the raw table if the view is missing.
 async function loadAgreements() {
   const rows = document.getElementById('agreementRows');
   let result = await sb.from('v_agreement_progress')
@@ -475,13 +309,12 @@ async function loadAgreements() {
     .order('updated_at', { ascending:false });
 
   if(result.error) {
-    // Fallback if the view hasn't been created yet.
     result = await sb.from('signer_documents')
-      .select('doc_id,title,status,created_at,updated_at,final_pdf_url')
+      .select('doc_id,title,status,created_at')
       .order('created_at', { ascending:false });
   }
   if(result.error) {
-    rows.innerHTML = '<div class="error">Could not load agreements. Run the agreements SQL in Supabase to create the tables and the v_agreement_progress view.</div>';
+    rows.innerHTML = '<div class="error">Could not load agreements. Run the agreements SQL (v_agreement_progress view) in this Supabase project.</div>';
     return;
   }
   allAgreements = (result.data || []).map(normalize);
@@ -493,14 +326,16 @@ function normalize(a) {
   const signed = Number(a.signed_count || 0);
   const statusRaw = String(a.status || '').toLowerCase();
   const completed = statusRaw.includes('complete') || (total > 0 && signed >= total) || !!a.completed_at;
-  let phase;            // 'completed' | 'progress' | 'draft'
+  let phase;
   if(completed) phase = 'completed';
-  else if(statusRaw.includes('progress') || signed > 0 || total > 0) phase = 'progress';
+  else if(statusRaw.includes('progress') || statusRaw.includes('pending') || signed > 0 || total > 0) phase = 'progress';
   else phase = 'draft';
+  const updated = a.updated_at || a.created_at;
   return {
     doc_id: a.doc_id,
     title: a.title || 'Untitled Agreement',
-    updated: a.updated_at || a.created_at,
+    updated,
+    updatedMs: updated ? new Date(updated).getTime() : 0,
     total, signed, phase,
     current_order: a.current_signer_order,
     current_name: a.current_signer_name || '',
@@ -510,26 +345,27 @@ function normalize(a) {
 function inFolder(a) {
   if(currentFolder === 'completed') return a.phase === 'completed';
   if(currentFolder === 'sent')      return a.phase === 'progress';
-  return true; // inbox = everything
+  return true;
 }
-
+function inRange(a) {
+  if(!rangeDays) return true;           // "All time"
+  if(!a.updatedMs) return true;         // keep undated rows visible
+  return a.updatedMs >= (Date.now() - rangeDays * 86400000);
+}
 function folderLabel(folder) {
-  return folder === 'sent' ? 'Awaiting Signature' : folder === 'completed' ? 'Completed' : 'Inbox';
+  return folder === 'sent' ? 'Awaiting Signature' : folder === 'completed' ? 'Completed' : 'All Agreements';
 }
-
 function updateFolderUI() {
-  const label = folderLabel(currentFolder);
-  document.getElementById('folderTitle').textContent = label;
-  document.getElementById('searchInput').placeholder = `Search ${label} and Folders`;
+  document.getElementById('folderTitle').textContent = folderLabel(currentFolder);
   document.querySelectorAll('[data-folder]').forEach(btn => btn.classList.toggle('active', btn.dataset.folder === currentFolder));
 }
-
 function updateCounts() {
-  const inbox = allAgreements.length;
-  const sent = allAgreements.filter(a => a.phase === 'progress').length;
-  const completed = allAgreements.filter(a => a.phase === 'completed').length;
+  // counts reflect the active date range
+  const inRangeList = allAgreements.filter(inRange);
   const set = (k,v) => { const el = document.querySelector(`[data-count="${k}"]`); if(el) el.textContent = v; };
-  set('inbox', inbox); set('sent', sent); set('completed', completed);
+  set('inbox', inRangeList.length);
+  set('sent', inRangeList.filter(a => a.phase === 'progress').length);
+  set('completed', inRangeList.filter(a => a.phase === 'completed').length);
 }
 
 function progressCell(a) {
@@ -542,9 +378,9 @@ function progressCell(a) {
   }
   if(a.phase === 'progress') {
     const pct = a.total ? Math.round((a.signed / a.total) * 100) : 0;
-    const who = a.current_name ? ` · with ${escapeHtml(a.current_name)}` : (a.current_order ? ` · signer ${a.current_order}` : '');
+    const who = a.current_name ? ` · ${escapeHtml(a.current_name)}` : (a.current_order ? ` · signer ${a.current_order}` : '');
     return `<div class="status-cell">
-      <span class="status-badge badge-progress"><span class="dot"></span>In Progress</span>
+      <span class="status-badge badge-progress"><span class="dot"></span>Awaiting Signature</span>
       <div class="mini-track"><div class="mini-fill" style="width:${pct}%"></div></div>
       <span class="status-sub">Signed ${a.signed} of ${a.total}${who}</span>
     </div>`;
@@ -559,37 +395,48 @@ function renderAgreements() {
   updateFolderUI();
   updateCounts();
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
-  const foldered = allAgreements.filter(inFolder);
-  const filtered = q ? foldered.filter(a => a.title.toLowerCase().includes(q)) : foldered;
+  let list = allAgreements.filter(a => inFolder(a) && inRange(a));
+  if(q) list = list.filter(a => a.title.toLowerCase().includes(q));
+  list.sort((a,b) => sortAsc ? a.updatedMs - b.updatedMs : b.updatedMs - a.updatedMs);
+
   const rows = document.getElementById('agreementRows');
   const empty = document.getElementById('emptyState');
-  if(!filtered.length) { rows.innerHTML = ''; empty.classList.remove('hidden'); return; }
-  empty.classList.add('hidden');
-  rows.innerHTML = filtered.map(a => `
+  document.getElementById('pageCount').textContent = list.length ? `${list.length} item${list.length===1?'':'s'}` : '';
+  if(!list.length) { rows.innerHTML = ''; empty.classList.add('show'); return; }
+  empty.classList.remove('show');
+  rows.innerHTML = list.map(a => `
     <div class="table-row">
-      <div><div class="radio-dot"></div></div>
-      <div><div class="item-title">${escapeHtml(a.title)}</div><div class="item-sub">Agreement</div></div>
+      <div class="doc-cell">
+        <div class="doc-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div>
+        <div class="doc-meta"><div class="item-title">${escapeHtml(a.title)}</div><div class="item-sub">Agreement</div></div>
+      </div>
       <div>${progressCell(a)}</div>
-      <div>${fmtDate(a.updated)}</div>
+      <div class="row-updated">${fmtDate(a.updated)}</div>
       <div><button class="row-action" type="button" data-open="${escapeHtml(a.doc_id)}">Open</button></div>
     </div>`).join('');
-  rows.querySelectorAll('[data-open]').forEach(btn =>
-    btn.addEventListener('click', () => openAgreement(btn.dataset.open)));
+  rows.querySelectorAll('[data-open]').forEach(btn => btn.addEventListener('click', () => openAgreement(btn.dataset.open)));
 }
 
 function openAgreement(id) { window.location.href = '/document-creation?id=' + encodeURIComponent(id); }
 
 document.getElementById('searchInput').addEventListener('input', renderAgreements);
-document.getElementById('clearSearch').addEventListener('click', () => { document.getElementById('searchInput').value=''; renderAgreements(); });
+document.getElementById('clearSearch').addEventListener('click', () => {
+  document.getElementById('searchInput').value='';
+  document.getElementById('dateRange').value='30'; rangeDays = 30;
+  renderAgreements();
+});
+document.getElementById('dateRange').addEventListener('change', (e) => { rangeDays = Number(e.target.value); renderAgreements(); });
+document.getElementById('sortUpdated').addEventListener('click', () => {
+  sortAsc = !sortAsc;
+  document.getElementById('sortUpdated').classList.toggle('asc', sortAsc);
+  renderAgreements();
+});
 document.querySelectorAll('[data-folder]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    currentFolder = btn.dataset.folder;
-    document.getElementById('searchInput').value = '';
-    renderAgreements();
-  });
+  btn.addEventListener('click', () => { currentFolder = btn.dataset.folder; document.getElementById('searchInput').value=''; renderAgreements(); });
 });
 
-(async()=>{ const session = await requireSession(); if(session) loadAgreements(); })();
+// Load immediately — auth lives in a different project, so don't gate/redirect here.
+loadAgreements();
 </script>
 </body>
 </html>
