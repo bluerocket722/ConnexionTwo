@@ -1,1 +1,626 @@
-adsf
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Connexion Two | Templates</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    :root {
+      --blue-950: #041124;
+      --blue-900: #061a3a;
+      --blue-800: #082b61;
+      --blue-700: #0054d1;
+      --blue-600: #0068ff;
+      --blue-500: #1683ff;
+      --blue-100: #eaf3ff;
+      --blue-050: #f5f9ff;
+      --text: #111827;
+      --muted: #5f6b7a;
+      --line: #d9e2ef;
+      --panel: #ffffff;
+      --bg: #f7f9fc;
+      --success: #0f9f6e;
+      --danger: #d93025;
+      --shadow: 0 22px 70px rgba(6, 26, 58, 0.10);
+      --shadow-soft: 0 12px 38px rgba(6, 26, 58, 0.06);
+      --purple: #12002f;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; }
+    body { background: var(--bg); color: var(--text); font-family: Inter, Arial, Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+    button, input, select { font: inherit; }
+
+    .app { min-height: 100vh; background: linear-gradient(180deg, #fff 0%, #f7f9fc 50%, #f2f6fb 100%); }
+
+    .top-nav {
+      height: 82px;
+      display: grid;
+      grid-template-columns: 258px 1fr auto;
+      align-items: center;
+      gap: 24px;
+      padding: 0 28px;
+      background: rgba(255,255,255,0.96);
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(14px);
+    }
+    .brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
+    .c2-logo { width: 42px; height: 42px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--blue-900), var(--blue-700)); border-radius: 12px; font-weight: 950; letter-spacing: -0.04em; box-shadow: 0 10px 24px rgba(0,84,209,.18); }
+    .brand-name { color: var(--blue-900); font-weight: 950; font-size: 1.08rem; letter-spacing: -0.035em; }
+    .brand-sub { color: var(--muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; margin-top: 2px; }
+    .nav-tabs { display: flex; align-items: stretch; align-self: stretch; gap: 2px; }
+    .nav-tabs a { display: flex; align-items: center; padding: 0 22px; color: #475569; font-size: .98rem; font-weight: 850; border-bottom: 3px solid transparent; transition: .18s ease; }
+    .nav-tabs a:hover, .nav-tabs a.active { color: var(--blue-700); border-bottom-color: var(--blue-700); background: linear-gradient(180deg, transparent, rgba(0,104,255,.045)); }
+    .top-actions { display: flex; align-items: center; gap: 12px; }
+    .trial-left { color: var(--blue-800); font-size: .96rem; font-weight: 900; white-space: nowrap; }
+    .buy-btn { height: 44px; padding: 0 20px; border: 1px solid var(--blue-700); border-radius: 999px; background: var(--blue-700); color: #fff; font-size: .95rem; font-weight: 900; cursor: pointer; box-shadow: 0 10px 22px rgba(0,84,209,.22); }
+    .icon-btn { width: 42px; height: 42px; border: 1px solid var(--line); background: #fff; color: var(--blue-800); border-radius: 50%; cursor: pointer; display: grid; place-items: center; font-size: 1.1rem; font-weight: 900; }
+    .avatar { width: 46px; height: 46px; border-radius: 50%; background: linear-gradient(135deg, var(--blue-100), #d8ebff); color: var(--blue-800); display: grid; place-items: center; font-size: .98rem; font-weight: 900; border: 1px solid #c7dcf8; }
+
+    .system-strip { min-height: 58px; background: #f3f7fc; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: center; gap: 10px; color: #25364f; font-size: .95rem; padding: 12px 24px; }
+    .info-dot { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--blue-800); color: var(--blue-800); display: grid; place-items: center; font-size: .82rem; font-weight: 950; flex: 0 0 auto; }
+
+    .layout { display: grid; grid-template-columns: 294px 1fr; min-height: calc(100vh - 140px); }
+    .side-nav { background: #fff; border-right: 1px solid var(--line); padding: 18px 0; }
+    .side-heading { padding: 0 24px 14px; color: var(--blue-900); font-weight: 950; letter-spacing: -0.03em; }
+    .side-item { width: 100%; height: 48px; border: 0; background: transparent; color: #35425a; display: grid; grid-template-columns: 32px 1fr; gap: 10px; align-items: center; padding: 0 24px; text-align: left; cursor: pointer; font-weight: 820; }
+    .side-item:hover, .side-item.active { background: #eef3fb; color: var(--blue-900); }
+    .side-symbol { width: 24px; height: 24px; display: grid; place-items: center; color: var(--blue-800); }
+    .side-rule { height: 1px; background: var(--line); margin: 14px 0; }
+
+    .main { padding: 34px 38px 56px; min-width: 0; }
+    .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; margin-bottom: 28px; }
+    .eyebrow { color: var(--blue-700); font-weight: 950; text-transform: uppercase; letter-spacing: .12em; font-size: .78rem; margin-bottom: 10px; }
+    h1 { color: var(--blue-950); font-size: clamp(2rem, 4vw, 3.4rem); line-height: .95; letter-spacing: -.07em; font-weight: 900; }
+    .lead { color: var(--muted); font-size: 1rem; max-width: 680px; line-height: 1.65; margin-top: 14px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+    .btn { min-height: 46px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--blue-900); font-weight: 900; padding: 0 18px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: .16s ease; }
+    .btn:hover { border-color: #aac8ef; background: var(--blue-050); transform: translateY(-1px); }
+    .btn-primary { background: var(--blue-700); border-color: var(--blue-700); color: #fff; box-shadow: 0 10px 22px rgba(0,84,209,.20); }
+    .btn-primary:hover { background: var(--blue-600); color: #fff; }
+    .btn-danger { color: var(--danger); border-color: #ffd3cf; }
+    .btn-small { min-height: 36px; padding: 0 12px; font-size: .84rem; border-radius: 8px; }
+
+    .template-shell { background: #fff; border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-soft); overflow: hidden; }
+    .template-toolbar { padding: 18px; display: flex; justify-content: space-between; align-items: center; gap: 16px; border-bottom: 1px solid var(--line); }
+    .search { position: relative; width: min(420px, 100%); }
+    .search input { width: 100%; height: 46px; border: 1px solid #bfcce0; border-radius: 10px; padding: 0 14px 0 42px; outline: 0; color: var(--blue-900); font-size: .96rem; }
+    .search input:focus { border-color: var(--blue-600); box-shadow: 0 0 0 4px rgba(0,104,255,.12); }
+    .search-mark { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 17px; height: 17px; border: 3px solid var(--blue-900); border-radius: 50%; }
+    .search-mark::after { content: ''; position: absolute; width: 8px; height: 3px; background: var(--blue-900); transform: rotate(45deg); right: -7px; bottom: -4px; border-radius: 999px; }
+
+    .template-table { width: 100%; border-collapse: collapse; }
+    .template-table th { color: var(--blue-900); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; text-align: left; padding: 16px 22px; border-bottom: 1px solid var(--line); }
+    .template-table td { padding: 20px 22px; border-bottom: 1px solid var(--line); color: var(--blue-950); font-size: .98rem; }
+    .template-table tr:hover td { background: #fbfdff; }
+    .radio-dot { width: 24px; height: 24px; border-radius: 50%; border: 3px solid #8a829a; display: block; }
+    .pill { display: inline-flex; align-items: center; min-height: 28px; border-radius: 999px; padding: 0 10px; background: var(--blue-050); color: var(--blue-800); font-weight: 850; font-size: .8rem; }
+
+    .builder { display: none; grid-template-columns: 1fr 316px; gap: 22px; align-items: start; }
+    .builder.open { display: grid; }
+    .builder-bar { grid-column: 1 / -1; background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: flex; justify-content: space-between; align-items: center; gap: 16px; box-shadow: var(--shadow-soft); }
+    .builder-title { color: var(--blue-950); font-weight: 950; letter-spacing: -.03em; font-size: 1.1rem; }
+    .builder-sub { color: var(--muted); font-size: .86rem; margin-top: 4px; }
+    .pdf-area { background: #eef3fb; border: 1px solid var(--line); border-radius: 16px; min-height: 620px; padding: 28px; overflow: auto; box-shadow: inset 0 1px 0 rgba(255,255,255,.55); }
+    #pdfViewer { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+    .page-wrap { position: relative; background: #fff; box-shadow: 0 16px 44px rgba(6,26,58,.15); }
+    .field-box { position: absolute; border: 2px solid var(--blue-700); background: rgba(0,84,209,.10); color: var(--blue-900); font-size: 11px; font-weight: 950; display: flex; align-items: center; justify-content: center; cursor: move; user-select: none; border-radius: 4px; z-index: 10; text-transform: uppercase; letter-spacing: .04em; }
+    .field-box.active { box-shadow: 0 0 0 4px rgba(0,104,255,.14); }
+    .resize-handle { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; border-radius: 50%; background: var(--blue-700); cursor: nwse-resize; }
+    .builder-side { background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-soft); overflow: hidden; position: sticky; top: 104px; }
+    .side-block { padding: 18px; border-bottom: 1px solid var(--line); }
+    .side-block:last-child { border-bottom: 0; }
+    .block-title { color: var(--blue-950); font-size: .94rem; font-weight: 950; margin-bottom: 12px; }
+    .palette { display: grid; gap: 10px; }
+    .palette button { min-height: 42px; border: 1px solid var(--line); border-radius: 10px; background: #fbfdff; color: var(--blue-900); font-weight: 900; cursor: pointer; text-align: left; padding: 0 13px; }
+    .palette button:hover { border-color: var(--blue-500); background: var(--blue-050); }
+    .form-grid { display: grid; gap: 10px; }
+    .field-control label { display: block; color: var(--muted); font-size: .74rem; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
+    .field-control input, .field-control select { width: 100%; height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; outline: 0; color: var(--blue-900); background: #fff; }
+    .field-control input:focus, .field-control select:focus { border-color: var(--blue-600); box-shadow: 0 0 0 3px rgba(0,104,255,.12); }
+    .empty-state { padding: 54px 24px; text-align: center; color: var(--muted); }
+    .empty-title { color: var(--blue-900); font-weight: 950; font-size: 1.05rem; margin-bottom: 6px; }
+
+    .modal { position: fixed; inset: 0; background: rgba(6,26,58,.42); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.open { display: flex; }
+    .modal-card { width: min(520px, 100%); background: #fff; border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 24px; }
+    .modal-head { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+    .modal-title { color: var(--blue-950); font-weight: 950; font-size: 1.25rem; letter-spacing: -.04em; }
+    .modal-close { border: 0; background: transparent; color: var(--blue-900); font-size: 1.4rem; cursor: pointer; }
+    .upload-box { border: 1px dashed #aac8ef; background: var(--blue-050); border-radius: 14px; padding: 18px; }
+
+    @media (max-width: 1050px) {
+      .layout { grid-template-columns: 1fr; }
+      .side-nav { display: none; }
+      .top-nav { grid-template-columns: 1fr auto; }
+      .nav-tabs { display: none; }
+      .builder.open { grid-template-columns: 1fr; }
+      .builder-side { position: static; }
+    }
+    @media (max-width: 720px) {
+      .top-nav { padding: 12px 16px; height: auto; }
+      .trial-left, .buy-btn { display: none; }
+      .main { padding: 24px 16px 42px; }
+      .page-head, .template-toolbar, .builder-bar { flex-direction: column; align-items: stretch; }
+      .template-table th:nth-child(3), .template-table td:nth-child(3), .template-table th:nth-child(4), .template-table td:nth-child(4) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="top-nav">
+      <a href="/welcome" class="brand" aria-label="Connexion Two dashboard home">
+        <div class="c2-logo" aria-hidden="true">C2</div>
+        <div>
+          <div class="brand-name">Connexion Two</div>
+          <div class="brand-sub">Document Workflow System</div>
+        </div>
+      </a>
+
+      <nav class="nav-tabs" aria-label="Main navigation">
+        <a href="/welcome">Home</a>
+        <a href="/document-creation">Agreements</a>
+        <a href="/templates" class="active">Templates</a>
+        <a href="#">Reports</a>
+        <a href="#">Admin</a>
+      </nav>
+
+      <div class="top-actions">
+        <div class="trial-left">7 Days Left</div>
+        <button class="buy-btn" type="button">Buy Now</button>
+        <button class="icon-btn" type="button" id="signout" aria-label="Sign out">↪</button>
+        <div class="avatar">AP</div>
+      </div>
+    </header>
+
+    <div class="system-strip">
+      <span class="info-dot">i</span>
+      <span>Create reusable templates, place signer fields, and save exact signature coordinates for Connexion Two workflows.</span>
+    </div>
+
+    <div class="layout">
+      <aside class="side-nav">
+        <div class="side-heading">Templates</div>
+        <button class="side-item active" type="button" data-filter="starter"><span class="side-symbol">↓</span><span>Starter Templates</span></button>
+        <button class="side-item" type="button" data-filter="mine"><span class="side-symbol">○</span><span>My Templates</span></button>
+        <button class="side-item" type="button" data-filter="shared"><span class="side-symbol">◇</span><span>Shared with Me</span></button>
+        <button class="side-item" type="button" data-filter="all"><span class="side-symbol">□</span><span>All Templates</span></button>
+        <button class="side-item" type="button" data-filter="favorites"><span class="side-symbol">★</span><span>Favorites</span></button>
+        <div class="side-rule"></div>
+        <button class="side-item" type="button"><span class="side-symbol">▾</span><span>Folders</span></button>
+        <button class="side-item" type="button"><span class="side-symbol">▾</span><span>Shared Folders</span></button>
+      </aside>
+
+      <main class="main">
+        <section id="listView">
+          <div class="page-head">
+            <div>
+              <div class="eyebrow">Template Library</div>
+              <h1>Select a template</h1>
+              <p class="lead">Build reusable signing packets for agreements, purchase orders, statements of work, waivers, onboarding forms, and internal approvals.</p>
+            </div>
+            <div class="actions">
+              <button class="btn" type="button" onclick="window.location.href='/document-creation'">Get Signatures</button>
+              <button class="btn btn-primary" type="button" id="openCreateModal">New Template</button>
+            </div>
+          </div>
+
+          <div class="template-shell">
+            <div class="template-toolbar">
+              <div class="search"><span class="search-mark"></span><input id="templateSearch" type="text" placeholder="Search templates"></div>
+              <button class="btn btn-small" type="button" id="refreshTemplates">Refresh</button>
+            </div>
+            <div style="overflow:auto;">
+              <table class="template-table">
+                <thead>
+                  <tr><th style="width:72px;"></th><th>Name</th><th>Category</th><th>Fields</th><th>Updated</th><th></th></tr>
+                </thead>
+                <tbody id="templateRows"><tr><td colspan="6"><div class="empty-state"><div class="empty-title">Loading templates…</div></div></td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="builderView" class="builder">
+          <div class="builder-bar">
+            <div>
+              <div class="builder-title" id="builderTemplateName">Template Builder</div>
+              <div class="builder-sub">Click a field type, then click the document to place it. Drag or resize fields before saving.</div>
+            </div>
+            <div class="actions">
+              <button class="btn" type="button" id="backToTemplates">Back</button>
+              <button class="btn btn-danger" type="button" id="deleteSelectedField">Delete Field</button>
+              <button class="btn btn-primary" type="button" id="saveFields">Save Coordinates</button>
+            </div>
+          </div>
+          <div class="pdf-area"><div id="pdfViewer"></div></div>
+          <aside class="builder-side">
+            <div class="side-block">
+              <div class="block-title">Add fields</div>
+              <div class="palette">
+                <button type="button" data-field-type="signature">Signature</button>
+                <button type="button" data-field-type="initials">Initials</button>
+                <button type="button" data-field-type="name">Name</button>
+                <button type="button" data-field-type="date">Date</button>
+                <button type="button" data-field-type="text">Text</button>
+                <button type="button" data-field-type="checkbox">Checkbox</button>
+              </div>
+            </div>
+            <div class="side-block">
+              <div class="block-title">Selected field</div>
+              <div class="form-grid">
+                <div class="field-control"><label>Field Type</label><input id="fieldTypeDisplay" type="text" disabled></div>
+                <div class="field-control"><label>Signer Order</label><input id="signerOrderInput" type="number" min="1" value="1"></div>
+                <div class="field-control"><label>Required</label><select id="requiredInput"><option value="true">Required</option><option value="false">Optional</option></select></div>
+                <div class="field-control"><label>Label</label><input id="fieldLabelInput" type="text" placeholder="Field label"></div>
+              </div>
+            </div>
+            <div class="side-block">
+              <div class="block-title">Coordinates</div>
+              <div class="form-grid">
+                <div class="field-control"><label>Page</label><input id="coordPage" type="text" disabled></div>
+                <div class="field-control"><label>X %</label><input id="coordX" type="text" disabled></div>
+                <div class="field-control"><label>Y %</label><input id="coordY" type="text" disabled></div>
+                <div class="field-control"><label>Width %</label><input id="coordW" type="text" disabled></div>
+                <div class="field-control"><label>Height %</label><input id="coordH" type="text" disabled></div>
+              </div>
+            </div>
+          </aside>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal" id="createModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <div class="modal-title">Create template</div>
+          <p class="lead" style="margin-top:6px;">Upload a PDF and save it as a reusable Connexion Two signing template.</p>
+        </div>
+        <button class="modal-close" id="closeCreateModal" type="button">×</button>
+      </div>
+      <div class="form-grid">
+        <div class="field-control"><label>Template Name</label><input id="templateNameInput" type="text" placeholder="Statement of Work"></div>
+        <div class="field-control"><label>Category</label><input id="templateCategoryInput" type="text" placeholder="Cross-Industry"></div>
+        <div class="upload-box">
+          <div class="field-control"><label>PDF File</label><input id="templateFileInput" type="file" accept="application/pdf,.pdf"></div>
+        </div>
+        <button class="btn btn-primary" id="createTemplateBtn" type="button">Create Template</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SB_URL = 'https://xbwuvaxtnylqvagdvpxp.supabase.co';
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc';
+    const TEMPLATE_BUCKET = 'template-files';
+    const LOGIN_URL = 'https://www.connexiontwo.com/';
+    const sb = supabase.createClient(SB_URL, SB_KEY);
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    let userId = null;
+    let templates = [];
+    let currentTemplate = null;
+    let currentPdfDoc = null;
+    let currentFields = [];
+    let selectedField = null;
+    let selectedTool = 'signature';
+    let scale = 1.1;
+
+    const starterTemplates = [
+      { id:'starter-badge', name:'New Badge Request', category:'Cross-Industry', fields_count:0, updated_at:null, starter:true },
+      { id:'starter-po', name:'Purchase Order', category:'Cross-Industry', fields_count:0, updated_at:null, starter:true },
+      { id:'starter-sales', name:'Sales Contract', category:'Cross-Industry', fields_count:0, updated_at:null, starter:true },
+      { id:'starter-sow', name:'Statement of Work (SOW)', category:'Cross-Industry', fields_count:0, updated_at:null, starter:true },
+      { id:'starter-waiver', name:'Emergency Contact & Medical Waiver', category:'Education', fields_count:0, updated_at:null, starter:true }
+    ];
+
+    async function requireSession(){
+      const { data:{ session } } = await sb.auth.getSession();
+      if(!session){ window.location.replace(LOGIN_URL); return null; }
+      userId = session.user.id;
+      return session;
+    }
+
+    function fmtDate(iso){ return iso ? new Date(iso).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}) : 'Starter'; }
+
+    async function loadTemplates(){
+      const rows = document.getElementById('templateRows');
+      rows.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-title">Loading templates…</div></div></td></tr>';
+      const { data, error } = await sb
+        .from('document_templates')
+        .select('id,name,category,file_path,file_name,status,updated_at,created_at,template_fields(count)')
+        .order('updated_at', { ascending:false });
+      if(error){ rows.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-title">Could not load templates</div><div>'+error.message+'</div></div></td></tr>'; return; }
+      templates = (data || []).map(t => ({...t, fields_count: t.template_fields?.[0]?.count || 0 }));
+      renderTemplates();
+    }
+
+    function renderTemplates(){
+      const q = (document.getElementById('templateSearch').value || '').trim().toLowerCase();
+      const rows = document.getElementById('templateRows');
+      const combined = [...starterTemplates, ...templates];
+      const shown = q ? combined.filter(t => (t.name||'').toLowerCase().includes(q) || (t.category||'').toLowerCase().includes(q)) : combined;
+      if(!shown.length){ rows.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-title">No templates found</div><div>Create a new template or adjust your search.</div></div></td></tr>'; return; }
+      rows.innerHTML = shown.map(t => `
+        <tr>
+          <td><span class="radio-dot"></span></td>
+          <td><strong>${escapeHtml(t.name || 'Untitled Template')}</strong></td>
+          <td>${escapeHtml(t.category || 'General')}</td>
+          <td><span class="pill">${Number(t.fields_count||0)} fields</span></td>
+          <td>${fmtDate(t.updated_at || t.created_at)}</td>
+          <td>${t.starter ? '<button class="btn btn-small" disabled>Starter</button>' : `<button class="btn btn-small btn-primary" onclick="openBuilder('${t.id}')">Edit Fields</button>`}</td>
+        </tr>`).join('');
+    }
+
+    function escapeHtml(str){ return String(str).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+
+    document.getElementById('templateSearch').addEventListener('input', renderTemplates);
+    document.getElementById('refreshTemplates').addEventListener('click', loadTemplates);
+    document.querySelectorAll('.side-item[data-filter]').forEach(btn => btn.addEventListener('click', () => {
+      document.querySelectorAll('.side-item').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }));
+
+    const modal = document.getElementById('createModal');
+    document.getElementById('openCreateModal').addEventListener('click', () => modal.classList.add('open'));
+    document.getElementById('closeCreateModal').addEventListener('click', () => modal.classList.remove('open'));
+
+    document.getElementById('createTemplateBtn').addEventListener('click', async () => {
+      const name = document.getElementById('templateNameInput').value.trim();
+      const category = document.getElementById('templateCategoryInput').value.trim() || 'General';
+      const file = document.getElementById('templateFileInput').files[0];
+      if(!name) return alert('Enter a template name.');
+      if(!file) return alert('Upload a PDF template file.');
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+      const filePath = `${userId}/${crypto.randomUUID()}-${safeName}`;
+      const up = await sb.storage.from(TEMPLATE_BUCKET).upload(filePath, file, { upsert:false, contentType:'application/pdf' });
+      if(up.error) return alert('Upload failed: ' + up.error.message);
+      const ins = await sb.from('document_templates').insert({ user_id:userId, name, category, file_path:filePath, file_name:file.name, status:'active' }).select().single();
+      if(ins.error) return alert('Template save failed: ' + ins.error.message);
+      modal.classList.remove('open');
+      document.getElementById('templateNameInput').value = '';
+      document.getElementById('templateCategoryInput').value = '';
+      document.getElementById('templateFileInput').value = '';
+      await loadTemplates();
+      openBuilder(ins.data.id);
+    });
+
+    async function openBuilder(id){
+      currentTemplate = templates.find(t => String(t.id) === String(id));
+      if(!currentTemplate) return alert('Template not found.');
+      document.getElementById('listView').style.display = 'none';
+      document.getElementById('builderView').classList.add('open');
+      document.getElementById('builderTemplateName').textContent = currentTemplate.name;
+      const signed = await sb.storage.from(TEMPLATE_BUCKET).createSignedUrl(currentTemplate.file_path, 3600);
+      if(signed.error) return alert('Could not open template PDF: ' + signed.error.message);
+      const fieldResult = await sb.from('template_fields').select('*').eq('template_id', currentTemplate.id).order('page').order('created_at');
+      if(fieldResult.error) return alert('Could not load fields: ' + fieldResult.error.message);
+      currentFields = (fieldResult.data || []).map(dbToLocalField);
+      await renderPdf(signed.data.signedUrl);
+    }
+
+    document.getElementById('backToTemplates').addEventListener('click', () => {
+      document.getElementById('builderView').classList.remove('open');
+      document.getElementById('listView').style.display = '';
+      selectedField = null;
+      loadTemplates();
+    });
+
+    async function renderPdf(url){
+      currentPdfDoc = await pdfjsLib.getDocument(url).promise;
+      const viewer = document.getElementById('pdfViewer');
+      viewer.innerHTML = '';
+      for(let p=1; p<=currentPdfDoc.numPages; p++){
+        const page = await currentPdfDoc.getPage(p);
+        const viewport = page.getViewport({ scale });
+        const wrap = document.createElement('div');
+        wrap.className = 'page-wrap';
+        wrap.dataset.page = String(p);
+        wrap.style.width = viewport.width + 'px';
+        wrap.style.height = viewport.height + 'px';
+        const canvas = document.createElement('canvas');
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.floor(viewport.width * dpr);
+        canvas.height = Math.floor(viewport.height * dpr);
+        canvas.style.width = viewport.width + 'px';
+        canvas.style.height = viewport.height + 'px';
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+        await page.render({ canvasContext:ctx, viewport }).promise;
+        wrap.appendChild(canvas);
+        wrap.addEventListener('click', (e) => {
+          if(e.target !== wrap && e.target !== canvas) return;
+          const rect = wrap.getBoundingClientRect();
+          addField(p, (e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height);
+        });
+        viewer.appendChild(wrap);
+      }
+      currentFields.forEach(renderField);
+    }
+
+    document.querySelectorAll('[data-field-type]').forEach(btn => btn.addEventListener('click', () => {
+      selectedTool = btn.dataset.fieldType;
+      document.querySelectorAll('[data-field-type]').forEach(b => b.style.background = '#fbfdff');
+      btn.style.background = 'var(--blue-050)';
+    }));
+
+    function defaultSize(type){
+      if(type === 'checkbox') return { w:.035, h:.025 };
+      if(type === 'initials') return { w:.10, h:.045 };
+      if(type === 'date') return { w:.13, h:.035 };
+      return { w:.20, h:.055 };
+    }
+
+    function addField(page, x, y){
+      const s = defaultSize(selectedTool);
+      const field = {
+        local_id: crypto.randomUUID(),
+        id: null,
+        type: selectedTool,
+        page,
+        x_pct: Math.max(0, Math.min(.98, x)),
+        y_pct: Math.max(0, Math.min(.98, y)),
+        w_pct: s.w,
+        h_pct: s.h,
+        signer_order: Number(document.getElementById('signerOrderInput').value || 1),
+        required: true,
+        label: selectedTool.charAt(0).toUpperCase() + selectedTool.slice(1)
+      };
+      currentFields.push(field);
+      renderField(field);
+      selectField(field.local_id);
+    }
+
+    function renderField(field){
+      const wrap = document.querySelector(`.page-wrap[data-page="${field.page}"]`);
+      if(!wrap) return;
+      const el = document.createElement('div');
+      el.className = 'field-box';
+      el.dataset.localId = field.local_id;
+      el.textContent = field.label || field.type;
+      el.style.left = (field.x_pct * 100) + '%';
+      el.style.top = (field.y_pct * 100) + '%';
+      el.style.width = (field.w_pct * 100) + '%';
+      el.style.height = (field.h_pct * 100) + '%';
+      const handle = document.createElement('div');
+      handle.className = 'resize-handle';
+      el.appendChild(handle);
+      wrap.appendChild(el);
+      makeDraggable(el, field, wrap);
+      handle.addEventListener('pointerdown', (e) => startResize(e, el, field, wrap));
+      el.addEventListener('click', (e) => { e.stopPropagation(); selectField(field.local_id); });
+    }
+
+    function selectField(localId){
+      selectedField = currentFields.find(f => f.local_id === localId);
+      document.querySelectorAll('.field-box').forEach(el => el.classList.toggle('active', el.dataset.localId === localId));
+      if(!selectedField) return;
+      document.getElementById('fieldTypeDisplay').value = selectedField.type;
+      document.getElementById('signerOrderInput').value = selectedField.signer_order;
+      document.getElementById('requiredInput').value = String(selectedField.required);
+      document.getElementById('fieldLabelInput').value = selectedField.label || '';
+      updateCoordPanel();
+    }
+
+    function updateCoordPanel(){
+      if(!selectedField) return;
+      document.getElementById('coordPage').value = selectedField.page;
+      document.getElementById('coordX').value = (selectedField.x_pct * 100).toFixed(2);
+      document.getElementById('coordY').value = (selectedField.y_pct * 100).toFixed(2);
+      document.getElementById('coordW').value = (selectedField.w_pct * 100).toFixed(2);
+      document.getElementById('coordH').value = (selectedField.h_pct * 100).toFixed(2);
+    }
+
+    ['signerOrderInput','requiredInput','fieldLabelInput'].forEach(id => document.getElementById(id).addEventListener('input', () => {
+      if(!selectedField) return;
+      selectedField.signer_order = Number(document.getElementById('signerOrderInput').value || 1);
+      selectedField.required = document.getElementById('requiredInput').value === 'true';
+      selectedField.label = document.getElementById('fieldLabelInput').value.trim() || selectedField.type;
+      const el = document.querySelector(`.field-box[data-local-id="${selectedField.local_id}"]`);
+      if(el) el.firstChild.nodeValue = selectedField.label;
+    }));
+
+    function makeDraggable(el, field, wrap){
+      el.addEventListener('pointerdown', (e) => {
+        if(e.target.classList.contains('resize-handle')) return;
+        e.preventDefault();
+        selectField(field.local_id);
+        const startX = e.clientX, startY = e.clientY;
+        const startLeft = field.x_pct, startTop = field.y_pct;
+        const rect = wrap.getBoundingClientRect();
+        function move(ev){
+          field.x_pct = Math.max(0, Math.min(1 - field.w_pct, startLeft + (ev.clientX - startX) / rect.width));
+          field.y_pct = Math.max(0, Math.min(1 - field.h_pct, startTop + (ev.clientY - startY) / rect.height));
+          el.style.left = (field.x_pct * 100) + '%';
+          el.style.top = (field.y_pct * 100) + '%';
+          updateCoordPanel();
+        }
+        function up(){ window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); }
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+      });
+    }
+
+    function startResize(e, el, field, wrap){
+      e.preventDefault(); e.stopPropagation();
+      selectField(field.local_id);
+      const startX = e.clientX, startY = e.clientY;
+      const startW = field.w_pct, startH = field.h_pct;
+      const rect = wrap.getBoundingClientRect();
+      function move(ev){
+        field.w_pct = Math.max(.02, Math.min(1 - field.x_pct, startW + (ev.clientX - startX) / rect.width));
+        field.h_pct = Math.max(.018, Math.min(1 - field.y_pct, startH + (ev.clientY - startY) / rect.height));
+        el.style.width = (field.w_pct * 100) + '%';
+        el.style.height = (field.h_pct * 100) + '%';
+        updateCoordPanel();
+      }
+      function up(){ window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); }
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    }
+
+    document.getElementById('deleteSelectedField').addEventListener('click', async () => {
+      if(!selectedField) return alert('Select a field first.');
+      if(selectedField.id){ await sb.from('template_fields').delete().eq('id', selectedField.id); }
+      document.querySelector(`.field-box[data-local-id="${selectedField.local_id}"]`)?.remove();
+      currentFields = currentFields.filter(f => f.local_id !== selectedField.local_id);
+      selectedField = null;
+      ['fieldTypeDisplay','coordPage','coordX','coordY','coordW','coordH'].forEach(id => document.getElementById(id).value = '');
+    });
+
+    document.getElementById('saveFields').addEventListener('click', async () => {
+      if(!currentTemplate) return;
+      const rows = currentFields.map(f => ({
+        id: f.id || undefined,
+        template_id: currentTemplate.id,
+        user_id: userId,
+        field_type: f.type,
+        label: f.label,
+        page: f.page,
+        x_pct: Number(f.x_pct),
+        y_pct: Number(f.y_pct),
+        w_pct: Number(f.w_pct),
+        h_pct: Number(f.h_pct),
+        signer_order: Number(f.signer_order || 1),
+        required: !!f.required
+      }));
+      if(!rows.length) return alert('No fields to save.');
+      const { data, error } = await sb.from('template_fields').upsert(rows, { onConflict:'id' }).select('*');
+      if(error) return alert('Could not save coordinates: ' + error.message);
+      currentFields = data.map(dbToLocalField);
+      alert('Template coordinates saved.');
+    });
+
+    function dbToLocalField(row){
+      return {
+        local_id: crypto.randomUUID(),
+        id: row.id,
+        type: row.field_type,
+        label: row.label,
+        page: row.page,
+        x_pct: Number(row.x_pct),
+        y_pct: Number(row.y_pct),
+        w_pct: Number(row.w_pct),
+        h_pct: Number(row.h_pct),
+        signer_order: Number(row.signer_order || 1),
+        required: !!row.required
+      };
+    }
+
+    document.getElementById('signout').addEventListener('click', async () => { await sb.auth.signOut(); window.location.replace(LOGIN_URL); });
+
+    (async () => {
+      const session = await requireSession();
+      if(session) loadTemplates();
+    })();
+  </script>
+</body>
+</html>
