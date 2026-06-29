@@ -11,8 +11,8 @@
       "destination": "/welcome-2.html"
     },
     {
-      "source": "/sign",
-      "destination": "/sign.html"
+      "source": "/sign-2",
+      "destination": "/sign-2.html"
     },
     {
       "source": "/templates",
