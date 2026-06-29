@@ -23,6 +23,10 @@
       "destination": "/agreements.html"
     },
     {
+      "source": "/pay-now",
+      "destination": "/pay-now.html"
+    },
+    {
       "source": "/welcome",
       "destination": "/welcome.html"
     }
