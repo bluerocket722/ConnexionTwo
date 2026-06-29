@@ -4,82 +4,58 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Connexion Two | Sovereign Document Workflow System</title>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+
   <style>
     :root {
-      --blue-950: #041124;
-      --blue-900: #061a3a;
-      --blue-800: #082b61;
-      --blue-700: #0054d1;
-      --blue-600: #0068ff;
-      --blue-500: #1683ff;
-      --blue-100: #eaf3ff;
-      --blue-050: #f5f9ff;
-      --text: #111827;
-      --muted: #5f6b7a;
-      --line: #d9e2ef;
-      --panel: #ffffff;
-      --bg: #f7f9fc;
-      --success: #0f9f6e;
-      --warning: #f59e0b;
-      --shadow: 0 22px 70px rgba(6, 26, 58, 0.10);
-      --max: 1180px;
+      --bg: #f6f3ee;
+      --bg-dark: #101820;
+      --card: #ffffff;
+      --text: #17212b;
+      --muted: #5d6875;
+      --line: #d9d3c8;
+      --accent: #b58b4c;
+      --accent-dark: #8b6532;
+      --soft: #ebe4d8;
+      --max: 1160px;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html { scroll-behavior: smooth; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     body {
-      min-height: 100vh;
+      font-family: Inter, Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
-      font-family: Inter, Arial, Helvetica, sans-serif;
-      -webkit-font-smoothing: antialiased;
       line-height: 1.6;
     }
 
-    a { color: inherit; text-decoration: none; }
-    button { font: inherit; }
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
 
     .page {
-      background:
-        radial-gradient(circle at 88% 5%, rgba(0, 104, 255, 0.16), transparent 25%),
-        radial-gradient(circle at 10% 0%, rgba(22, 131, 255, 0.12), transparent 22%),
-        linear-gradient(180deg, #ffffff 0%, #f7f9fc 42%, #ffffff 100%);
       overflow: hidden;
     }
 
-    .container { width: min(94%, var(--max)); margin: 0 auto; }
-
-    .trial-bar {
-      background: linear-gradient(90deg, var(--blue-900), var(--blue-700));
-      color: #ffffff;
-      font-size: 0.9rem;
-      font-weight: 700;
-      letter-spacing: -0.01em;
+    .container {
+      width: min(92%, var(--max));
+      margin: 0 auto;
     }
-
-    .trial-bar-inner {
-      min-height: 44px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      text-align: center;
-      flex-wrap: wrap;
-    }
-
-    .trial-bar .material-icons-round { font-size: 18px; opacity: 0.9; }
 
     header {
+      background: rgba(246, 243, 238, 0.92);
+      border-bottom: 1px solid var(--line);
       position: sticky;
       top: 0;
-      z-index: 50;
-      background: rgba(255,255,255,0.88);
-      border-bottom: 1px solid var(--line);
-      backdrop-filter: blur(14px);
+      z-index: 10;
+      backdrop-filter: blur(12px);
     }
 
     .nav {
@@ -87,576 +63,710 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 28px;
+      gap: 24px;
     }
 
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 190px;
+    .logo {
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      font-size: 1.3rem;
     }
-
-    .brand-mark {
-      width: 42px;
-      height: 42px;
-      border-radius: 14px;
-      background: linear-gradient(135deg, var(--blue-600), var(--blue-900));
-      color: #ffffff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 900;
-      letter-spacing: -0.08em;
-      box-shadow: 0 14px 30px rgba(0, 104, 255, 0.22);
-    }
-
-    .brand-text {
-      display: flex;
-      flex-direction: column;
-      line-height: 1.05;
-    }
-
-    .brand-name { font-size: 1.05rem; font-weight: 900; letter-spacing: -0.04em; }
-    .brand-sub { font-size: 0.72rem; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }
 
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 26px;
-      color: #3f4a5c;
+      gap: 22px;
       font-size: 0.95rem;
-      font-weight: 800;
+      color: var(--muted);
     }
 
-    .nav-links a { transition: 0.18s ease; }
-    .nav-links a:hover { color: var(--blue-700); }
-
-    .nav-actions { display: flex; align-items: center; gap: 12px; }
-
-    .login-link {
-      color: var(--blue-800);
-      font-size: 0.88rem;
-      font-weight: 900;
-      padding: 10px 12px;
-    }
-
-    .btn {
+    .nav-cta,
+    .button {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      min-height: 46px;
-      padding: 0 20px;
+      background: var(--text);
+      color: white;
       border-radius: 999px;
-      font-weight: 900;
-      border: 1px solid transparent;
+      padding: 12px 20px;
+      font-weight: 700;
+      border: 1px solid var(--text);
       transition: 0.2s ease;
-      cursor: pointer;
     }
 
-    .btn-primary { background: var(--blue-700); color: #ffffff; box-shadow: 0 14px 32px rgba(0, 84, 209, 0.22); }
-    .btn-primary:hover { background: var(--blue-800); transform: translateY(-1px); }
-    .btn-secondary { background: #ffffff; color: var(--blue-800); border-color: var(--line); }
-    .btn-secondary:hover { border-color: var(--blue-500); box-shadow: 0 14px 28px rgba(6,26,58,0.08); transform: translateY(-1px); }
+    .nav-cta:hover,
+    .button:hover {
+      background: var(--accent-dark);
+      border-color: var(--accent-dark);
+      transform: translateY(-1px);
+    }
 
-    .hero { padding: 82px 0 74px; }
+    .button.secondary {
+      background: transparent;
+      color: var(--text);
+      border-color: var(--line);
+    }
+
+    .button.secondary:hover {
+      background: var(--soft);
+      border-color: var(--accent);
+    }
+
+    .hero {
+      padding: 92px 0 72px;
+      background:
+        radial-gradient(circle at top right, rgba(181, 139, 76, 0.24), transparent 36%),
+        linear-gradient(180deg, #fbf8f1 0%, var(--bg) 100%);
+    }
 
     .hero-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.08fr) minmax(380px, 0.72fr);
-      gap: 48px;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 56px;
       align-items: center;
     }
 
-    .prehead {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      background: #ffffff;
-      color: var(--blue-800);
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 8px 12px 8px 8px;
-      margin-bottom: 24px;
-      box-shadow: 0 10px 28px rgba(6, 26, 58, 0.06);
-      font-size: 0.86rem;
-      font-weight: 900;
-    }
-
-    .prehead-icon {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: var(--blue-100);
-      color: var(--blue-700);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .eyebrow {
+      color: var(--accent-dark);
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.78rem;
+      margin-bottom: 18px;
     }
 
     h1 {
-      font-size: clamp(3rem, 6.3vw, 6.4rem);
-      line-height: 0.9;
-      letter-spacing: -0.085em;
-      color: var(--blue-950);
-      max-width: 860px;
-      margin-bottom: 28px;
+      font-size: clamp(2.6rem, 6vw, 5.5rem);
+      line-height: 0.95;
+      letter-spacing: -0.07em;
+      margin-bottom: 24px;
     }
 
     .hero h2 {
-      font-size: clamp(1.25rem, 2.1vw, 1.85rem);
-      line-height: 1.28;
-      color: #344054;
-      max-width: 790px;
-      font-weight: 750;
-      letter-spacing: -0.035em;
-      margin-bottom: 26px;
+      font-size: clamp(1.2rem, 2.2vw, 1.65rem);
+      line-height: 1.35;
+      color: var(--muted);
+      font-weight: 500;
+      margin-bottom: 28px;
+      max-width: 760px;
     }
 
     .hero-copy {
+      font-size: 1.08rem;
+      color: var(--muted);
+      max-width: 780px;
       display: grid;
       gap: 16px;
-      max-width: 780px;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 34px;
+    }
+
+    .hero-card {
+      background: var(--bg-dark);
+      color: white;
+      border-radius: 28px;
+      padding: 34px;
+      box-shadow: 0 28px 90px rgba(16, 24, 32, 0.18);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-card::before {
+      content: "";
+      position: absolute;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: rgba(181, 139, 76, 0.32);
+      right: -56px;
+      top: -56px;
+    }
+
+    .hero-card h3 {
+      font-size: 1.5rem;
+      letter-spacing: -0.03em;
+      margin-bottom: 22px;
+      position: relative;
+    }
+
+    .metric-list {
+      display: grid;
+      gap: 14px;
+      position: relative;
+    }
+
+    .metric {
+      padding: 18px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.05);
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 1.2rem;
+      margin-bottom: 4px;
+    }
+
+    .metric span {
+      color: rgba(255,255,255,0.74);
+      font-size: 0.95rem;
+    }
+
+    section {
+      padding: 82px 0;
+    }
+
+    .section-header {
+      max-width: 820px;
+      margin-bottom: 38px;
+    }
+
+    .section-header h2 {
+      font-size: clamp(2rem, 4vw, 3.6rem);
+      line-height: 1;
+      letter-spacing: -0.06em;
+      margin-bottom: 18px;
+    }
+
+    .section-header p {
       color: var(--muted);
       font-size: 1.06rem;
     }
 
-    .hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 34px; }
+    .dark {
+      background: var(--bg-dark);
+      color: white;
+    }
 
-    .micro-login { margin-top: 14px; color: var(--muted); font-size: 0.9rem; }
-    .micro-login a { color: var(--blue-700); font-weight: 900; }
+    .dark .section-header p,
+    .dark p,
+    .dark li {
+      color: rgba(255,255,255,0.76);
+    }
 
-    .auth-card {
-      background: rgba(255,255,255,0.96);
+    .problem-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 38px;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      padding: 34px;
+      box-shadow: 0 18px 50px rgba(16, 24, 32, 0.06);
+    }
+
+    .dark .panel {
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(255,255,255,0.12);
+      box-shadow: none;
+    }
+
+    .panel p + p {
+      margin-top: 14px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .statement {
+      padding: 18px 20px;
+      background: var(--soft);
+      border-radius: 18px;
+      font-weight: 700;
+    }
+
+    .dark .statement {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 22px;
+    }
+
+    .card {
+      background: var(--card);
       border: 1px solid var(--line);
       border-radius: 24px;
-      box-shadow: var(--shadow);
       padding: 28px;
-      position: relative;
-      overflow: hidden;
+      box-shadow: 0 14px 42px rgba(16, 24, 32, 0.05);
     }
 
-    .auth-card::before {
-      content: '';
-      position: absolute;
-      inset: 0 0 auto 0;
-      height: 5px;
-      background: linear-gradient(90deg, var(--blue-600), var(--blue-500));
-    }
-
-    .trial-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--blue-100);
-      color: var(--blue-800);
-      border-radius: 999px;
-      padding: 7px 12px;
-      font-size: 0.78rem;
-      font-weight: 950;
+    .card h3 {
+      font-size: 1.35rem;
+      letter-spacing: -0.03em;
       margin-bottom: 14px;
     }
 
-    .auth-headline { font-size: 1.56rem; line-height: 1.1; letter-spacing: -0.055em; font-weight: 950; color: var(--blue-950); margin-bottom: 8px; }
-    .auth-sub { color: var(--muted); font-size: 0.96rem; margin-bottom: 20px; }
-
-    .referral-box {
-      background: linear-gradient(135deg, #f5f9ff, #ffffff);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 14px 14px;
-      margin-bottom: 18px;
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
+    .card p {
+      color: var(--muted);
+      margin-bottom: 14px;
     }
 
-    .referral-box .material-icons-round { color: var(--success); font-size: 20px; margin-top: 2px; }
-    .referral-box strong { display: block; color: var(--blue-950); font-size: 0.88rem; margin-bottom: 3px; }
-    .referral-box span { display: block; color: var(--muted); font-size: 0.83rem; line-height: 1.45; }
+    ul {
+      list-style: none;
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    li {
+      position: relative;
+      padding-left: 22px;
+      color: var(--muted);
+    }
+
+    li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 10px;
+      width: 7px;
+      height: 7px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+
+    .steps {
+      counter-reset: step;
+      display: grid;
+      gap: 18px;
+    }
+
+    .step {
+      counter-increment: step;
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 18px;
+      align-items: start;
+      padding: 24px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+    }
+
+    .step::before {
+      content: counter(step);
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--text);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.1rem;
+    }
+
+    .fit-grid {
+      display: grid;
+      grid-template-columns: 0.8fr 1.2fr;
+      gap: 32px;
+      align-items: start;
+    }
+
+    .offer-box {
+      background: var(--bg-dark);
+      color: white;
+      border-radius: 32px;
+      padding: 42px;
+      box-shadow: 0 28px 90px rgba(16, 24, 32, 0.18);
+    }
+
+    .price {
+      font-size: clamp(2.4rem, 5vw, 4.8rem);
+      line-height: 1;
+      letter-spacing: -0.07em;
+      margin: 16px 0 24px;
+      color: white;
+    }
+
+    .offer-box p,
+    .offer-box li {
+      color: rgba(255,255,255,0.78);
+    }
+
+    .addons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .addon {
+      background: var(--soft);
+      border-radius: 18px;
+      padding: 18px;
+      font-weight: 700;
+    }
+
+    .why-now {
+      background:
+        linear-gradient(rgba(16,24,32,0.92), rgba(16,24,32,0.92)),
+        radial-gradient(circle at top right, rgba(181,139,76,0.5), transparent 34%);
+      color: white;
+    }
+
+    .cta {
+      padding: 96px 0;
+      background: #fff;
+    }
+
+    .cta-box {
+      background: var(--text);
+      color: white;
+      border-radius: 34px;
+      padding: clamp(34px, 6vw, 64px);
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 32px;
+      align-items: center;
+    }
+
+    .cta-box h2 {
+      font-size: clamp(2rem, 4vw, 4rem);
+      line-height: 1;
+      letter-spacing: -0.06em;
+      margin-bottom: 18px;
+    }
+
+    .cta-box p {
+      color: rgba(255,255,255,0.78);
+      font-size: 1.08rem;
+    }
+
+    .cta-box .button {
+      background: white;
+      color: var(--text);
+      border-color: white;
+      justify-self: start;
+    }
+
+    footer {
+      padding: 34px 0;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+
+
+    /* AUTH / LOGIN CARD */
+    .auth-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      padding: 34px;
+      box-shadow: 0 28px 90px rgba(16, 24, 32, 0.14);
+    }
+
+    .auth-card:hover {
+      box-shadow: 0 32px 95px rgba(16, 24, 32, 0.18);
+    }
+
+    .auth-headline {
+      font-size: 1.45rem;
+      line-height: 1.15;
+      letter-spacing: -0.04em;
+      font-weight: 800;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+
+    .auth-sub {
+      font-size: 0.96rem;
+      color: var(--muted);
+      margin-bottom: 22px;
+    }
 
     .google-btn,
     .submit-btn {
       width: 100%;
-      height: 50px;
+      height: 52px;
       border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 800;
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 10px;
-      font-weight: 950;
-      cursor: pointer;
-      transition: 0.18s ease;
-    }
-
-    .google-btn { background: #ffffff; color: var(--text); border: 1px solid var(--line); }
-    .google-btn:hover { border-color: var(--blue-500); box-shadow: 0 12px 28px rgba(6, 26, 58, 0.08); }
-    .submit-btn { background: var(--blue-700); color: #ffffff; border: 1px solid var(--blue-700); margin-top: 8px; }
-    .submit-btn:hover { background: var(--blue-800); transform: translateY(-1px); }
-    .submit-btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
-
-    .divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 0.78rem; margin: 16px 0; }
-    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
-
-    .form-group { margin-bottom: 13px; }
-    .form-label { display: block; color: #445061; font-size: 0.76rem; font-weight: 950; margin-bottom: 6px; }
-    .form-input, .form-select {
-      width: 100%;
-      height: 50px;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: var(--blue-050);
-      color: var(--text);
-      padding: 0 14px;
-      outline: none;
-      font-size: 0.94rem;
-      transition: 0.18s ease;
-    }
-    .form-input:focus, .form-select:focus { background: #ffffff; border-color: var(--blue-600); box-shadow: 0 0 0 4px rgba(0, 104, 255, 0.12); }
-    .form-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='%235f6b7a'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
-
-    .form-error { background: #fff1ef; border: 1px solid #ffc8bf; color: #ad271b; font-size: 0.86rem; padding: 10px 14px; border-radius: 10px; margin-bottom: 12px; }
-    .form-note { margin-top: 12px; color: var(--muted); display: flex; justify-content: center; gap: 6px; align-items: center; font-size: 0.78rem; text-align: center; }
-    .form-note .material-icons-round { color: var(--success); font-size: 15px; }
-    .auth-switch { text-align: center; margin-top: 14px; font-size: 0.86rem; color: var(--muted); }
-    .auth-switch a { color: var(--blue-700); font-weight: 950; }
-
-    .step-pills { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
-    .step-pill { width: 28px; height: 28px; border-radius: 50%; background: var(--blue-050); border: 2px solid var(--line); color: var(--muted); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 950; }
-    .step-pill.active { background: var(--blue-700); border-color: var(--blue-700); color: #ffffff; }
-    .step-line { flex: 1; height: 2px; background: var(--line); }
-
-    .logged-in-dashboard { display: none; padding: 0 0 72px; }
-    .dashboard-preview {
-      border: 1px solid var(--line);
-      border-radius: 24px;
-      overflow: hidden;
-      box-shadow: var(--shadow);
-      background: #ffffff;
-    }
-    .dashboard-bar { min-height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 0 24px; border-bottom: 1px solid var(--line); }
-    .dashboard-brand { display: flex; align-items: center; gap: 10px; font-weight: 950; color: var(--blue-950); }
-    .dashboard-mini-logo { width: 34px; height: 34px; border-radius: 11px; background: var(--blue-700); color: #fff; display: flex; align-items: center; justify-content: center; letter-spacing: -0.08em; font-weight: 950; }
-    .dash-actions { display: flex; gap: 12px; align-items: center; }
-    .trial-counter { font-weight: 950; color: var(--blue-800); }
-    .buy-btn { min-height: 42px; padding: 0 18px; border-radius: 999px; color: #fff; background: var(--blue-700); display: inline-flex; align-items: center; font-weight: 950; }
-    .icon-btn { width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 50%; background: #fff; color: var(--blue-800); cursor: pointer; }
-    .welcome-strip { background: #eef6ff; color: var(--blue-800); display: flex; justify-content: center; gap: 8px; align-items: center; padding: 14px; font-weight: 800; text-align: center; }
-    .welcome-panel { background: linear-gradient(180deg, var(--blue-800), var(--blue-950)); color: #fff; text-align: center; padding: 68px 24px 74px; }
-    .welcome-panel h2 { color: #fff; font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -0.055em; margin-bottom: 30px; }
-    .welcome-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; }
-    .welcome-action { min-height: 58px; padding: 0 22px; border-radius: 11px; display: inline-flex; align-items: center; gap: 10px; font-weight: 950; }
-    .welcome-action.primary { background: #dcecff; color: var(--blue-950); }
-    .welcome-action.outline { color: #fff; border: 1px solid rgba(255,255,255,0.28); }
-
-    section.content-section { padding: 82px 0; }
-    .section-header { max-width: 840px; margin-bottom: 40px; }
-    .section-eyebrow { color: var(--blue-700); font-size: 0.78rem; font-weight: 950; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 14px; }
-    .section-header h2 { font-size: clamp(2rem, 4vw, 3.8rem); line-height: 0.98; letter-spacing: -0.07em; color: var(--blue-950); margin-bottom: 18px; }
-    .section-header p { color: var(--muted); font-size: 1.06rem; }
-
-    .dark-section { background: var(--blue-950); color: #ffffff; }
-    .dark-section .section-header h2, .dark-section h3 { color: #ffffff; }
-    .dark-section .section-header p, .dark-section p, .dark-section li { color: rgba(255,255,255,0.76); }
-
-    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
-    .panel, .card {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 22px;
-      padding: 28px;
-      box-shadow: 0 12px 38px rgba(6, 26, 58, 0.05);
-    }
-    .dark-section .panel { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.13); box-shadow: none; }
-    .panel p + p { margin-top: 14px; }
-    .stack { display: grid; gap: 12px; }
-    .statement { background: var(--blue-050); border: 1px solid var(--line); padding: 16px 18px; border-radius: 14px; font-weight: 950; color: var(--blue-950); }
-    .dark-section .statement { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.13); color: #fff; }
-
-    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
-    .card h3 { font-size: 1.24rem; letter-spacing: -0.035em; color: var(--blue-950); margin-bottom: 12px; }
-    .card p { color: var(--muted); margin-bottom: 12px; }
-    ul { list-style: none; display: grid; gap: 9px; margin-top: 12px; }
-    li { position: relative; padding-left: 22px; color: var(--muted); }
-    li::before { content: ''; position: absolute; left: 0; top: 10px; width: 7px; height: 7px; background: var(--blue-600); border-radius: 50%; }
-
-    .steps { display: grid; gap: 16px; counter-reset: step; }
-    .step { counter-increment: step; display: grid; grid-template-columns: 54px 1fr; gap: 16px; align-items: start; background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 22px; }
-    .step::before { content: counter(step); width: 54px; height: 54px; border-radius: 16px; background: var(--blue-700); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 950; }
-
-    .fit-grid { display: grid; grid-template-columns: 0.82fr 1.18fr; gap: 30px; }
-    .offer-box { background: linear-gradient(135deg, var(--blue-900), var(--blue-950)); color: #fff; border-radius: 26px; padding: clamp(28px, 5vw, 48px); box-shadow: var(--shadow); }
-    .offer-box h2 { color: #fff; font-size: clamp(1.85rem, 3vw, 3rem); line-height: 1.02; letter-spacing: -0.06em; }
-    .price { color: #fff; font-size: clamp(2.6rem, 5vw, 5rem); line-height: 1; letter-spacing: -0.08em; font-weight: 950; margin: 18px 0 22px; }
-    .offer-box p, .offer-box li { color: rgba(255,255,255,0.78); }
-    .offer-topline { display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.16); padding: 8px 12px; border-radius: 999px; font-size: 0.8rem; font-weight: 950; margin-bottom: 18px; }
-
-    .addons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-    .addon { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 18px; font-weight: 900; color: var(--blue-950); }
-
-    .why-now { background: linear-gradient(180deg, var(--blue-950), #071d40); color: #fff; }
-    .why-now .section-header h2, .why-now h3 { color: #fff; }
-    .why-now p, .why-now li { color: rgba(255,255,255,0.76); }
-
-    .cta { padding: 90px 0; background: #ffffff; }
-    .cta-box { background: linear-gradient(135deg, var(--blue-900), var(--blue-700)); color: #fff; border-radius: 28px; padding: clamp(32px, 6vw, 62px); display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 28px; align-items: center; box-shadow: var(--shadow); }
-    .cta-box h2 { color: #fff; font-size: clamp(2rem, 4vw, 4rem); line-height: 0.98; letter-spacing: -0.07em; margin-bottom: 18px; }
-    .cta-box p { color: rgba(255,255,255,0.78); font-size: 1.06rem; }
-    .cta-box .btn { justify-self: start; background: #fff; color: var(--blue-800); }
-
-    footer { padding: 34px 0; color: var(--muted); border-top: 1px solid var(--line); background: #fff; }
-
-    @media (max-width: 980px) {
-      .hero-grid, .split, .grid, .fit-grid, .cta-box { grid-template-columns: 1fr; }
-      .nav-links { display: none; }
-      .auth-card { max-width: 560px; }
-      .addons { grid-template-columns: 1fr 1fr; }
-      .dashboard-bar { flex-direction: column; align-items: flex-start; padding: 18px 20px; }
-    }
-
-    @media (max-width: 640px) {
-      .trial-bar-inner { justify-content: flex-start; text-align: left; padding: 8px 0; }
-      .nav { height: auto; padding: 16px 0; align-items: flex-start; }
-      .nav-actions { flex-direction: column; align-items: flex-end; }
-      .brand { min-width: auto; }
-      .brand-sub { display: none; }
-      .hero { padding: 56px 0; }
-      .hero-actions, .dash-actions, .welcome-actions { flex-direction: column; }
-      .btn, .welcome-action, .buy-btn { width: 100%; }
-      .auth-card, .panel, .card { padding: 22px; }
-      .addons { grid-template-columns: 1fr; }
-      section.content-section { padding: 62px 0; }
-    }
-
-
-    /* FULL PHOTO HERO — added below banner */
-    .full-photo-hero {
-      position: relative;
-      width: 100%;
-      overflow: hidden;
-      background: var(--blue-950);
-    }
-
-    .full-photo-hero img {
-      width: 100%;
-      height: auto;
-      display: block;
-    }
-
-    .full-photo-hero::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(
-        75deg,
-        rgba(2, 6, 23, 0.9) 0%,
-        rgba(2, 6, 23, 0.6) 40%,
-        rgba(2, 6, 23, 0) 100%
-      );
-      z-index: 1;
-    }
-
-    .hero-content {
-      position: absolute;
-      z-index: 2;
-      top: 50%;
-      left: 7%;
-      transform: translate(0, -50%);
-      text-align: left;
-      color: #fff;
-      font-family: Inter, sans-serif;
-      width: 70vw;
-    }
-
-    .hero-title {
-      font-size: clamp(1.55rem, 3vw, 4rem);
-      font-weight: 750;
-      line-height: 1.1;
-      margin-bottom: clamp(14px, 2vw, 30px);
-      letter-spacing: -0.055em;
-    }
-
-    .hero-buttons {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: clamp(12px, 1.2vw, 20px);
-      margin-bottom: clamp(16px, 2vw, 28px);
-    }
-
-    .hero-buttons a {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: clamp(10px, 0.7vw, 14px) clamp(18px, 1.2vw, 24px);
-      font-size: clamp(1rem, 1.25vw, 1.32rem);
-      border-radius: 999px;
-      font-weight: 900;
-      text-decoration: none;
-      text-align: center;
-      color: #fff;
-      width: max-content;
-      min-width: clamp(210px, 22vw, 340px);
-      min-height: 50px;
       transition: 0.2s ease;
     }
 
-    .full-photo-hero .btn-primary {
-      background: var(--blue-700);
+    .google-btn {
+      background: #fff;
+      border: 1.5px solid var(--line);
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .google-btn:hover {
+      border-color: var(--accent);
+      box-shadow: 0 10px 30px rgba(16, 24, 32, 0.08);
+    }
+
+    .submit-btn {
+      background: var(--text);
       color: #fff;
-      box-shadow: 0 14px 32px rgba(0, 84, 209, 0.26);
-      border: 1px solid var(--blue-700);
+      border: 1px solid var(--text);
+      margin-top: 8px;
     }
 
-    .full-photo-hero .btn-primary:hover {
-      background: var(--blue-800);
-      border-color: var(--blue-800);
-      transform: translateY(-3px) scale(1.02);
+    .submit-btn:hover {
+      background: var(--accent-dark);
+      border-color: var(--accent-dark);
+      transform: translateY(-1px);
     }
 
-    .full-photo-hero .btn-secondary {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.22);
-      color: #fff;
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+    .submit-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
     }
 
-    .full-photo-hero .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.15);
-      border-color: rgba(255, 255, 255, 0.32);
-      transform: translateY(-3px) scale(1.02);
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 18px 0;
+      color: var(--muted);
+      font-size: 0.78rem;
     }
 
-    .hero-subtext {
-      font-size: clamp(0.98rem, 1.8vw, 2rem);
-      opacity: 0.9;
-      margin-top: clamp(18px, 2.3vw, 34px);
-      line-height: 1.45;
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--line);
     }
 
-    .c2-hero-label {
-      font-size: clamp(10px, 0.8vw, 13px);
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.5em;
-      color: #7eb6ff;
-      margin-bottom: 12px;
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    .form-label {
       display: block;
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: var(--muted);
+      margin-bottom: 6px;
     }
 
-    @media (max-width: 760px) {
-      .full-photo-hero img { min-height: 420px; object-fit: cover; object-position: center; }
-      .hero-content { width: 86vw; left: 6%; }
-      .hero-title { font-size: 2.1rem; }
-      .hero-buttons a { min-width: 240px; }
+    .form-input,
+    .form-select {
+      width: 100%;
+      height: 52px;
+      padding: 0 16px;
+      background: #fbf8f1;
+      border: 1.5px solid var(--line);
+      border-radius: 12px;
+      font-size: 0.95rem;
+      color: var(--text);
+      outline: none;
+      transition: 0.2s ease;
     }
 
+    .form-input:focus,
+    .form-select:focus {
+      border-color: var(--accent-dark);
+      box-shadow: 0 0 0 3px rgba(181, 139, 76, 0.18);
+      background: #fff;
+    }
+
+    .form-select {
+      appearance: none;
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='%235d6875'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+    }
+
+    .form-error {
+      background: #fff1ef;
+      border: 1px solid #ffc8bf;
+      color: #ad271b;
+      font-size: 0.86rem;
+      padding: 10px 14px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+    }
+
+    .form-note {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .form-note .material-icons-round {
+      font-size: 14px;
+      color: #2e7d32;
+    }
+
+    .auth-switch {
+      text-align: center;
+      margin-top: 14px;
+      font-size: 0.86rem;
+      color: var(--muted);
+    }
+
+    .auth-switch a {
+      color: var(--accent-dark);
+      font-weight: 800;
+    }
+
+    .step-pills {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .step-pill {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #fbf8f1;
+      border: 2px solid var(--line);
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .step-pill.active {
+      background: var(--text);
+      border-color: var(--text);
+      color: #fff;
+    }
+
+    .step-line {
+      flex: 1;
+      height: 2px;
+      background: var(--line);
+    }
+
+    @media (max-width: 920px) {
+      .hero-grid,
+      .problem-content,
+      .grid,
+      .fit-grid,
+      .cta-box {
+        grid-template-columns: 1fr;
+      }
+
+      .addons {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .nav-links {
+        display: none;
+      }
+    }
+
+    @media (max-width: 620px) {
+      section {
+        padding: 62px 0;
+      }
+
+      .hero {
+        padding: 68px 0 56px;
+      }
+
+      .panel,
+      .card,
+      .offer-box,
+      .hero-card {
+        padding: 24px;
+        border-radius: 22px;
+      }
+
+      .addons {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-actions {
+        flex-direction: column;
+      }
+
+      .button,
+      .nav-cta {
+        width: 100%;
+      }
+    }
   </style>
 </head>
+
 <body>
   <div class="page">
-    <div class="trial-bar">
-      <div class="container trial-bar-inner">
-        <span class="material-icons-round">bolt</span>
-        <span>Start with a 7-day free trial. Invite a friend — when they join, you get another 7 days free.</span>
-      </div>
-    </div>
-
-    <div class="full-photo-hero">
-      <img src="https://rfdvogakvyodixgpvqvz.supabase.co/storage/v1/object/public/ai-images/Connexion%20Two%20Staffing%20Picture.jpg" alt="Connexion Two staffing team">
-
-      <div class="hero-content">
-        <span class="c2-hero-label">Connexion Two</span>
-
-        <div class="hero-title">
-          Need A Job?
-        </div>
-
-        <div class="hero-buttons">
-          <a href="/find-work" class="btn-primary">Click Me!</a>
-
-          <div class="hero-title">
-            Hiring Someone?
-          </div>
-
-          <a href="/for-employers" class="btn-secondary" target="_blank">
-            Click Here!
-          </a>
-        </div>
-      </div>
-    </div>
-
 
     <header>
       <div class="container nav">
-        <a href="#" class="brand" aria-label="Connexion Two Home">
-          <div class="brand-mark">C2</div>
-          <div class="brand-text">
-            <span class="brand-name">Connexion Two</span>
-            <span class="brand-sub">Document Workflow System</span>
-          </div>
-        </a>
+        <a href="#" class="logo">Connexion Two</a>
 
         <nav class="nav-links">
           <a href="#problem">Problem</a>
           <a href="#promise">Promise</a>
           <a href="#what-you-get">What You Get</a>
           <a href="#offer">Beta Offer</a>
+          <a href="#get-started">Login</a>
         </nav>
 
-        <div class="nav-actions">
-          <a href="#get-started" class="login-link">Login</a>
-          <a href="#get-started" class="btn btn-primary">Start free trial</a>
-        </div>
+        <a href="#get-started" class="nav-cta">Login / Book a discovery call</a>
       </div>
     </header>
 
     <main>
+
       <section class="hero">
         <div class="container hero-grid">
           <div>
-            <div class="prehead">
-              <span class="prehead-icon"><span class="material-icons-round" style="font-size:16px;">verified_user</span></span>
-              Sovereign Document Workflow System
-            </div>
+            <div class="eyebrow">Sovereign Document Workflow System</div>
 
             <h1>Sovereign Document Workflow System</h1>
 
-            <h2>For EU Focused Organizations That Need Document Control Without SaaS Lock In</h2>
+            <h2>For EU-Focused Organizations That Need Document Control Without SaaS Lock-In</h2>
 
             <div class="hero-copy">
-              <p>This is for small government contractors, regulated service firms, municipalities, compliance teams, and EU focused organizations that need a private document signing and office workflow system they can own, host, audit, and control.</p>
-
-              <p>Connexion Two can also replace Microsoft Word, Excel, and PowerPoint style document creation inside your workflow. Your team can create DOCX files, XLSX spreadsheets, and PPTX presentationS in the browser, so you do not need to keep paying for every Microsoft seat just to draft proposals, agreements, cost sheets, templates, and internal documents.</p>
+              <p>This is for small government contractors, regulated service firms, municipalities, compliance teams, and EU-focused organizations that need a private document signing and office workflow system they can own, host, audit, and control.</p>
 
               <p>In 30 days, we help you replace scattered signing tools, shared document folders, and foreign SaaS dependency with a private document workflow portal deployed on your infrastructure.</p>
 
-              <p>You get secure signing links, template based workflows, audit trails, document storage, browser based document editing, and full source code handoff — without monthly seat fees, per-signature charges, or vendor-controlled archives.</p>
+              <p>You get secure signing links, template-based workflows, audit trails, document storage, browser-based document editing, and full source-code handoff — without monthly seat fees, per-signature charges, or vendor-controlled archives.</p>
             </div>
 
             <div class="hero-actions">
-              <a href="#get-started" class="btn btn-primary"><span class="material-icons-round" style="font-size:18px;">rocket_launch</span>Start 7-day free trial</a>
-              <a href="#what-you-get" class="btn btn-secondary">See what you get</a>
+              <a href="#get-started" class="button">Login / Book a discovery call</a>
+              <a href="#what-you-get" class="button secondary">See what you get</a>
             </div>
-
-            <p class="micro-login">Already have access? <a href="#get-started">Log in</a></p>
           </div>
 
           <aside class="auth-card" id="get-started">
-            <div id="step-auth">
-              <div class="trial-badge"><span class="material-icons-round" style="font-size:16px;">schedule</span>7-day free trial</div>
-              <div class="auth-headline">Start your private workflow trial</div>
-              <div class="auth-sub">Create your Connexion Two account and access your private document workflow portal.</div>
 
-              <div class="referral-box">
-                <span class="material-icons-round">group_add</span>
-                <div>
-                  <strong>Invite a friend. Get 7 more days free.</strong>
-                  <span>When someone you invite joins, your trial extends by another 7 days.</span>
-                </div>
-              </div>
+            <div id="step-auth">
+              <div class="auth-headline">Create your Connexion Two account</div>
+              <div class="auth-sub">Access your private document workflow portal.</div>
 
               <button class="google-btn" id="btn-google">
                 <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
@@ -667,12 +777,12 @@
 
               <div class="form-group">
                 <label class="form-label">Full Name</label>
-                <input class="form-input" id="auth-name" type="text" placeholder="e.g. John Doe">
+                <input class="form-input" id="auth-name" type="text" placeholder="e.g. Mike Johnson">
               </div>
 
               <div class="form-group">
                 <label class="form-label">Email Address</label>
-                <input class="form-input" id="auth-email" type="email" placeholder="john@example.com">
+                <input class="form-input" id="auth-email" type="email" placeholder="mike@example.com">
               </div>
 
               <div class="form-group">
@@ -684,15 +794,17 @@
 
               <button class="submit-btn" id="btn-email-signup">
                 <span class="material-icons-round" style="font-size:18px;">lock_open</span>
-                Start 7-Day Free Trial
+                Create Account
               </button>
 
               <div class="form-note">
                 <span class="material-icons-round">verified_user</span>
-                Secure access · Private portal · Invite-based trial extension
+                Secure access · Private portal · Source-code handoff
               </div>
 
-              <p class="auth-switch">Already have an account? <a href="#" id="show-login">Sign in</a></p>
+              <p class="auth-switch">
+                Already have an account? <a href="#" id="show-login">Sign in</a>
+              </p>
             </div>
 
             <div id="step-login" style="display:none;">
@@ -708,7 +820,7 @@
 
               <div class="form-group">
                 <label class="form-label">Email Address</label>
-                <input class="form-input" id="login-email" type="email" placeholder="aaron@example.com">
+                <input class="form-input" id="login-email" type="email" placeholder="mike@example.com">
               </div>
 
               <div class="form-group">
@@ -723,7 +835,9 @@
                 Sign In
               </button>
 
-              <p class="auth-switch">No account yet? <a href="#" id="show-signup">Start your free trial</a></p>
+              <p class="auth-switch">
+                No account yet? <a href="#" id="show-signup">Sign up</a>
+              </p>
             </div>
 
             <div id="step-profile" style="display:none;">
@@ -779,51 +893,39 @@
             </div>
 
             <div id="step-success" style="display:none;text-align:center;padding:12px 0;">
-              <div style="width:64px;height:64px;border-radius:50%;background:#eaf3ff;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
-                <span class="material-icons-round" style="font-size:34px;color:#0054d1;">mark_email_unread</span>
+              <div style="width:64px;height:64px;border-radius:50%;background:#e8f5e9;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+                <span class="material-icons-round" style="font-size:34px;color:#2e7d32;">mark_email_unread</span>
               </div>
+
               <div class="auth-headline">Check your email</div>
-              <p style="font-size:0.95rem;color:var(--muted);margin:10px 0 24px;line-height:1.7;">We've sent a confirmation link to your inbox. Click it to verify your account, then sign in to start your 7-day free trial and access your portal.</p>
-              <a href="#" id="back-to-login" class="btn btn-primary" style="width:100%;"><span class="material-icons-round" style="font-size:18px;">login</span>Back to Sign In</a>
-              <div class="form-note" style="margin-top:16px;"><span class="material-icons-round">mail</span>Didn't get it? Check your spam folder</div>
+
+              <p style="font-size:0.95rem;color:var(--muted);margin:10px 0 24px;line-height:1.7;">
+                We've sent a confirmation link to your inbox. Click it to verify your account, then sign in to access your portal.
+              </p>
+
+              <a href="#" id="back-to-login" class="button" style="justify-content:center;width:100%;">
+                <span class="material-icons-round" style="font-size:18px;">login</span>
+                Back to Sign In
+              </a>
+
+              <div class="form-note" style="margin-top:16px;">
+                <span class="material-icons-round">mail</span>
+                Didn't get it? Check your spam folder
+              </div>
             </div>
+
           </aside>
         </div>
       </section>
 
-      <section class="logged-in-dashboard" id="logged-in-dashboard">
-        <div class="container">
-          <div class="dashboard-preview">
-            <div class="dashboard-bar">
-              <div class="dashboard-brand"><span class="dashboard-mini-logo">C2</span>Connexion Two Portal</div>
-              <div class="dash-actions">
-                <div class="trial-counter"><span id="trial-days-left">7</span> Days Left</div>
-                <a href="#offer" class="buy-btn">Buy Now</a>
-                <button class="icon-btn" id="sign-out-btn" type="button" aria-label="Sign out"><span class="material-icons-round">logout</span></button>
-              </div>
-            </div>
-            <div class="welcome-strip"><span class="material-icons-round">info</span><span id="trial-note-text">Your 7-day free trial is active. Invite a friend and get 7 more days free.</span></div>
-            <div class="welcome-panel">
-              <h2 id="welcome-message">Welcome back</h2>
-              <div class="welcome-actions">
-                <a href="signing/new.html" class="welcome-action primary"><span class="material-icons-round">send</span>New Signing Document</a>
-                <a href="templates/new.html" class="welcome-action outline"><span class="material-icons-round">dashboard_customize</span>Create Template</a>
-                <a href="editor.html?new=docx" class="welcome-action outline"><span class="material-icons-round">description</span>Create DOCX</a>
-                <a href="editor.html?new=xlsx" class="welcome-action outline"><span class="material-icons-round">table_chart</span>Create XLSX</a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="content-section" id="problem">
+      <section id="problem">
         <div class="container">
           <div class="section-header">
-            <div class="section-eyebrow">The Problem</div>
             <h2>The Problem</h2>
             <p>Most organizations are still running critical document workflows through tools they do not control.</p>
           </div>
-          <div class="split">
+
+          <div class="problem-content">
             <div class="panel">
               <p>Contracts are signed in one SaaS app.</p>
               <p>Documents are drafted in another.</p>
@@ -832,27 +934,31 @@
               <p>Vendor pricing keeps increasing.</p>
               <p>And if policy, procurement, or compliance requirements change, the organization is stuck adapting around someone else’s platform.</p>
             </div>
+
             <div class="panel stack">
               <p>For EU-focused organizations, this creates a bigger issue:</p>
+
               <div class="statement">You do not fully control the code.</div>
               <div class="statement">You do not fully control the data.</div>
               <div class="statement">You do not fully control the infrastructure.</div>
               <div class="statement">You do not fully control the roadmap.</div>
+
               <p>That is the gap this offer solves.</p>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="content-section dark-section" id="promise">
+      <section id="promise" class="dark">
         <div class="container">
           <div class="section-header">
-            <div class="section-eyebrow">The Promise</div>
             <h2>The Promise</h2>
             <p>In 30 days, we build and deploy a private document workflow system your organization owns.</p>
           </div>
+
           <div class="panel">
             <p>You will be able to draft, send, sign, store, and audit important documents from your own portal — with the source code, deployment documentation, admin access, and full handoff included.</p>
+
             <ul>
               <li>No DocuSign dependency.</li>
               <li>No per-seat software tax.</li>
@@ -864,236 +970,435 @@
         </div>
       </section>
 
-      <section class="content-section" id="what-you-get">
+      <section id="what-you-get">
         <div class="container">
           <div class="section-header">
-            <div class="section-eyebrow">What You Get</div>
             <h2>What You Get</h2>
           </div>
+
           <div class="grid">
-            <div class="card"><h3>1. Private Signing Portal</h3><p>A secure signing portal for sending documents to clients, vendors, staff, or internal stakeholders.</p><p>Includes:</p><ul><li>Secure signer links</li><li>UUID-based signer access</li><li>Timestamped signing events</li><li>IP and device audit trails</li><li>Signed document storage</li><li>Signer status tracking</li><li>Admin dashboard</li><li>Template-based signing workflows</li></ul></div>
-            <div class="card"><h3>2. Bison Docs Browser Office Suite</h3><p>A browser-based Word and Excel alternative bundled into the workflow.</p><p>Your team can draft:</p><ul><li>Proposals</li><li>Agreements</li><li>Internal forms</li><li>Client documents</li><li>Operational templates</li><li>Basic spreadsheets</li><li>Supporting documentation</li></ul><p>This gives your organization a practical document workspace without forcing everything through Microsoft Office or Google Docs.</p></div>
-            <div class="card"><h3>3. Workflow Setup</h3><p>We configure the first version of your system around your real document process.</p><p>Examples:</p><ul><li>Client onboarding packets</li><li>Vendor agreements</li><li>Internal approval forms</li><li>Contractor paperwork</li><li>Policy acknowledgments</li><li>Service agreements</li><li>Compliance documents</li><li>Proposal-to-signature workflows</li></ul></div>
-            <div class="card"><h3>4. EU-Hosted Deployment</h3><p>We deploy the system on EU-hosted infrastructure or your preferred infrastructure.</p><p>Built with:</p><ul><li>Supabase</li><li>Edge Functions</li><li>GitHub</li><li>Browser-based document tools</li><li>Secure database storage</li><li>Admin-controlled access</li></ul></div>
-            <div class="card"><h3>5. Full Ownership Handoff</h3><p>After delivery, your organization owns the system.</p><p>You receive:</p><ul><li>Source code</li><li>Deployment documentation</li><li>Admin access</li><li>Workflow documentation</li><li>Template documentation</li><li>Handoff call</li><li>90 days of support</li></ul></div>
+            <div class="card">
+              <h3>1. Private Signing Portal</h3>
+              <p>A secure signing portal for sending documents to clients, vendors, staff, or internal stakeholders.</p>
+
+              <p>Includes:</p>
+
+              <ul>
+                <li>Secure signer links</li>
+                <li>UUID-based signer access</li>
+                <li>Timestamped signing events</li>
+                <li>IP and device audit trails</li>
+                <li>Signed document storage</li>
+                <li>Signer status tracking</li>
+                <li>Admin dashboard</li>
+                <li>Template-based signing workflows</li>
+              </ul>
+            </div>
+
+            <div class="card">
+              <h3>2. Bison Docs Browser Office Suite</h3>
+              <p>A browser-based Word and Excel alternative bundled into the workflow.</p>
+
+              <p>Your team can draft:</p>
+
+              <ul>
+                <li>Proposals</li>
+                <li>Agreements</li>
+                <li>Internal forms</li>
+                <li>Client documents</li>
+                <li>Operational templates</li>
+                <li>Basic spreadsheets</li>
+                <li>Supporting documentation</li>
+              </ul>
+
+              <p>This gives your organization a practical document workspace without forcing everything through Microsoft Office or Google Docs.</p>
+            </div>
+
+            <div class="card">
+              <h3>3. Workflow Setup</h3>
+              <p>We configure the first version of your system around your real document process.</p>
+
+              <p>Examples:</p>
+
+              <ul>
+                <li>Client onboarding packets</li>
+                <li>Vendor agreements</li>
+                <li>Internal approval forms</li>
+                <li>Contractor paperwork</li>
+                <li>Policy acknowledgments</li>
+                <li>Service agreements</li>
+                <li>Compliance documents</li>
+                <li>Proposal-to-signature workflows</li>
+              </ul>
+            </div>
+
+            <div class="card">
+              <h3>4. EU-Hosted Deployment</h3>
+              <p>We deploy the system on EU-hosted infrastructure or your preferred infrastructure.</p>
+
+              <p>Built with:</p>
+
+              <ul>
+                <li>Supabase</li>
+                <li>Edge Functions</li>
+                <li>GitHub</li>
+                <li>Browser-based document tools</li>
+                <li>Secure database storage</li>
+                <li>Admin-controlled access</li>
+              </ul>
+            </div>
+
+            <div class="card">
+              <h3>5. Full Ownership Handoff</h3>
+              <p>After delivery, your organization owns the system.</p>
+
+              <p>You receive:</p>
+
+              <ul>
+                <li>Source code</li>
+                <li>Deployment documentation</li>
+                <li>Admin access</li>
+                <li>Workflow documentation</li>
+                <li>Template documentation</li>
+                <li>Handoff call</li>
+                <li>90 days of support</li>
+              </ul>
+            </div>
           </div>
         </div>
       </section>
 
-      <section class="content-section" id="how-it-works">
+      <section id="how-it-works">
         <div class="container">
-          <div class="section-header"><div class="section-eyebrow">How It Works</div><h2>How It Works</h2></div>
+          <div class="section-header">
+            <h2>How It Works</h2>
+          </div>
+
           <div class="steps">
-            <div class="step"><div><p>First, we map your current document process.</p></div></div>
-            <div class="step"><div><p>Then we build your private portal, configure your signing workflows, set up your templates, deploy the system to your infrastructure, train your team, and hand over the keys.</p></div></div>
-            <div class="step"><div><p>By the end of 30 days, your organization has a working document workflow system it controls — instead of relying completely on outside SaaS vendors for critical document operations.</p></div></div>
+            <div class="step">
+              <div>
+                <p>First, we map your current document process.</p>
+              </div>
+            </div>
+
+            <div class="step">
+              <div>
+                <p>Then we build your private portal, configure your signing workflows, set up your templates, deploy the system to your infrastructure, train your team, and hand over the keys.</p>
+              </div>
+            </div>
+
+            <div class="step">
+              <div>
+                <p>By the end of 30 days, your organization has a working document workflow system it controls — instead of relying completely on outside SaaS vendors for critical document operations.</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section class="content-section" id="who-this-is-for">
+      <section id="who-this-is-for">
         <div class="container fit-grid">
-          <div class="section-header"><div class="section-eyebrow">Who This Is For</div><h2>Who This Is For</h2><p>This is for organizations that care about control, auditability, and ownership.</p></div>
-          <div class="panel"><p>Best fit:</p><ul><li>EU public-sector suppliers</li><li>Government contractors</li><li>Compliance-heavy SMEs</li><li>Legal support firms</li><li>Accounting and bookkeeping firms</li><li>HR and staffing firms</li><li>Local government departments</li><li>Procurement-heavy organizations</li><li>Internal operations teams managing repeat document workflows</li></ul><p>This is not for teams that only need a cheap e-signature tool.</p><p>This is for organizations that want a private system they can own.</p></div>
+          <div class="section-header">
+            <h2>Who This Is For</h2>
+            <p>This is for organizations that care about control, auditability, and ownership.</p>
+          </div>
+
+          <div class="panel">
+            <p>Best fit:</p>
+
+            <ul>
+              <li>EU public-sector suppliers</li>
+              <li>Government contractors</li>
+              <li>Compliance-heavy SMEs</li>
+              <li>Legal support firms</li>
+              <li>Accounting and bookkeeping firms</li>
+              <li>HR and staffing firms</li>
+              <li>Local government departments</li>
+              <li>Procurement-heavy organizations</li>
+              <li>Internal operations teams managing repeat document workflows</li>
+            </ul>
+
+            <p>This is not for teams that only need a cheap e-signature tool.</p>
+            <p>This is for organizations that want a private system they can own.</p>
+          </div>
         </div>
       </section>
 
-      <section class="content-section" id="offer">
+      <section id="offer">
         <div class="container">
           <div class="offer-box">
-            <div class="offer-topline"><span class="material-icons-round" style="font-size:16px;">schedule</span>Beta Implementation Offer · Start with a 7-day free trial</div>
+            <div class="eyebrow">Beta Implementation Offer</div>
+
             <h2>We are opening 8 implementation spots for organizations that want a private document workflow system built and deployed within 30 days.</h2>
+
             <div class="price">€5,000 Beta</div>
+
             <p>Sovereign Workflow Build — €5,000 Beta</p>
+
             <p>Includes:</p>
-            <ul><li>Private signing portal</li><li>Bison Docs browser office suite</li><li>EU-hosted deployment</li><li>Up to 10 document templates</li><li>Up to 3 custom signing workflows</li><li>Audit trail dashboard</li><li>Admin training call</li><li>Source-code handoff</li><li>Deployment documentation</li><li>90 days of support</li></ul>
+
+            <ul>
+              <li>Private signing portal</li>
+              <li>Bison Docs browser office suite</li>
+              <li>EU-hosted deployment</li>
+              <li>Up to 10 document templates</li>
+              <li>Up to 3 custom signing workflows</li>
+              <li>Audit trail dashboard</li>
+              <li>Admin training call</li>
+              <li>Source-code handoff</li>
+              <li>Deployment documentation</li>
+              <li>90 days of support</li>
+            </ul>
+
             <p>Beta clients also receive direct founder support during implementation.</p>
+
             <p>After the beta round, this implementation will move to €7,500–€15,000 depending on workflow complexity.</p>
           </div>
         </div>
       </section>
 
-      <section class="content-section" id="addons">
+      <section id="addons">
         <div class="container">
-          <div class="section-header"><div class="section-eyebrow">Optional Add-Ons</div><h2>Optional Add-Ons</h2></div>
-          <div class="addons"><div class="addon">Additional templates: quoted per scope</div><div class="addon">Additional custom workflows: quoted per scope</div><div class="addon">Advanced permissions: quoted per scope</div><div class="addon">API integrations: quoted per scope</div><div class="addon">Long-term maintenance: monthly support plan available</div><div class="addon">Custom compliance requirements: quoted after discovery</div></div>
-        </div>
-      </section>
+          <div class="section-header">
+            <h2>Optional Add-Ons</h2>
+          </div>
 
-      <section class="content-section why-now" id="why-now">
-        <div class="container">
-          <div class="section-header"><div class="section-eyebrow">Why Now</div><h2>Why Now</h2><p>European organizations are moving toward digital sovereignty, open infrastructure, and better control over critical software systems.</p></div>
-          <div class="panel" style="background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.13);"><p>Document workflows are one of the easiest places to start because they touch contracts, procurement, compliance, HR, operations, vendors, and clients.</p><p>Instead of waiting for a full digital transformation project, this gives your organization a practical first step:</p><ul><li>Own the document system.</li><li>Control the data.</li><li>Control the workflows.</li><li>Control the infrastructure.</li><li>Keep the audit trail.</li><li>Reduce SaaS dependency.</li></ul></div>
-        </div>
-      </section>
-
-      <section class="cta" id="cta">
-        <div class="container">
-          <div class="cta-box">
-            <div><div class="section-eyebrow" style="color:#cfe5ff;">Call to Action</div><h2>Book a discovery call</h2><p>If your organization sends, signs, stores, or audits important documents every month, we can build your private document workflow system in 30 days.</p><p>Book a discovery call and we will map your current document process, identify the workflows that should be systemized first, and show you what the first version of your private portal would look like.</p></div>
-            <a href="#get-started" class="btn">Start 7-day free trial</a>
+          <div class="addons">
+            <div class="addon">Additional templates: quoted per scope</div>
+            <div class="addon">Additional custom workflows: quoted per scope</div>
+            <div class="addon">Advanced permissions: quoted per scope</div>
+            <div class="addon">API integrations: quoted per scope</div>
+            <div class="addon">Long-term maintenance: monthly support plan available</div>
+            <div class="addon">Custom compliance requirements: quoted after discovery</div>
           </div>
         </div>
       </section>
+
+      <section id="why-now" class="why-now">
+        <div class="container">
+          <div class="section-header">
+            <h2>Why Now</h2>
+            <p>European organizations are moving toward digital sovereignty, open infrastructure, and better control over critical software systems.</p>
+          </div>
+
+          <div class="panel">
+            <p>Document workflows are one of the easiest places to start because they touch contracts, procurement, compliance, HR, operations, vendors, and clients.</p>
+
+            <p>Instead of waiting for a full digital transformation project, this gives your organization a practical first step:</p>
+
+            <ul>
+              <li>Own the document system.</li>
+              <li>Control the data.</li>
+              <li>Control the workflows.</li>
+              <li>Control the infrastructure.</li>
+              <li>Keep the audit trail.</li>
+              <li>Reduce SaaS dependency.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="cta" class="cta">
+        <div class="container">
+          <div class="cta-box">
+            <div>
+              <div class="eyebrow">Call to Action</div>
+
+              <h2>Book a discovery call</h2>
+
+              <p>If your organization sends, signs, stores, or audits important documents every month, we can build your private document workflow system in 30 days.</p>
+
+              <p>Book a discovery call and we will map your current document process, identify the workflows that should be systemized first, and show you what the first version of your private portal would look like.</p>
+            </div>
+
+            <a href="#get-started" class="button">Book a discovery call</a>
+          </div>
+        </div>
+      </section>
+
     </main>
 
-    <footer><div class="container"><p>© Connexion Two. Sovereign Document Workflow System.</p></div></footer>
+    <footer>
+      <div class="container">
+        <p>© Connexion Two. Sovereign Document Workflow System.</p>
+      </div>
+    </footer>
+
   </div>
 
-  <script>
-    const { createClient } = supabase;
-    const sb = createClient(
-      'https://xbwuvaxtnylqvagdvpxp.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc'
-    );
+<script>
+  // Supabase auth for Connexion Two
+  const { createClient } = supabase;
+  const sb = createClient(
+    'https://xbwuvaxtnylqvagdvpxp.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc'
+  );
 
-    const APP_URL = 'connexion-two-dashboard-intel-blue.html';
-    const TRIAL_DAYS = 7;
+  const APP_URL = 'editor.html';
 
-    function showStep(id) {
-      ['step-auth', 'step-login', 'step-profile', 'step-success'].forEach(stepId => {
-        const step = document.getElementById(stepId);
-        if (step) step.style.display = stepId === id ? '' : 'none';
-      });
+  function showStep(id) {
+    ['step-auth', 'step-login', 'step-profile', 'step-success'].forEach(stepId => {
+      const step = document.getElementById(stepId);
+      if (step) step.style.display = stepId === id ? '' : 'none';
+    });
+  }
+
+  function goToApp() {
+    window.location.replace(APP_URL);
+  }
+
+  async function routeForSession(session) {
+    try {
+      const { data } = await sb
+        .from('profiles')
+        .select('trade')
+        .eq('id', session.user.id)
+        .single();
+
+      if (data && data.trade) goToApp();
+      else showStep('step-profile');
+    } catch (_) {
+      showStep('step-profile');
     }
+  }
 
-    function getDisplayName(user) {
-      return user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'there';
-    }
+  function showError(elId, message) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.textContent = message;
+    el.style.display = '';
+  }
 
-    function getTrialDaysLeft(user) {
-      const trialEndsAt = user?.user_metadata?.trial_ends_at;
-      if (!trialEndsAt) return TRIAL_DAYS;
-      const diff = new Date(trialEndsAt).getTime() - Date.now();
-      return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-    }
+  function hideError(elId) {
+    const el = document.getElementById(elId);
+    if (el) el.style.display = 'none';
+  }
 
-    function showAuthCard() {
-      const authCard = document.getElementById('get-started');
-      const dashboard = document.getElementById('logged-in-dashboard');
-      if (authCard) authCard.style.display = '';
-      if (dashboard) dashboard.style.display = 'none';
-    }
+  function setLoading(button, isLoading) {
+    button.disabled = isLoading;
+    button.style.opacity = isLoading ? '0.7' : '1';
+  }
 
-    function showLoggedInState(session) {
-      const authCard = document.getElementById('get-started');
-      const dashboard = document.getElementById('logged-in-dashboard');
-      const name = getDisplayName(session.user);
-      const daysLeft = getTrialDaysLeft(session.user);
-      if (authCard) authCard.style.display = 'none';
-      if (dashboard) dashboard.style.display = 'block';
-      document.getElementById('welcome-message').textContent = `Welcome back, ${name}`;
-      document.getElementById('trial-days-left').textContent = daysLeft;
-      document.getElementById('trial-note-text').textContent = daysLeft > 0
-        ? `Your ${TRIAL_DAYS}-day free trial is active. You have ${daysLeft} day${daysLeft === 1 ? '' : 's'} left. Invite a friend and get 7 more days free.`
-        : 'Your free trial has ended. Upgrade now to keep using your private document workflow portal.';
-    }
+  document.getElementById('show-login')?.addEventListener('click', event => {
+    event.preventDefault();
+    showStep('step-login');
+  });
 
-    async function routeForSession(session) {
-      try {
-        const { data } = await sb.from('profiles').select('trade').eq('id', session.user.id).single();
-        if (data && data.trade) showLoggedInState(session);
-        else { showAuthCard(); showStep('step-profile'); }
-      } catch (_) {
-        showAuthCard(); showStep('step-profile');
+  document.getElementById('show-signup')?.addEventListener('click', event => {
+    event.preventDefault();
+    showStep('step-auth');
+  });
+
+  document.getElementById('back-to-login')?.addEventListener('click', event => {
+    event.preventDefault();
+    showStep('step-login');
+  });
+
+  async function googleSignIn() {
+    const { error } = await sb.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.href }
+    });
+
+    if (error) alert('Google sign-in failed: ' + error.message);
+  }
+
+  document.getElementById('btn-google')?.addEventListener('click', googleSignIn);
+  document.getElementById('btn-google-login')?.addEventListener('click', googleSignIn);
+
+  document.getElementById('btn-email-signup')?.addEventListener('click', async () => {
+    const button = document.getElementById('btn-email-signup');
+    const name = document.getElementById('auth-name').value.trim();
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+
+    hideError('auth-error');
+
+    if (!name) return showError('auth-error', 'Please enter your full name.');
+    if (!email) return showError('auth-error', 'Please enter your email address.');
+    if (password.length < 8) return showError('auth-error', 'Password must be at least 8 characters.');
+
+    setLoading(button, true);
+
+    const { data, error } = await sb.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: name },
+        emailRedirectTo: window.location.href
       }
-    }
+    });
 
-    function showError(elId, message) {
-      const el = document.getElementById(elId);
-      if (!el) return;
-      el.textContent = message;
-      el.style.display = '';
-    }
+    setLoading(button, false);
 
-    function hideError(elId) {
-      const el = document.getElementById(elId);
-      if (el) el.style.display = 'none';
-    }
+    if (error) return showError('auth-error', error.message);
+    if (data.session) showStep('step-profile');
+    else showStep('step-success');
+  });
 
-    function setLoading(button, isLoading) {
-      button.disabled = isLoading;
-      button.style.opacity = isLoading ? '0.7' : '1';
-    }
+  document.getElementById('btn-login')?.addEventListener('click', async () => {
+    const button = document.getElementById('btn-login');
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
 
-    document.getElementById('show-login')?.addEventListener('click', event => { event.preventDefault(); showStep('step-login'); });
-    document.getElementById('show-signup')?.addEventListener('click', event => { event.preventDefault(); showStep('step-auth'); });
-    document.getElementById('back-to-login')?.addEventListener('click', event => { event.preventDefault(); showStep('step-login'); });
+    hideError('login-error');
 
-    async function googleSignIn() {
-      const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } });
-      if (error) alert('Google sign-in failed: ' + error.message);
-    }
+    if (!email) return showError('login-error', 'Please enter your email address.');
+    if (!password) return showError('login-error', 'Please enter your password.');
 
-    document.getElementById('btn-google')?.addEventListener('click', googleSignIn);
-    document.getElementById('btn-google-login')?.addEventListener('click', googleSignIn);
+    setLoading(button, true);
 
-    document.getElementById('btn-email-signup')?.addEventListener('click', async () => {
-      const button = document.getElementById('btn-email-signup');
-      const name = document.getElementById('auth-name').value.trim();
-      const email = document.getElementById('auth-email').value.trim();
-      const password = document.getElementById('auth-password').value;
-      hideError('auth-error');
-      if (!name) return showError('auth-error', 'Please enter your full name.');
-      if (!email) return showError('auth-error', 'Please enter your email address.');
-      if (password.length < 8) return showError('auth-error', 'Password must be at least 8 characters.');
-      setLoading(button, true);
-      const { data, error } = await sb.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: name,
-            trial_started_at: new Date().toISOString(),
-            trial_ends_at: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
-            referral_bonus_days: 7
-          },
-          emailRedirectTo: window.location.href
-        }
-      });
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+
+    setLoading(button, false);
+
+    if (error) return showError('login-error', error.message);
+    if (data.session) routeForSession(data.session);
+  });
+
+  document.getElementById('btn-save-profile')?.addEventListener('click', async () => {
+    const button = document.getElementById('btn-save-profile');
+    const phone = document.getElementById('prof-phone').value.trim();
+    const trade = document.getElementById('prof-trade').value;
+    const size = document.getElementById('prof-size').value;
+
+    hideError('profile-error');
+
+    if (!trade) return showError('profile-error', 'Please select your organization type.');
+
+    setLoading(button, true);
+
+    const { data: { user } } = await sb.auth.getUser();
+
+    if (!user) {
       setLoading(button, false);
-      if (error) return showError('auth-error', error.message);
-      if (data.session) showStep('step-profile');
-      else showStep('step-success');
+      return showStep('step-success');
+    }
+
+    const { error } = await sb.from('profiles').upsert({
+      id: user.id,
+      full_name: user.user_metadata?.full_name || user.email,
+      email: user.email,
+      phone,
+      trade,
+      business_size: size,
+      updated_at: new Date().toISOString()
     });
 
-    document.getElementById('btn-login')?.addEventListener('click', async () => {
-      const button = document.getElementById('btn-login');
-      const email = document.getElementById('login-email').value.trim();
-      const password = document.getElementById('login-password').value;
-      hideError('login-error');
-      if (!email) return showError('login-error', 'Please enter your email address.');
-      if (!password) return showError('login-error', 'Please enter your password.');
-      setLoading(button, true);
-      const { data, error } = await sb.auth.signInWithPassword({ email, password });
-      setLoading(button, false);
-      if (error) return showError('login-error', error.message);
-      if (data.session) routeForSession(data.session);
-    });
+    setLoading(button, false);
 
-    document.getElementById('btn-save-profile')?.addEventListener('click', async () => {
-      const button = document.getElementById('btn-save-profile');
-      const phone = document.getElementById('prof-phone').value.trim();
-      const trade = document.getElementById('prof-trade').value;
-      const size = document.getElementById('prof-size').value;
-      hideError('profile-error');
-      if (!trade) return showError('profile-error', 'Please select your organization type.');
-      setLoading(button, true);
-      const { data: { user } } = await sb.auth.getUser();
-      if (!user) { setLoading(button, false); return showStep('step-success'); }
-      const { error } = await sb.from('profiles').upsert({ id: user.id, full_name: user.user_metadata?.full_name || user.email, email: user.email, phone, trade, business_size: size, updated_at: new Date().toISOString() });
-      setLoading(button, false);
-      if (error) return showError('profile-error', error.message);
-      const { data: sessionData } = await sb.auth.getSession();
-      if (sessionData.session) showLoggedInState(sessionData.session);
-    });
+    if (error) return showError('profile-error', error.message);
+    goToApp();
+  });
 
-    document.getElementById('sign-out-btn')?.addEventListener('click', async () => { await sb.auth.signOut(); });
+  sb.auth.onAuthStateChange((event, session) => {
+    if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+      routeForSession(session);
+    } else if (event === 'SIGNED_OUT') {
+      showStep('step-auth');
+    }
+  });
+</script>
 
-    sb.auth.onAuthStateChange((event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) routeForSession(session);
-      else if (event === 'SIGNED_OUT') { showAuthCard(); showStep('step-auth'); }
-    });
-  </script>
 </body>
 </html>
