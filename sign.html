@@ -3,60 +3,41 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sign Document | Connexion Two</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
+<title>Sign Document | Blu Balences</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 
 <style>
 :root {
-  --blue-950: #041124;
-  --blue-900: #061a3a;
-  --blue-800: #082b61;
-  --blue-700: #0054d1;
-  --blue-600: #0068ff;
-  --blue-500: #1683ff;
-  --blue-100: #eaf3ff;
-  --blue-050: #f5f9ff;
-
-  --bg: #f7f9fc;
-  --workbench: #eef3f9;
-  --surface: #ffffff;
-  --surface-2: #f8fbff;
-  --surface-3: #eef6ff;
-
-  --border: #d9e2ef;
-  --border-strong: #b9cbe2;
-
-  --text: #111827;
-  --text-sub: #5f6b7a;
-  --text-dim: #8a96a8;
-
-  --accent: var(--blue-700);
-  --accent-dim: rgba(0, 104, 255, .10);
-  --accent-border: rgba(0, 104, 255, .26);
-  --accent-hover: var(--blue-800);
-
-  --green: #0f9f6e;
-  --green-dim: rgba(15, 159, 110, .10);
-  --danger: #d93025;
-
-  --radius: 10px;
-  --radius-lg: 18px;
-  --shadow: 0 12px 38px rgba(6, 26, 58, .08);
-  --shadow-lg: 0 28px 80px rgba(6, 26, 58, .20);
+  --bg: #202124;
+  --surface: #292a2d;
+  --surface-2: #35363a;
+  --surface-3: #3c3d42;
+  --border: rgba(255,255,255,.10);
+  --border-strong: rgba(255,255,255,.15);
+  --text: #e8eaed;
+  --text-sub: #9aa0a6;
+  --text-dim: #5f6368;
+  --accent: #1a73e8;
+  --accent-dim: rgba(26,115,232,.12);
+  --accent-border: rgba(26,115,232,.35);
+  --accent-hover: #4285f4;
+  --green: #0f9d58;
+  --green-dim: rgba(15,157,88,.10);
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.2);
+  --shadow-lg: 0 24px 64px rgba(0,0,0,.5);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 
 body {
-  background:
-    radial-gradient(circle at 88% 6%, rgba(0, 104, 255, .10), transparent 26%),
-    radial-gradient(circle at 8% 4%, rgba(22, 131, 255, .08), transparent 24%),
-    var(--bg);
+  background: var(--bg);
   color: var(--text);
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: 'Roboto', sans-serif;
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -66,267 +47,125 @@ body {
 
 /* ── HEADER ── */
 .header {
-  height: 68px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 26px;
-  background: rgba(255,255,255,.94);
+  height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px;
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  position: sticky; top: 0; z-index: 100;
   flex-shrink: 0;
-  backdrop-filter: blur(16px);
-  box-shadow: 0 1px 0 rgba(255,255,255,.9);
 }
-.header-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.header-brand { display: flex; align-items: center; gap: 10px; }
 .header-logo {
-  width: 42px;
-  height: 42px;
-  background: linear-gradient(135deg, var(--blue-600), var(--blue-900));
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 950;
-  letter-spacing: -.08em;
-  color: #fff;
-  box-shadow: 0 14px 30px rgba(0, 104, 255, .22);
+  width: 32px; height: 32px;
+  background: var(--accent); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 700; color: #fff;
 }
-.header-name {
-  font-size: 18px;
-  font-weight: 900;
-  color: var(--blue-950);
-  letter-spacing: -.045em;
-}
-.header-divider { width: 1px; height: 24px; background: var(--border); }
-.header-doc-title {
-  font-size: 13px;
-  color: var(--text-sub);
-  font-weight: 700;
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.header-name { font-size: 18px; font-weight: 400; color: var(--text); letter-spacing: -.3px; }
+.header-divider { width: 1px; height: 20px; background: var(--border-strong); }
+.header-doc-title { font-size: 13px; color: var(--text-sub); font-weight: 400; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .header-right { display: flex; align-items: center; gap: 12px; }
 
 #pageInfo {
-  font-size: 12px;
-  color: var(--blue-800);
-  background: var(--blue-050);
-  padding: 7px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  font-weight: 800;
+  font-size: 12px; color: var(--text-sub);
+  background: var(--surface-2); padding: 4px 10px;
+  border-radius: 20px; border: 1px solid var(--border);
 }
 
 .btn-finish {
-  background: var(--blue-700);
-  color: #fff;
-  border: none;
-  padding: 11px 22px;
-  border-radius: 999px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 900;
-  cursor: pointer;
-  transition: all .18s ease;
-  letter-spacing: -.01em;
-  box-shadow: 0 14px 28px rgba(0, 84, 209, .22);
+  background: var(--accent); color: #fff; border: none;
+  padding: 9px 22px; border-radius: 20px;
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all .15s; letter-spacing: .25px;
 }
-.btn-finish:hover:not(:disabled) {
-  background: var(--blue-800);
-  transform: translateY(-1px);
-  box-shadow: 0 18px 34px rgba(6, 26, 58, .16);
-}
-.btn-finish:disabled { opacity: .42; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-finish:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-finish:disabled { opacity: .3; cursor: not-allowed; }
 
 /* ── LAYOUT ── */
-.main {
-  flex: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 310px;
-  overflow: hidden;
-  min-height: 0;
-}
+.main { flex: 1; display: grid; grid-template-columns: 1fr 268px; overflow: hidden; min-height: 0; }
 
-.pdf-panel {
-  display: flex;
-  flex-direction: column;
-  background: linear-gradient(180deg, #f5f8fc, #eef3f9);
-  overflow: hidden;
-}
+.pdf-panel { display: flex; flex-direction: column; background: var(--bg); overflow: hidden; }
 
 .pdf-toolbar {
-  padding: 12px 16px;
-  background: rgba(255,255,255,.84);
+  padding: 10px 16px; background: var(--surface);
   border-bottom: 1px solid var(--border);
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: center;
+  display: flex; gap: 6px; align-items: center; justify-content: center;
   flex-shrink: 0;
-  backdrop-filter: blur(12px);
 }
 .btn-zoom {
-  background: #fff;
-  border: 1px solid var(--border);
-  color: var(--blue-800);
-  padding: 8px 15px;
-  border-radius: 999px;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 900;
-  cursor: pointer;
-  transition: all .16s ease;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  background: var(--surface-2); border: 1px solid var(--border-strong);
+  color: var(--text-sub); padding: 6px 14px; border-radius: 20px;
+  font-family: inherit; font-size: 12px; font-weight: 500; cursor: pointer;
+  transition: all .12s; display: flex; align-items: center; gap: 5px;
 }
-.btn-zoom:hover {
-  color: var(--blue-700);
-  border-color: var(--blue-500);
-  box-shadow: 0 10px 24px rgba(6, 26, 58, .08);
-  transform: translateY(-1px);
-}
+.btn-zoom:hover { color: var(--text); border-color: var(--accent); }
 
 .viewer-wrap {
-  flex: 1;
-  padding: 28px 22px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(6,26,58,.22) transparent;
+  flex: 1; padding: 24px 20px; overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.1) transparent;
 }
-.viewer-wrap::-webkit-scrollbar { width: 7px; }
-.viewer-wrap::-webkit-scrollbar-thumb { background: rgba(6,26,58,.22); border-radius: 99px; }
+.viewer-wrap::-webkit-scrollbar { width: 5px; }
+.viewer-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 99px; }
 
 #viewer { display: flex; flex-direction: column; align-items: center; }
 
 /* ── SIDE PANEL ── */
 .side {
-  background: rgba(255,255,255,.96);
-  border-left: 1px solid var(--border);
-  padding: 22px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  box-shadow: -18px 0 42px rgba(6, 26, 58, .04);
+  background: var(--surface); border-left: 1px solid var(--border);
+  padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px;
 }
 .side-section-label {
-  font-size: 11px;
-  font-weight: 950;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: var(--blue-700);
-  margin-bottom: 10px;
+  font-size: 10px; font-weight: 500; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--accent-hover); margin-bottom: 10px;
 }
 .signer-card {
-  background: linear-gradient(180deg, #fff, var(--blue-050));
-  border-radius: 16px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  box-shadow: 0 10px 28px rgba(6, 26, 58, .04);
+  background: var(--surface-2); border-radius: var(--radius);
+  padding: 14px; border: 1px solid var(--border);
 }
 .signer-avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, var(--blue-600), var(--blue-900));
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 950;
-  margin-bottom: 12px;
-  box-shadow: 0 12px 24px rgba(0,104,255,.20);
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; margin-bottom: 10px;
 }
-#signerName { font-weight: 900; font-size: 14px; color: var(--blue-950); }
-#signerEmail { font-size: 12px; color: var(--text-sub); margin-top: 3px; }
+#signerName { font-weight: 500; font-size: 14px; color: var(--text); }
+#signerEmail { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
 .status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin-top: 12px;
-  background: var(--green-dim);
-  border: 1px solid rgba(15,159,110,.24);
-  color: var(--green);
-  font-size: 11px;
-  font-weight: 900;
-  padding: 6px 11px;
-  border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 10px;
+  background: var(--green-dim); border: 1px solid rgba(15,157,88,.25);
+  color: var(--green); font-size: 11px; font-weight: 500;
+  padding: 3px 10px; border-radius: 99px;
 }
-.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+.status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); }
 
 .side-tip {
-  font-size: 12px;
-  color: var(--text-sub);
-  line-height: 1.7;
-  padding: 14px 15px;
-  background: var(--blue-050);
-  border-radius: 14px;
-  border: 1px solid var(--border);
+  font-size: 12px; color: var(--text-sub); line-height: 1.65;
+  padding: 12px 14px; background: var(--surface-2);
+  border-radius: var(--radius); border: 1px solid var(--border);
 }
 .progress-section {
-  background: #fff;
-  border-radius: 16px;
-  padding: 15px;
-  border: 1px solid var(--border);
-  box-shadow: 0 10px 28px rgba(6, 26, 58, .04);
+  background: var(--surface-2); border-radius: var(--radius);
+  padding: 14px; border: 1px solid var(--border);
 }
-.progress-label {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-sub);
-  margin-bottom: 10px;
-  font-weight: 800;
-}
-.progress-bar {
-  height: 7px;
-  background: #e8eef7;
-  border-radius: 999px;
-  overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--blue-700), var(--blue-500));
-  border-radius: 999px;
-  transition: width .4s ease;
-  width: 0%;
-}
+.progress-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-sub); margin-bottom: 8px; }
+.progress-bar { height: 3px; background: var(--border-strong); border-radius: 99px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width .4s ease; width: 0%; }
 
 /* ── FOOTER ── */
 .footer {
-  height: 42px;
-  padding: 0 24px;
-  background: rgba(255,255,255,.94);
+  height: 38px; padding: 0 24px; background: var(--surface);
   border-top: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  color: var(--text-dim);
-  gap: 9px;
-  flex-shrink: 0;
-  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--text-dim); gap: 8px; flex-shrink: 0;
 }
-.footer-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--border-strong); }
+.footer-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--border-strong); }
 
 /* ── PAGE CONTAINER ── */
 .page-container {
-  position: relative;
-  margin-bottom: 18px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow:
-    0 0 0 1px rgba(6, 26, 58, .09),
-    0 18px 48px rgba(6, 26, 58, .16);
+  position: relative; margin-bottom: 16px; background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.1), 0 4px 24px rgba(0,0,0,.4);
   overflow: hidden;
 }
 
@@ -334,319 +173,166 @@ body {
 .field { position: absolute; z-index: 1000; pointer-events: auto; }
 .field[data-type="signature"],
 .field[data-type="initials"] {
-  background: rgba(0,104,255,.09);
-  border: 1.5px dashed rgba(0,84,209,.56);
-  overflow: hidden;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 7px;
-  transition: all .16s ease;
+  background: rgba(26,115,232,.08);
+  border: 1.5px dashed rgba(26,115,232,.5);
+  overflow: hidden; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 4px; transition: all .15s;
 }
 .field[data-type="signature"]:hover,
 .field[data-type="initials"]:hover {
-  background: rgba(0,104,255,.15);
-  border-color: var(--blue-700);
-  box-shadow: 0 0 0 4px rgba(0,104,255,.12);
+  background: rgba(26,115,232,.15);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(26,115,232,.1);
 }
 .field[data-type="initials"],
 .field[data-type="name"],
 .field[data-type="date"] {
-  background: rgba(0,104,255,.09);
-  border: 1.5px dashed rgba(0,84,209,.56);
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 7px;
+  background: rgba(26,115,232,.08);
+  border: 1.5px dashed rgba(26,115,232,.5);
+  overflow: hidden; display: flex; align-items: center; justify-content: center; border-radius: 4px;
 }
 .signature-display-img {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: none;
+  position: absolute; inset: 0; margin: auto;
+  width: 100%; height: 100%; object-fit: contain; display: none;
 }
 .signature-placeholder {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%,-50%);
-  font-size: 10px;
-  font-weight: 950;
-  color: var(--blue-700);
-  opacity: .9;
-  pointer-events: none;
-  white-space: nowrap;
-  letter-spacing: .08em;
-  text-transform: uppercase;
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  font-size: 10px; font-weight: 500; color: var(--accent); opacity: .8;
+  pointer-events: none; white-space: nowrap; letter-spacing: .06em; text-transform: uppercase;
 }
 
 /* ── E-SIGN CONSENT MODAL ── */
 #esignModal {
-  position: fixed;
-  inset: 0;
-  background: rgba(4, 17, 36, .72);
-  z-index: 2147483646;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(10px);
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.75); z-index: 2147483646;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(8px);
 }
 .consent-card {
-  background: #fff;
-  padding: 38px 34px;
-  border-radius: 24px;
-  width: 90%;
-  max-width: 430px;
-  text-align: center;
-  box-shadow: var(--shadow-lg);
-  border: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+  background: var(--surface); padding: 36px 32px; border-radius: 16px;
+  width: 90%; max-width: 400px; text-align: center;
+  box-shadow: var(--shadow-lg); border: 1px solid var(--border-strong);
+  display: flex; flex-direction: column; gap: 18px;
 }
 .consent-icon {
-  width: 58px;
-  height: 58px;
-  background: var(--blue-100);
-  border: 1px solid var(--accent-border);
-  border-radius: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
-  font-size: 26px;
-  box-shadow: 0 14px 30px rgba(0,104,255,.12);
+  width: 52px; height: 52px; background: var(--accent-dim);
+  border: 1px solid var(--accent-border); border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto; font-size: 24px;
 }
-.consent-card h2 {
-  font-size: 22px;
-  font-weight: 950;
-  color: var(--blue-950);
-  letter-spacing: -.045em;
-}
-.consent-card p {
-  font-size: 13px;
-  color: var(--text-sub);
-  line-height: 1.7;
-}
+.consent-card h2 { font-size: 20px; font-weight: 500; color: var(--text); letter-spacing: -.3px; }
+.consent-card p { font-size: 13px; color: var(--text-sub); line-height: 1.65; }
 .consent-checkbox-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 850;
-  color: var(--blue-950);
-  cursor: pointer;
-  padding: 13px 16px;
-  background: var(--blue-050);
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  transition: all .16s ease;
+  display: flex; gap: 10px; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer;
+  padding: 12px 16px; background: var(--surface-2);
+  border-radius: var(--radius); border: 1px solid var(--border-strong); transition: all .12s;
 }
-.consent-checkbox-row:hover { border-color: var(--blue-500); background: #fff; }
-.consent-checkbox-row input[type="checkbox"] {
-  width: 17px;
-  height: 17px;
-  accent-color: var(--blue-700);
-  cursor: pointer;
-}
+.consent-checkbox-row:hover { border-color: var(--accent-border); background: var(--accent-dim); }
+.consent-checkbox-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
 .btn-start {
-  background: var(--blue-700);
-  color: #fff;
-  border: none;
-  padding: 13px 24px;
-  border-radius: 999px;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 950;
-  cursor: pointer;
-  transition: all .18s ease;
-  box-shadow: 0 14px 28px rgba(0,84,209,.22);
+  background: var(--accent); color: #fff; border: none; padding: 12px 24px;
+  border-radius: 20px; font-family: inherit; font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: all .15s;
 }
-.btn-start:hover:not(:disabled) { background: var(--blue-800); transform: translateY(-1px); }
-.btn-start:disabled { opacity: .42; cursor: not-allowed; box-shadow: none; }
+.btn-start:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-start:disabled { opacity: .3; cursor: not-allowed; }
 
 /* ── SIGNATURE DRAW MODAL ── */
 #sigModal {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 2147483647 !important;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  background: rgba(4, 17, 36, .74);
-  backdrop-filter: blur(10px);
+  position: fixed !important; inset: 0 !important;
+  z-index: 2147483647 !important; display: none;
+  align-items: center; justify-content: center;
+  background: rgba(0,0,0,.75); backdrop-filter: blur(6px);
 }
 .modal-content {
-  background: #fff;
-  width: 90%;
-  max-width: 590px;
-  padding: 30px;
-  border-radius: 24px;
-  box-shadow: var(--shadow-lg);
-  border: 1px solid var(--border);
+  background: var(--surface); width: 90%; max-width: 560px; padding: 28px;
+  border-radius: 16px; box-shadow: var(--shadow-lg); border: 1px solid var(--border-strong);
 }
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 18px;
-}
-.modal-title {
-  font-size: 18px;
-  font-weight: 950;
-  color: var(--blue-950);
-  letter-spacing: -.04em;
-}
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.modal-title { font-size: 16px; font-weight: 500; color: var(--text); letter-spacing: -.2px; }
 .modal-tabs {
-  display: flex;
-  gap: 4px;
-  background: var(--blue-050);
-  padding: 4px;
-  border-radius: 12px;
-  margin-bottom: 16px;
-  border: 1px solid var(--border);
+  display: flex; gap: 3px; background: var(--surface-2); padding: 3px;
+  border-radius: 8px; margin-bottom: 14px; border: 1px solid var(--border);
 }
 .tab-btn {
-  flex: 1;
-  padding: 9px 16px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 900;
-  color: var(--text-sub);
-  border-radius: 9px;
-  transition: all .16s ease;
+  flex: 1; padding: 7px 16px; border: none; background: transparent;
+  cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500;
+  color: var(--text-sub); border-radius: 6px; transition: all .15s;
 }
-.tab-btn.active {
-  background: #fff;
-  color: var(--blue-800);
-  box-shadow: 0 8px 18px rgba(6,26,58,.08);
-}
+.tab-btn.active { background: var(--surface-3); color: var(--text); }
 
 /* bigger canvas area */
 .sig-area {
-  border: 1px solid var(--border-strong);
-  border-radius: 14px;
-  margin-bottom: 16px;
-  height: 270px;
-  position: relative;
-  background: #ffffff;
-  overflow: hidden;
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  margin-bottom: 14px; height: 260px;
+  position: relative; background: #ffffff; overflow: hidden;
 }
 .sig-area::after {
-  content: '';
-  position: absolute;
-  bottom: 52px;
-  left: 8%;
-  right: 8%;
-  height: 1px;
-  background: rgba(6,26,58,.14);
-  pointer-events: none;
+  content: ''; position: absolute; bottom: 52px; left: 8%; right: 8%;
+  height: 1px; background: rgba(0,0,0,.08); pointer-events: none;
 }
 #modal-canvas { width: 100%; height: 100%; cursor: crosshair; touch-action: none; display: block; }
 #typed-sig-input {
-  width: 100%;
-  height: 100%;
-  border: none;
-  font-family: 'Dancing Script', cursive;
-  font-size: 70px;
-  text-align: center;
-  outline: none;
-  background: transparent;
-  color: #111;
-  padding: 16px;
+  width: 100%; height: 100%; border: none;
+  font-family: 'Dancing Script', cursive; font-size: 68px;
+  text-align: center; outline: none; background: transparent;
+  color: #111; padding: 16px;
 }
 
-.modal-footer { display: flex; justify-content: flex-end; gap: 9px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 8px; }
 .btn-modal {
-  background: #fff;
-  border: 1px solid var(--border);
-  color: var(--blue-800);
-  padding: 10px 17px;
-  border-radius: 999px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 900;
-  cursor: pointer;
-  transition: all .16s ease;
+  background: var(--surface-2); border: 1px solid var(--border-strong);
+  color: var(--text-sub); padding: 9px 16px; border-radius: 20px;
+  font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .12s;
 }
-.btn-modal:hover { border-color: var(--blue-500); transform: translateY(-1px); }
+.btn-modal:hover { color: var(--text); }
 .btn-modal.primary {
-  background: var(--blue-700);
-  color: #fff;
-  border-color: transparent;
-  box-shadow: 0 12px 24px rgba(0,84,209,.18);
+  background: var(--accent); color: #fff; border-color: transparent;
 }
-.btn-modal.primary:hover { background: var(--blue-800); }
-
-.field input[type="text"],
-.field input[type="number"] {
-  width: 100%;
-  height: 100%;
-  border: none;
-  background: transparent;
-  padding: 4px 6px;
-  font-family: inherit;
-  font-size: 13px;
-  color: #111;
-  outline: none;
-}
-.field input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: var(--blue-700);
-}
-/* native AcroForm fields already in the PDF (kept fillable in-app) */
-.field[data-native="1"] {
-  background: rgba(0,104,255,.07);
-  border: 1px solid rgba(0,84,209,.40);
-  border-radius: 5px;
-}
-.field[data-native="1"]:hover { border-color: var(--blue-700); }
+.btn-modal.primary:hover { background: var(--accent-hover); }
 
 /* ── MOBILE ── */
 @media (max-width: 768px) {
+  /* hide side panel and footer — document fills everything */
   .side { display: none; }
   .footer { display: none; }
 
-  .header {
-    height: auto;
-    padding: 10px 14px;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
+  /* header compact */
+  .header { height: auto; padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
   .header-doc-title { display: none; }
   .header-divider { display: none; }
-  .btn-finish { padding: 10px 18px; font-size: 13px; }
+  .btn-finish { padding: 9px 18px; font-size: 13px; }
 
+  /* toolbar compact */
   .pdf-toolbar { padding: 8px 12px; }
 
-  .main { grid-template-columns: 1fr; height: calc(100dvh - 64px); }
+  /* main takes full height, single column */
+  .main { grid-template-columns: 1fr; height: calc(100dvh - 56px); }
 
+  /* document viewer fills screen edge to edge */
   .viewer-wrap { padding: 0; }
   .page-container { border-radius: 0; margin-bottom: 0; box-shadow: none; }
 
+  /* signature modal full screen */
   .modal-content {
-    width: 100%;
-    height: 100%;
-    max-width: none;
-    border-radius: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    width: 100%; height: 100%; max-width: none; border-radius: 0;
+    display: flex; flex-direction: column; justify-content: center;
   }
   .sig-area { height: 55vh; }
   #typed-sig-input { font-size: 52px; }
 }
+
+.field input[type="text"],
+.field input[type="number"] {
+  width: 100%; height: 100%; border: none; background: transparent;
+  padding: 4px 6px; font-family: inherit; font-size: 13px; color: #111; outline: none;
+}
+.field input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--accent); }
+/* native AcroForm fields already in the PDF (kept fillable in-app) */
+.field[data-native="1"] { background: rgba(26,115,232,.07); border: 1px solid rgba(26,115,232,.4); border-radius: 3px; }
+.field[data-native="1"]:hover { border-color: var(--accent); }
 </style>
 </head>
 
@@ -655,8 +341,8 @@ body {
 
   <div class="header">
     <div class="header-brand">
-      <div class="header-logo">C2</div>
-      <span class="header-name">Connexion Two</span>
+      <div class="header-logo">B</div>
+      <span class="header-name">Blu Balence</span>
       <div class="header-divider"></div>
       <span class="header-doc-title" id="headerDocTitle">Loading document…</span>
     </div>
@@ -704,9 +390,9 @@ body {
   </div>
 
   <div class="footer">
-    <span>Secured by Connexion Two</span>
+    <span>Secured by Blu Balence</span>
     <span class="footer-dot"></span>
-    <span>Sovereign Signature Workflow</span>
+    <span>Electronic Signature System</span>
     <span class="footer-dot"></span>
     <span>256-bit Encrypted</span>
   </div>
@@ -1020,7 +706,7 @@ async function boot() {
     record.current_pdf_url = documentRow.current_pdf_url||null;
     record.final_pdf_url = documentRow.final_pdf_url||null;
     document.getElementById("headerDocTitle").textContent = record.title;
-    document.title = `Sign – ${record.title} | Connexion Two`;
+    document.title = `Sign – ${record.title} | Blu Balence`;
     const rawFields = await fetch(`${SUPABASE_URL}/rest/v1/document_fields?doc_id=eq.${record.doc_id}&select=*`,{headers:{apikey:SUPABASE_ANON,Authorization:`Bearer ${SUPABASE_ANON}`}}).then(r=>r.json());
     const toRatio=(v)=>{const n=Number(v??0);return n>1?n/100:n;};
     fields = rawFields.map(f=>({id:String(f.id),signer_order:Number(f.signer_order??1),type:String(f.field_type||f.type||"").toLowerCase(),page:Number(f.page??1),xPct:toRatio(f.xpct??f.x_pct),yPct:toRatio(f.ypct??f.y_pct),wPct:toRatio(f.wpct??f.w_pct??15),hPct:toRatio(f.hpct??f.h_pct??4),value:f.value||""}));
@@ -1038,22 +724,22 @@ async function boot() {
 }
 
 const tokenParam = new URLSearchParams(window.location.search).get("token");
-const errorPage=(title,msg)=>`<div style="position:fixed;inset:0;background:#041124;color:#ffffff;display:flex;align-items:center;justify-content:center;text-align:center;font-family:'Inter',system-ui;padding:40px;"><div style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.12);border-radius:16px;padding:48px 40px;max-width:420px;"><div style="width:48px;height:48px;background:rgba(217,48,37,0.12);border:1px solid rgba(217,48,37,0.25);border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:20px;">✕</div><h2 style="font-size:20px;font-weight:500;margin-bottom:10px;letter-spacing:-.3px;">${title}</h2><p style="opacity:.55;font-size:13px;line-height:1.65;">${msg}</p></div></div>`;
+const errorPage=(title,msg)=>`<div style="position:fixed;inset:0;background:#202124;color:#e8eaed;display:flex;align-items:center;justify-content:center;text-align:center;font-family:'Roboto',system-ui;padding:40px;"><div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:48px 40px;max-width:420px;"><div style="width:48px;height:48px;background:rgba(217,48,37,0.12);border:1px solid rgba(217,48,37,0.25);border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:20px;">✕</div><h2 style="font-size:20px;font-weight:500;margin-bottom:10px;letter-spacing:-.3px;">${title}</h2><p style="opacity:.55;font-size:13px;line-height:1.65;">${msg}</p></div></div>`;
 
 if (!tokenParam) {
-  document.body.innerHTML = errorPage("Invalid Document Link","Please contact Connexion Two for a valid signing link.");
+  document.body.innerHTML = errorPage("Invalid Document Link","Please contact Blu Balence for a valid signing link.");
 } else {
   fetch(`${SUPABASE_URL}/rest/v1/signers?token=eq.${tokenParam}&select=created_at,status`,{headers:{apikey:SUPABASE_ANON,Authorization:`Bearer ${SUPABASE_ANON}`}})
   .then(r=>r.json())
   .then(data=>{
     if(!data||(Array.isArray(data)&&data.length===0)){document.body.innerHTML=errorPage("Document Not Found","This link is no longer valid.");return;}
     const signer=data[0];
-    if((Date.now()-new Date(signer.created_at).getTime())>48*60*60*1000||signer.status==="completed"){document.body.innerHTML=errorPage("Link Expired","This signing session is no longer available. Please contact Connexion Two for a new link.");return;}
+    if((Date.now()-new Date(signer.created_at).getTime())>48*60*60*1000||signer.status==="completed"){document.body.innerHTML=errorPage("Link Expired","This signing session is no longer available. Please contact Blu Balence for a new link.");return;}
     document.getElementById("zoomInBtn")?.addEventListener("click",async()=>{if(!pdfDoc||!currentPdfUrl)return;currentScale*=1.15;await renderAllPages(currentPdfUrl);});
     document.getElementById("zoomOutBtn")?.addEventListener("click",async()=>{if(!pdfDoc||!currentPdfUrl)return;currentScale/=1.15;await renderAllPages(currentPdfUrl);});
     boot();
   })
-  .catch(()=>{ document.body.innerHTML=errorPage("Connection Error","Please try again or contact Connexion Two."); });
+  .catch(()=>{ document.body.innerHTML=errorPage("Connection Error","Please try again or contact Blu Balence."); });
 }
 
 document.getElementById("esignCheckbox")?.addEventListener("change",(e)=>{document.getElementById("startSigningBtn").disabled=!e.target.checked;});
@@ -1126,7 +812,7 @@ document.getElementById("finishBtn")?.addEventListener("click",async()=>{
     });
     const result = await resp.json().catch(()=>({}));
     if(!resp.ok){ alert("Finalize failed ("+resp.status+"): "+(result.error||"see function logs")); btn.disabled=false; return; }
-    document.body.innerHTML=`<div style="position:fixed;inset:0;background:#041124;color:#ffffff;display:flex;align-items:center;justify-content:center;font-family:'Inter',system-ui;z-index:999999;padding:40px;"><div style="text-align:center;max-width:420px;"><div style="width:64px;height:64px;background:rgba(15,157,88,0.12);border:1px solid rgba(15,157,88,0.3);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:28px;">✓</div><h1 style="font-size:24px;font-weight:400;margin-bottom:12px;letter-spacing:-.3px;">Document Signed</h1><p style="color:rgba(255,255,255,0.5);font-size:14px;line-height:1.7;">This document has been securely completed and recorded by Connexion Two. For your protection, the signed document is no longer viewable on this device.</p></div></div>`;
+    document.body.innerHTML=`<div style="position:fixed;inset:0;background:#202124;color:#e8eaed;display:flex;align-items:center;justify-content:center;font-family:'Roboto',system-ui;z-index:999999;padding:40px;"><div style="text-align:center;max-width:420px;"><div style="width:64px;height:64px;background:rgba(15,157,88,0.12);border:1px solid rgba(15,157,88,0.3);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:28px;">✓</div><h1 style="font-size:24px;font-weight:400;margin-bottom:12px;letter-spacing:-.3px;">Document Signed</h1><p style="color:rgba(255,255,255,0.5);font-size:14px;line-height:1.7;">This document has been securely completed and recorded by Blu Balence. For your protection, the signed document is no longer viewable on this device.</p></div></div>`;
     document.documentElement.style.overflow="hidden"; document.body.style.overflow="hidden";
   }catch(err){
     console.error("Finish error:",err);
