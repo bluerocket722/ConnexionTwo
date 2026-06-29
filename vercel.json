@@ -15,8 +15,8 @@
       "destination": "/sign.html"
     },
     {
-      "source": "/dashboard",
-      "destination": "/dashboard.html"
+      "source": "/welcome",
+      "destination": "/welcome.html"
     }
   ]
 }
