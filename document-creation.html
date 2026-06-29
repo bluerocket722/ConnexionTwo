@@ -746,13 +746,17 @@ async function submitData() {
       { signer_order:4, name:document.getElementById("signer4_name").value, email:document.getElementById("signer4_email").value }
     ].filter(s => s.email);
 
-    const { data:doc, error:docError } = await sb.from("signer_documents").insert({
-      jira_code:   document.getElementById("jira_code")?.value || "",
-      title:       titleInput?.value || name,
-      template_name: "",
-      pdf_url:     window.UPLOADED_PDF_URL || "",
-      custom_email: ""
-    }).select().single();
+    const { data:{ user } } = await sb.auth.getUser();
+const { data:doc, error:docError } = await sb.from("signer_documents").insert({
+  owner_id:    user?.id || null,
+  jira_code:   document.getElementById("jira_code")?.value || "",
+  title:       titleInput?.value || name,
+  template_name: "",
+  pdf_url:     window.UPLOADED_PDF_URL || "",
+  custom_email: "",
+  status:        "in_progress",
+  total_signers: signers.length
+}).select().single();
     if (docError) throw docError;
 
     const docId = doc.doc_id;
