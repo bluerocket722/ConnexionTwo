@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sign Document | Blu Balences</title>
+<title>Sign Document | Connexion Two</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
@@ -341,8 +341,8 @@ body {
 
   <div class="header">
     <div class="header-brand">
-      <div class="header-logo">B</div>
-      <span class="header-name">Blu Balence</span>
+      <div class="header-logo">C2</div>
+      <span class="header-name">Connexion Two</span>
       <div class="header-divider"></div>
       <span class="header-doc-title" id="headerDocTitle">Loading document…</span>
     </div>
@@ -390,7 +390,7 @@ body {
   </div>
 
   <div class="footer">
-    <span>Secured by Blu Balence</span>
+    <span>Secured by Connexion Two</span>
     <span class="footer-dot"></span>
     <span>Electronic Signature System</span>
     <span class="footer-dot"></span>
@@ -706,7 +706,7 @@ async function boot() {
     record.current_pdf_url = documentRow.current_pdf_url||null;
     record.final_pdf_url = documentRow.final_pdf_url||null;
     document.getElementById("headerDocTitle").textContent = record.title;
-    document.title = `Sign – ${record.title} | Blu Balence`;
+    document.title = `Sign – ${record.title} | Connexion Two`;
     const rawFields = await fetch(`${SUPABASE_URL}/rest/v1/document_fields?doc_id=eq.${record.doc_id}&select=*`,{headers:{apikey:SUPABASE_ANON,Authorization:`Bearer ${SUPABASE_ANON}`}}).then(r=>r.json());
     const toRatio=(v)=>{const n=Number(v??0);return n>1?n/100:n;};
     fields = rawFields.map(f=>({id:String(f.id),signer_order:Number(f.signer_order??1),type:String(f.field_type||f.type||"").toLowerCase(),page:Number(f.page??1),xPct:toRatio(f.xpct??f.x_pct),yPct:toRatio(f.ypct??f.y_pct),wPct:toRatio(f.wpct??f.w_pct??15),hPct:toRatio(f.hpct??f.h_pct??4),value:f.value||""}));
@@ -727,19 +727,19 @@ const tokenParam = new URLSearchParams(window.location.search).get("token");
 const errorPage=(title,msg)=>`<div style="position:fixed;inset:0;background:#202124;color:#e8eaed;display:flex;align-items:center;justify-content:center;text-align:center;font-family:'Roboto',system-ui;padding:40px;"><div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:48px 40px;max-width:420px;"><div style="width:48px;height:48px;background:rgba(217,48,37,0.12);border:1px solid rgba(217,48,37,0.25);border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:20px;">✕</div><h2 style="font-size:20px;font-weight:500;margin-bottom:10px;letter-spacing:-.3px;">${title}</h2><p style="opacity:.55;font-size:13px;line-height:1.65;">${msg}</p></div></div>`;
 
 if (!tokenParam) {
-  document.body.innerHTML = errorPage("Invalid Document Link","Please contact Blu Balence for a valid signing link.");
+  document.body.innerHTML = errorPage("Invalid Document Link","Please contact Connexion Two for a valid signing link.");
 } else {
   fetch(`${SUPABASE_URL}/rest/v1/signers?token=eq.${tokenParam}&select=created_at,status`,{headers:{apikey:SUPABASE_ANON,Authorization:`Bearer ${SUPABASE_ANON}`}})
   .then(r=>r.json())
   .then(data=>{
     if(!data||(Array.isArray(data)&&data.length===0)){document.body.innerHTML=errorPage("Document Not Found","This link is no longer valid.");return;}
     const signer=data[0];
-    if((Date.now()-new Date(signer.created_at).getTime())>48*60*60*1000||signer.status==="completed"){document.body.innerHTML=errorPage("Link Expired","This signing session is no longer available. Please contact Blu Balence for a new link.");return;}
+    if((Date.now()-new Date(signer.created_at).getTime())>48*60*60*1000||signer.status==="completed"){document.body.innerHTML=errorPage("Link Expired","This signing session is no longer available. Please contact Connexion Two for a new link.");return;}
     document.getElementById("zoomInBtn")?.addEventListener("click",async()=>{if(!pdfDoc||!currentPdfUrl)return;currentScale*=1.15;await renderAllPages(currentPdfUrl);});
     document.getElementById("zoomOutBtn")?.addEventListener("click",async()=>{if(!pdfDoc||!currentPdfUrl)return;currentScale/=1.15;await renderAllPages(currentPdfUrl);});
     boot();
   })
-  .catch(()=>{ document.body.innerHTML=errorPage("Connection Error","Please try again or contact Blu Balence."); });
+  .catch(()=>{ document.body.innerHTML=errorPage("Connection Error","Please try again or contact Connexion Two."); });
 }
 
 document.getElementById("esignCheckbox")?.addEventListener("change",(e)=>{document.getElementById("startSigningBtn").disabled=!e.target.checked;});
@@ -812,7 +812,7 @@ document.getElementById("finishBtn")?.addEventListener("click",async()=>{
     });
     const result = await resp.json().catch(()=>({}));
     if(!resp.ok){ alert("Finalize failed ("+resp.status+"): "+(result.error||"see function logs")); btn.disabled=false; return; }
-    document.body.innerHTML=`<div style="position:fixed;inset:0;background:#202124;color:#e8eaed;display:flex;align-items:center;justify-content:center;font-family:'Roboto',system-ui;z-index:999999;padding:40px;"><div style="text-align:center;max-width:420px;"><div style="width:64px;height:64px;background:rgba(15,157,88,0.12);border:1px solid rgba(15,157,88,0.3);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:28px;">✓</div><h1 style="font-size:24px;font-weight:400;margin-bottom:12px;letter-spacing:-.3px;">Document Signed</h1><p style="color:rgba(255,255,255,0.5);font-size:14px;line-height:1.7;">This document has been securely completed and recorded by Blu Balence. For your protection, the signed document is no longer viewable on this device.</p></div></div>`;
+    document.body.innerHTML=`<div style="position:fixed;inset:0;background:#202124;color:#e8eaed;display:flex;align-items:center;justify-content:center;font-family:'Roboto',system-ui;z-index:999999;padding:40px;"><div style="text-align:center;max-width:420px;"><div style="width:64px;height:64px;background:rgba(15,157,88,0.12);border:1px solid rgba(15,157,88,0.3);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:28px;">✓</div><h1 style="font-size:24px;font-weight:400;margin-bottom:12px;letter-spacing:-.3px;">Document Signed</h1><p style="color:rgba(255,255,255,0.5);font-size:14px;line-height:1.7;">This document has been securely completed and recorded by Connexion Two. For your protection, the signed document is no longer viewable on this device.</p></div></div>`;
     document.documentElement.style.overflow="hidden"; document.body.style.overflow="hidden";
   }catch(err){
     console.error("Finish error:",err);
