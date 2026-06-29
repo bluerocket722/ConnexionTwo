@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Connexion Two | Documents</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --blue-900: #061a3a;
+      --blue-800: #082b61;
+      --blue-700: #0054d1;
+      --blue-600: #0068ff;
+      --blue-500: #1683ff;
+      --blue-100: #eaf3ff;
+      --blue-050: #f5f9ff;
+      --text: #111827;
+      --muted: #5f6b7a;
+      --line: #d9e2ef;
+      --panel: #ffffff;
+      --bg: #f7f9fc;
+      --word: #2b579a;
+      --cell: #217346;
+      --slide: #c43e1c;
+      --pdf: #d93025;
+      --gray: #6b7785;
+      --danger: #d93025;
+      --shadow: 0 22px 70px rgba(6, 26, 58, 0.10);
+      --shadow-soft: 0 12px 38px rgba(6, 26, 58, 0.06);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, Arial, Helvetica, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; }
+
+    .app {
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 88% 16%, rgba(0, 104, 255, 0.08), transparent 30%),
+        linear-gradient(180deg, #ffffff 0%, #f7f9fc 48%, #f2f6fb 100%);
+    }
+
+    .top-nav {
+      height: 82px;
+      display: grid;
+      grid-template-columns: 258px 1fr auto;
+      align-items: center;
+      gap: 24px;
+      padding: 0 28px;
+      background: rgba(255,255,255,0.94);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
+
+    .c2-logo {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: linear-gradient(135deg, var(--blue-900), var(--blue-700));
+      border-radius: 12px;
+      font-weight: 950;
+      font-size: 1rem;
+      letter-spacing: -0.04em;
+      position: relative;
+      isolation: isolate;
+      flex: 0 0 auto;
+      box-shadow: 0 10px 24px rgba(0, 84, 209, 0.18);
+    }
+
+    .brand-text { display: flex; flex-direction: column; gap: 2px; line-height: 1; }
+    .brand-name { color: var(--blue-900); font-weight: 950; font-size: 1.08rem; letter-spacing: -0.035em; }
+    .brand .brand-sub { display: none; }
+    .brand-sub { color: var(--muted); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+
+    .nav-tabs { display: flex; align-items: stretch; align-self: stretch; gap: 2px; }
+    .nav-tabs a { display: flex; align-items: center; padding: 0 22px; color: #475569; font-size: 0.98rem; font-weight: 800; border-bottom: 3px solid transparent; transition: 0.18s ease; }
+    .nav-tabs a:hover, .nav-tabs a.active { color: var(--blue-700); border-bottom-color: var(--blue-700); background: linear-gradient(180deg, transparent, rgba(0,104,255,0.045)); }
+
+    .top-actions { display: flex; align-items: center; gap: 12px; }
+    .trial-left { color: var(--blue-800); font-size: 0.96rem; font-weight: 900; white-space: nowrap; }
+    .buy-btn { height: 44px; padding: 0 20px; border: 1px solid var(--blue-700); border-radius: 8px; background: var(--blue-700); color: white; font-size: 0.95rem; font-weight: 900; cursor: pointer; box-shadow: 0 10px 22px rgba(0, 84, 209, 0.22); }
+    .icon-btn { width: 42px; height: 42px; border: 1px solid var(--line); background: #fff; color: var(--blue-800); border-radius: 8px; cursor: pointer; display: grid; place-items: center; font-size: 1.15rem; font-weight: 900; position: relative; }
+    .icon-btn:hover, .buy-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 28px rgba(6, 26, 58, 0.12); }
+    .notify-dot { width: 8px; height: 8px; border-radius: 50%; background: #e11d48; position: absolute; top: 8px; right: 8px; }
+    .avatar { width: 46px; height: 46px; border-radius: 50%; background: linear-gradient(135deg, var(--blue-100), #d8ebff); color: var(--blue-800); display: grid; place-items: center; font-size: 0.98rem; font-weight: 900; border: 1px solid #c7dcf8; }
+
+    .system-strip { min-height: 58px; background: #f3f7fc; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: center; gap: 10px; color: #25364f; font-size: 0.95rem; padding: 12px 24px; }
+    .info-dot { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--blue-800); color: var(--blue-800); display: grid; place-items: center; font-size: 0.82rem; font-weight: 950; flex: 0 0 auto; }
+    .system-strip a { color: var(--blue-700); text-decoration: underline; font-weight: 800; }
+
+    .hero-panel {
+      min-height: 390px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 28px 66px;
+      background:
+        linear-gradient(120deg, rgba(0, 84, 209, 0.96), rgba(0, 104, 255, 0.92) 52%, rgba(14, 131, 255, 0.92)),
+        radial-gradient(circle at 22% 18%, rgba(255,255,255,0.26), transparent 26%);
+      position: relative;
+      overflow: hidden;
+      color: #fff;
+    }
+
+    .hero-panel::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px); background-size: 48px 48px; mask-image: linear-gradient(90deg, transparent 0%, black 20%, black 80%, transparent 100%); opacity: 0.5; }
+    .hero-panel::after { content: ""; position: absolute; right: -120px; top: -120px; width: 380px; height: 380px; border: 44px solid rgba(255,255,255,0.12); border-radius: 50%; }
+    .hero-inner { width: min(1080px, 100%); text-align: center; position: relative; z-index: 1; }
+    .welcome-label { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid rgba(255,255,255,0.28); background: rgba(255,255,255,0.10); border-radius: 999px; font-size: 0.77rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.14em; margin-bottom: 22px; }
+    .status-light { width: 8px; height: 8px; background: #6ee7b7; border-radius: 50%; box-shadow: 0 0 0 4px rgba(110, 231, 183, 0.18); }
+    h1 { font-size: clamp(2rem, 4.2vw, 3.25rem); line-height: 1; letter-spacing: -0.055em; font-weight: 650; margin-bottom: 14px; }
+    .hero-sub { color: rgba(255,255,255,0.82); font-size: 1rem; max-width: 740px; line-height: 1.65; margin: 0 auto 34px; }
+
+    .main-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 14px; margin-bottom: 30px; }
+    .primary-action, .outline-action { min-height: 58px; border-radius: 8px; padding: 0 22px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; font-size: 0.98rem; font-weight: 900; cursor: pointer; transition: 0.18s ease; }
+    .primary-action { background: white; color: var(--blue-800); border: 1px solid rgba(255,255,255,0.85); }
+    .outline-action { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.36); backdrop-filter: blur(8px); }
+    .primary-action:hover, .outline-action:hover { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(6, 26, 58, 0.22); }
+    .action-icon { font-size: 1.35rem; line-height: 1; font-weight: 900; }
+
+    .secondary-actions { display: grid; grid-template-columns: repeat(4, minmax(170px, 1fr)); gap: 14px; margin: 42px auto 0; max-width: 980px; }
+    .quick-card { background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.22); border-radius: 12px; padding: 18px; color: white; text-align: left; backdrop-filter: blur(10px); transition: 0.18s ease; cursor: pointer; }
+    .quick-card:hover { background: rgba(255,255,255,0.18); transform: translateY(-2px); }
+    .quick-icon { width: 40px; height: 40px; border-radius: 9px; background: rgba(255,255,255,0.16); display: grid; place-items: center; font-weight: 950; font-size: 1.2rem; margin-bottom: 13px; }
+    .quick-title { font-weight: 950; font-size: 0.96rem; margin-bottom: 5px; }
+    .quick-desc { color: rgba(255,255,255,0.76); font-size: 0.82rem; line-height: 1.45; }
+
+    .workspace { max-width: 1360px; margin: 0 auto; padding: 34px 28px 58px; display: grid; grid-template-columns: 1fr 360px; gap: 28px; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-soft); overflow: visible; }
+    .panel-header { padding: 20px 22px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 14px; background: linear-gradient(180deg, #fff, #fbfdff); }
+    .panel-title { color: var(--blue-900); font-size: 1.02rem; font-weight: 950; letter-spacing: -0.02em; }
+    .view-all { color: var(--blue-700); font-size: 0.9rem; font-weight: 900; }
+    .docs-body { padding: 22px; }
+
+    .cmdbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border: 1px solid var(--line); background: #fff; color: var(--blue-900); font-size: 0.92rem; font-weight: 900; padding: 0 16px; border-radius: 8px; cursor: pointer; transition: 0.18s ease; }
+    .btn:hover { border-color: #aac8ef; background: var(--blue-050); transform: translateY(-1px); }
+    .btn-primary { background: var(--blue-700); border-color: var(--blue-700); color: #fff; box-shadow: 0 10px 22px rgba(0, 84, 209, 0.20); }
+    .btn-primary:hover { background: var(--blue-600); color: #fff; }
+    .spacer { flex: 1; }
+
+    .search { position: relative; }
+    .search input { height: 44px; width: 260px; max-width: 46vw; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 0 14px 0 38px; font-size: 0.92rem; font-family: inherit; outline: none; transition: 0.18s ease; }
+    .search input:focus { border-color: var(--blue-600); box-shadow: 0 0 0 3px rgba(0, 104, 255, 0.14); }
+    .search .si { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 15px; pointer-events: none; }
+
+    .menu-anchor { position: relative; }
+    .menu { position: absolute; top: 50px; left: 0; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 8px; min-width: 250px; z-index: 40; display: none; }
+    .menu.open { display: block; }
+    .menu-item { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 9px; cursor: pointer; font-size: 0.92rem; font-weight: 900; color: var(--blue-900); }
+    .menu-item:hover { background: var(--blue-050); }
+    .menu-item small { display: block; font-weight: 650; color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
+    .mi-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 950; font-size: 0.78rem; flex: 0 0 auto; }
+
+    .sec-head { display: flex; align-items: baseline; gap: 10px; margin: 24px 0 14px; }
+    .sec-head h2 { color: var(--blue-900); font-size: 0.94rem; font-weight: 950; }
+    .sec-head .count { color: var(--muted); font-size: 0.84rem; font-weight: 700; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+    .file { position: relative; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; cursor: pointer; transition: 0.18s ease; }
+    .file:hover { box-shadow: var(--shadow-soft); border-color: #aac8ef; transform: translateY(-2px); }
+    .file .ftop { display: flex; align-items: flex-start; gap: 12px; }
+    .ficon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 950; font-size: 0.82rem; flex-shrink: 0; letter-spacing: .3px; }
+    .fmeta { min-width: 0; flex: 1; }
+    .fname { font-size: 0.92rem; font-weight: 850; line-height: 1.35; color: var(--blue-900); word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .fsub { margin-top: 6px; font-size: 0.78rem; color: var(--muted); }
+    .fdel { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border: none; background: transparent; border-radius: 7px; color: var(--gray); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.12s ease; font-size: 16px; }
+    .file:hover .fdel { opacity: 1; }
+    .fdel:hover { background: #fde7e6; color: var(--danger); }
+
+    .empty { text-align: center; color: var(--muted); background: var(--blue-050); border: 1px dashed #bcd3ef; border-radius: 14px; padding: 54px 20px; }
+    .empty .big { width: 76px; height: 76px; border-radius: 18px; background: var(--blue-100); color: var(--blue-700); display: grid; place-items: center; margin: 0 auto 18px; font-size: 2rem; font-weight: 950; }
+    .empty .t { color: var(--blue-900); font-size: 1.1rem; font-weight: 950; margin-bottom: 6px; }
+    .empty .s { font-size: 0.9rem; }
+    .loading { color: var(--muted); font-size: 0.94rem; padding: 18px 2px; }
+
+    .side-stack { display: grid; gap: 18px; }
+    .side-card { padding: 22px; }
+    .usage-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 0.94rem; }
+    .usage-row:last-child { border-bottom: 0; }
+    .usage-row strong { color: var(--blue-900); }
+    .progress-track { height: 8px; background: #edf3fb; border-radius: 999px; overflow: hidden; margin-top: 16px; }
+    .progress-fill { height: 100%; width: 24%; background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-radius: 999px; }
+    .template-list { display: grid; gap: 10px; margin-top: 14px; }
+    .template-item { display: flex; align-items: center; gap: 12px; padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: #fbfdff; transition: 0.16s ease; cursor: pointer; }
+    .template-item:hover { border-color: #aac8ef; background: var(--blue-050); }
+    .template-icon { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: var(--blue-100); color: var(--blue-700); font-weight: 950; }
+    .template-item span:last-child { color: var(--blue-900); font-weight: 850; font-size: 0.9rem; }
+
+    .sidebar-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 26, 58, 0.38);
+      z-index: 850;
+      opacity: 0;
+      pointer-events: none;
+      transition: 0.18s ease;
+    }
+
+    .sidebar-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .left-sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 340px;
+      max-width: 88vw;
+      height: 100vh;
+      background: #fff;
+      border-right: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      z-index: 900;
+      transform: translateX(-104%);
+      transition: 0.22s ease;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .left-sidebar.open {
+      transform: translateX(0);
+    }
+
+    .sidebar-head {
+      height: 82px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #fff, #fbfdff);
+    }
+
+    .sidebar-title {
+      color: var(--blue-900);
+      font-size: 1rem;
+      font-weight: 950;
+      letter-spacing: -0.02em;
+    }
+
+    .sidebar-close {
+      width: 38px;
+      height: 38px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--blue-800);
+      border-radius: 8px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      font-size: 1.1rem;
+      font-weight: 950;
+    }
+
+    .sidebar-close:hover {
+      background: var(--blue-050);
+      border-color: #aac8ef;
+    }
+
+    .sidebar-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      background: #f8fbff;
+    }
+
+    .sidebar-tab {
+      min-height: 40px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--muted);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 900;
+      transition: 0.16s ease;
+    }
+
+    .sidebar-tab:hover,
+    .sidebar-tab.active {
+      background: var(--blue-700);
+      border-color: var(--blue-700);
+      color: #fff;
+    }
+
+    .sidebar-content {
+      padding: 18px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .sidebar-panel {
+      display: none;
+    }
+
+    .sidebar-panel.active {
+      display: block;
+    }
+
+    .sidebar-section-title {
+      color: var(--blue-900);
+      font-size: 0.95rem;
+      font-weight: 950;
+      margin-bottom: 12px;
+    }
+
+    .sidebar-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .sidebar-link {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fbfdff;
+      color: var(--blue-900);
+      text-align: left;
+      cursor: pointer;
+      transition: 0.16s ease;
+      font-weight: 850;
+    }
+
+    .sidebar-link:hover {
+      border-color: #aac8ef;
+      background: var(--blue-050);
+      transform: translateY(-1px);
+    }
+
+    .sidebar-link-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      background: var(--blue-100);
+      color: var(--blue-700);
+      font-weight: 950;
+      flex: 0 0 auto;
+    }
+
+    .sidebar-link-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .sidebar-link-text strong {
+      color: var(--blue-900);
+      font-size: 0.9rem;
+    }
+
+    .sidebar-link-text small {
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 650;
+      line-height: 1.35;
+    }
+
+    .sidebar-note {
+      margin-top: 16px;
+      padding: 14px;
+      border-radius: 12px;
+      background: var(--blue-050);
+      border: 1px dashed #bcd3ef;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.5;
+    }
+
+    .mobile-menu { display: none; }
+
+    @media (max-width: 1120px) {
+      .top-nav { grid-template-columns: auto 1fr auto; }
+      .nav-tabs a { padding: 0 14px; font-size: 0.92rem; }
+      .secondary-actions { grid-template-columns: repeat(2, minmax(170px, 1fr)); }
+      .workspace { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 780px) {
+      .top-nav { height: auto; min-height: 76px; grid-template-columns: 1fr auto; padding: 12px 16px; }
+      .nav-tabs { display: none; }
+      .trial-left, .buy-btn { display: none; }
+      .avatar { width: 42px; height: 42px; }
+      .mobile-menu { display: grid; }
+      .system-strip { justify-content: flex-start; }
+      .hero-panel { padding: 44px 16px 52px; }
+      .main-actions { flex-direction: column; align-items: stretch; }
+      .primary-action, .outline-action { width: 100%; }
+      .secondary-actions { grid-template-columns: 1fr; }
+      .workspace { padding: 22px 16px 42px; }
+      .cmdbar { align-items: stretch; }
+      .search, .search input { width: 100%; max-width: 100%; }
+    }
+
+
+    /* Professional Connexion Two dashboard refinements */
+    .top-nav {
+      height: 84px;
+      background: rgba(255,255,255,0.98);
+      box-shadow: 0 1px 0 rgba(6, 26, 58, 0.06);
+    }
+
+    .nav-tabs a.active {
+      color: var(--blue-900);
+      border-bottom-color: var(--blue-700);
+    }
+
+    .icon-btn {
+      width: auto;
+      min-width: 42px;
+      height: 42px;
+      padding: 0 13px;
+      font-size: 0.82rem;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+
+    .hero-panel {
+      min-height: 330px;
+      padding: 64px 28px 68px;
+      background:
+        radial-gradient(circle at 24% 22%, rgba(255,255,255,0.18), transparent 28%),
+        linear-gradient(125deg, var(--blue-900) 0%, var(--blue-800) 42%, var(--blue-700) 100%);
+    }
+
+    .hero-panel::before { opacity: 0.26; }
+    .hero-panel::after { opacity: 0.55; }
+
+    .welcome-label {
+      border-color: rgba(255,255,255,0.22);
+      background: rgba(255,255,255,0.08);
+      letter-spacing: 0.16em;
+    }
+
+    .main-actions {
+      margin-bottom: 0;
+      gap: 18px;
+    }
+
+    .primary-action,
+    .outline-action {
+      min-height: 56px;
+      min-width: 220px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 900;
+      letter-spacing: -0.015em;
+    }
+
+    .primary-action {
+      color: var(--blue-900);
+      background: #ffffff;
+      border-color: #ffffff;
+    }
+
+    .outline-action {
+      color: #ffffff;
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.34);
+    }
+
+    .secondary-actions { display: none; }
+
+    .workspace {
+      max-width: 1280px;
+      grid-template-columns: 1fr 320px;
+      padding-top: 46px;
+    }
+
+    .left-sidebar {
+      width: 404px;
+      background: #ffffff;
+      box-shadow: 30px 0 80px rgba(6, 26, 58, 0.18);
+    }
+
+    .sidebar-head {
+      height: 94px;
+      padding: 0 22px;
+      background: #ffffff;
+    }
+
+    .sidebar-brand-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sidebar-logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 11px;
+    }
+
+    .sidebar-close {
+      width: auto;
+      height: 40px;
+      padding: 0 12px;
+      border-radius: 10px;
+      font-size: 0.82rem;
+    }
+
+    .sidebar-search {
+      padding: 22px 26px 18px;
+      border-bottom: 1px solid var(--line);
+      background: #ffffff;
+    }
+
+    .sidebar-search input {
+      width: 100%;
+      height: 46px;
+      border: 1px solid #b9c6d8;
+      border-radius: 10px;
+      outline: none;
+      padding: 0 14px;
+      color: var(--blue-900);
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: #ffffff;
+    }
+
+    .sidebar-search input:focus {
+      border-color: var(--blue-700);
+      box-shadow: 0 0 0 4px rgba(0,84,209,0.10);
+    }
+
+    .sidebar-tabs.sidebar-nav-list {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+      padding: 0;
+      border-bottom: 1px solid var(--line);
+      background: #ffffff;
+    }
+
+    .sidebar-tab {
+      min-height: 48px;
+      border: 0;
+      border-radius: 0;
+      justify-content: flex-start;
+      text-align: left;
+      padding: 0 30px;
+      background: #ffffff;
+      color: #334155;
+      font-size: 0.95rem;
+      font-weight: 800;
+      position: relative;
+    }
+
+    .sidebar-tab::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border: 2px solid #8a96a8;
+      border-radius: 50%;
+      margin-right: 14px;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    .sidebar-tab:hover,
+    .sidebar-tab.active {
+      background: #f1f6ff;
+      color: var(--blue-900);
+      border-color: transparent;
+    }
+
+    .sidebar-tab.active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: var(--blue-700);
+    }
+
+    .sidebar-content {
+      padding: 24px 26px;
+    }
+
+    .sidebar-section-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--blue-800);
+      margin-bottom: 14px;
+    }
+
+    .template-table-lite {
+      border-top: 1px solid var(--line);
+    }
+
+    .template-row-lite {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 32px 1fr auto;
+      align-items: center;
+      gap: 12px;
+      min-height: 62px;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      background: #ffffff;
+      cursor: pointer;
+      text-align: left;
+      color: var(--blue-900);
+      font-family: inherit;
+    }
+
+    .template-row-lite:hover {
+      background: var(--blue-050);
+    }
+
+    .radio-dot {
+      width: 18px;
+      height: 18px;
+      border: 2px solid #8a96a8;
+      border-radius: 50%;
+      display: block;
+    }
+
+    .template-row-main {
+      font-weight: 850;
+      font-size: 0.92rem;
+    }
+
+    .template-row-cat {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 750;
+    }
+
+    .sidebar-empty-state {
+      min-height: 130px;
+      border: 1px dashed #bcd3ef;
+      border-radius: 14px;
+      background: var(--blue-050);
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      text-align: center;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .search input {
+      padding-left: 14px;
+    }
+
+    .search .si { display: none; }
+
+    .fdel {
+      width: auto;
+      height: 30px;
+      padding: 0 8px;
+      font-size: 0.72rem;
+      font-weight: 850;
+    }
+
+    .empty .big {
+      width: auto;
+      height: auto;
+      background: transparent;
+      font-size: 0.86rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 12px;
+    }
+
+
+    /* Billing plan modal */
+    .billing-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 17, 36, 0.58);
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+    }
+
+    .billing-overlay.open { display: flex; }
+
+    .billing-modal {
+      width: min(100%, 1120px);
+      max-height: calc(100vh - 56px);
+      background: #fff;
+      color: var(--blue-900);
+      border-radius: 22px;
+      box-shadow: 0 34px 100px rgba(4, 17, 36, 0.30);
+      overflow: hidden;
+      position: relative;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    .billing-modal-head {
+      padding: 46px 54px 32px;
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      gap: 34px;
+      align-items: start;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .billing-close {
+      position: absolute;
+      top: 24px;
+      right: 26px;
+      border: 0;
+      background: transparent;
+      color: var(--blue-900);
+      font-size: 2.2rem;
+      line-height: 1;
+      cursor: pointer;
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+    }
+
+    .billing-modal h2 {
+      font-size: clamp(2.35rem, 4.4vw, 4.15rem);
+      line-height: 0.98;
+      letter-spacing: -0.07em;
+      font-weight: 760;
+      color: var(--blue-900);
+      margin-bottom: 58px;
+    }
+
+    .billing-subtitle {
+      font-size: 1.18rem;
+      color: var(--blue-800);
+      letter-spacing: -0.02em;
+    }
+
+    .billing-save-card {
+      border: 1px solid #14a778;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+      margin-top: 26px;
+    }
+
+    .billing-save-top {
+      background: #bff4df;
+      color: #075f45;
+      padding: 10px 18px;
+      font-weight: 900;
+      font-size: 0.96rem;
+    }
+
+    .billing-select-box {
+      padding: 14px 18px 16px;
+      border-top: 1px solid rgba(20,167,120,0.20);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .billing-select-label {
+      color: #3d4a5f;
+      font-size: 0.84rem;
+      margin-bottom: 4px;
+    }
+
+    .billing-select-value {
+      color: var(--blue-900);
+      font-size: 1.08rem;
+      font-weight: 800;
+    }
+
+    .billing-chevron {
+      width: 13px;
+      height: 13px;
+      border-right: 3px solid var(--blue-900);
+      border-bottom: 3px solid var(--blue-900);
+      transform: rotate(45deg);
+      margin-right: 4px;
+    }
+
+    .billing-modal-body {
+      overflow-y: auto;
+      padding: 0 54px;
+      background: #fff;
+    }
+
+    .billing-plan-card {
+      margin: 38px 0 34px;
+      border: 5px solid #5d88ff;
+      border-radius: 8px;
+      padding: 28px 28px 32px;
+      position: relative;
+      min-height: 330px;
+    }
+
+    .billing-radio {
+      position: absolute;
+      top: 28px;
+      right: 28px;
+      width: 28px;
+      height: 28px;
+      border: 3px solid #5d88ff;
+      border-radius: 50%;
+    }
+
+    .billing-radio::after {
+      content: "";
+      position: absolute;
+      inset: 5px;
+      border-radius: 50%;
+      background: #5d88ff;
+    }
+
+    .billing-recommended {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 0 13px;
+      background: var(--blue-700);
+      color: #fff;
+      border-radius: 5px;
+      font-size: 0.86rem;
+      font-weight: 950;
+      margin-bottom: 22px;
+    }
+
+    .billing-plan-title {
+      font-size: 1.3rem;
+      font-weight: 950;
+      color: var(--blue-900);
+      margin-bottom: 14px;
+    }
+
+    .billing-price {
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      margin-bottom: 10px;
+      color: var(--blue-900);
+    }
+
+    .billing-price strong {
+      font-size: 3rem;
+      line-height: 1;
+      letter-spacing: -0.06em;
+    }
+
+    .billing-price span {
+      font-size: 1rem;
+      font-weight: 850;
+      padding-bottom: 8px;
+    }
+
+    .billing-billing-line {
+      font-size: 1.1rem;
+      color: var(--blue-900);
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .billing-small {
+      color: var(--blue-900);
+      font-size: 0.96rem;
+      line-height: 1.45;
+    }
+
+    .billing-feature-title {
+      margin: 28px 0 14px;
+      color: var(--blue-900);
+      font-weight: 800;
+    }
+
+    .billing-features {
+      list-style: none;
+      display: grid;
+      gap: 14px;
+      margin: 0;
+    }
+
+    .billing-features li {
+      position: relative;
+      padding-left: 32px;
+      color: var(--blue-900);
+      font-size: 1rem;
+    }
+
+    .billing-features li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 6px;
+      width: 14px;
+      height: 8px;
+      border-left: 3px solid var(--blue-900);
+      border-bottom: 3px solid var(--blue-900);
+      transform: rotate(-45deg);
+      background: transparent;
+      border-radius: 0;
+    }
+
+    .billing-modal-footer {
+      min-height: 92px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 18px;
+      padding: 18px 54px;
+      background: #fff;
+    }
+
+    .billing-secondary-btn,
+    .billing-next-btn {
+      min-height: 54px;
+      border-radius: 7px;
+      padding: 0 28px;
+      font-size: 1rem;
+      font-weight: 850;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .billing-secondary-btn {
+      background: #fff;
+      color: var(--blue-900);
+      border: 1px solid #9aa6bd;
+    }
+
+    .billing-next-btn {
+      background: var(--blue-700);
+      color: #fff;
+      border: 1px solid var(--blue-700);
+      min-width: 100px;
+    }
+
+    @media (max-width: 820px) {
+      .billing-overlay { padding: 0; }
+      .billing-modal { width: 100%; height: 100vh; max-height: 100vh; border-radius: 0; }
+      .billing-modal-head { grid-template-columns: 1fr; padding: 34px 24px 24px; }
+      .billing-modal h2 { margin-bottom: 26px; }
+      .billing-modal-body { padding: 0 24px; }
+      .billing-modal-footer { padding: 16px 24px; flex-wrap: wrap; }
+      .billing-secondary-btn, .billing-next-btn { flex: 1; }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <aside class="left-sidebar" id="leftSidebar" aria-label="Document workspace sidebar">
+      <div class="sidebar-head">
+        <div class="sidebar-brand-row">
+          <div class="c2-logo sidebar-logo" aria-hidden="true">C2</div>
+          <div>
+            <div class="sidebar-title">Connexion Two</div>
+            <div class="brand-sub">Document OS</div>
+          </div>
+        </div>
+        <button class="sidebar-close" type="button" id="closeSidebar" aria-label="Close sidebar">Close</button>
+      </div>
+
+      <div class="sidebar-search">
+        <input type="text" placeholder="Search templates" aria-label="Search templates">
+      </div>
+
+      <div class="sidebar-tabs sidebar-nav-list" aria-label="Workspace navigation">
+        <button class="sidebar-tab active" type="button" data-sidebar-tab="templates">Starter Templates</button>
+        <button class="sidebar-tab" type="button" data-sidebar-tab="mytemplates">My Templates</button>
+        <button class="sidebar-tab" type="button" data-sidebar-tab="shared">Shared with Me</button>
+        <button class="sidebar-tab" type="button" data-sidebar-tab="alltemplates" onclick="window.location.href='/templates'">All Templates</button>
+        <button class="sidebar-tab" type="button" data-sidebar-tab="favorites">Favorites</button>
+        <button class="sidebar-tab" type="button" data-sidebar-tab="folders">Folders</button>
+        <button class="sidebar-tab" type="button" data-sidebar-tab="sharedfolders">Shared Folders</button>
+      </div>
+
+      <div class="sidebar-content">
+        <div class="sidebar-panel active" id="sidebar-templates">
+          <div class="sidebar-section-title">Starter Templates</div>
+          <div class="template-table-lite">
+            <button class="template-row-lite" type="button" onclick="window.location.href='/templates'">
+              <span class="radio-dot"></span>
+              <span class="template-row-main">Service Agreement</span>
+              <span class="template-row-cat">Cross-Industry</span>
+            </button>
+            <button class="template-row-lite" type="button" onclick="window.location.href='/templates'">
+              <span class="radio-dot"></span>
+              <span class="template-row-main">Statement of Work</span>
+              <span class="template-row-cat">Operations</span>
+            </button>
+            <button class="template-row-lite" type="button" onclick="window.location.href='/templates'">
+              <span class="radio-dot"></span>
+              <span class="template-row-main">Vendor Agreement</span>
+              <span class="template-row-cat">Procurement</span>
+            </button>
+            <button class="template-row-lite" type="button" onclick="window.location.href='/templates'">
+              <span class="radio-dot"></span>
+              <span class="template-row-main">Policy Acknowledgment</span>
+              <span class="template-row-cat">Compliance</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="sidebar-panel" id="sidebar-mytemplates">
+          <div class="sidebar-section-title">My Templates</div>
+          <div class="sidebar-empty-state">Saved templates will appear here.</div>
+        </div>
+
+        <div class="sidebar-panel" id="sidebar-shared">
+          <div class="sidebar-section-title">Shared with Me</div>
+          <div class="sidebar-empty-state">Templates shared with your workspace will appear here.</div>
+        </div>
+
+        <div class="sidebar-panel" id="sidebar-alltemplates">
+          <div class="sidebar-section-title">All Templates</div>
+          <div class="sidebar-empty-state">Open the full template library to browse every template.</div>
+        </div>
+
+        <div class="sidebar-panel" id="sidebar-favorites">
+          <div class="sidebar-section-title">Favorites</div>
+          <div class="sidebar-empty-state">Favorite templates will appear here.</div>
+        </div>
+
+        <div class="sidebar-panel" id="sidebar-folders">
+          <div class="sidebar-section-title">Folders</div>
+          <div class="sidebar-empty-state">Template folders will appear here.</div>
+        </div>
+
+        <div class="sidebar-panel" id="sidebar-sharedfolders">
+          <div class="sidebar-section-title">Shared Folders</div>
+          <div class="sidebar-empty-state">Shared template folders will appear here.</div>
+        </div>
+      </div>
+    </aside>
+
+    <header class="top-nav">
+      <a href="/welcome" class="brand" aria-label="Connexion Two dashboard home">
+        <div class="c2-logo" aria-hidden="true">C2</div>
+        <div class="brand-text">
+          <div class="brand-name">Connexion Two</div>
+          <div class="brand-sub">Document OS</div>
+        </div>
+      </a>
+
+      <nav class="nav-tabs" aria-label="Main navigation">
+        <a href="/welcome" class="active">Home</a>
+        <a href="signing/new.html">Agreements</a>
+        <a href="/templates">Templates</a>
+      </nav>
+
+      <div class="top-actions">
+        <div class="trial-left">7 Days Left</div>
+        <button class="buy-btn" type="button" id="buyNowBtn">Buy Now</button>
+        <button class="icon-btn" type="button" id="openSidebar" aria-label="Open workspace menu">Menu</button>
+        <button class="icon-btn" type="button" id="signout" aria-label="Sign out">Sign out</button>
+        <div class="avatar">AP</div>
+        <button class="icon-btn mobile-menu" type="button" id="openMobileSidebar" aria-label="Open workspace menu">Menu</button>
+      </div>
+    </header>
+
+    <div class="system-strip">
+      <span class="info-dot">i</span>
+      <span>Your document workspace is ready. Upload, store, and manage your files inside Connexion Two.</span>
+    </div>
+
+    <main>
+      <section class="hero-panel">
+        <div class="hero-inner">
+          <div class="welcome-label"><span class="status-light"></span> Private document workspace</div>
+          <h1>Welcome back, Aaron P</h1>
+          <p class="hero-sub">Upload, store, organize, and download your files inside your private Connexion Two workspace.</p>
+
+          <div class="main-actions">
+            <a class="primary-action" href="/templates">Use a Template</a>
+            <a class="outline-action" href="/document-creation">Get Signatures</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <div class="panel" id="libraryPanel">
+          <div class="panel-header">
+            <div class="panel-title">Document Library</div>
+            <a href="#" class="view-all" id="refreshFiles">Refresh</a>
+          </div>
+          <div class="docs-body">
+            <div class="cmdbar">
+              <button class="btn btn-primary" id="uploadBtn" type="button">Upload</button>
+              <input type="file" id="fileInput" style="display:none" accept=".docx,.xlsx,.pptx,.doc,.xls,.ppt,.odt,.ods,.odp,.txt,.csv,.pdf">
+              <div class="spacer"></div>
+              <div class="search"><input type="text" id="search" placeholder="Search documents"></div>
+            </div>
+
+            <div class="sec-head"><h2>Files</h2><span class="count" id="count"></span></div>
+            <div id="fileList"><div class="loading">Loading…</div></div>
+          </div>
+        </div>
+
+        <aside class="side-stack">
+          <div class="panel side-card">
+            <div class="panel-title">Trial & Usage</div>
+            <div class="usage-row"><span>Trial status</span><strong>7 days left</strong></div>
+            <div class="usage-row"><span>Documents</span><strong id="docCount">0</strong></div>
+            <div class="usage-row"><span>Storage</span><strong id="storageTotal">0 MB</strong></div>
+            <div class="progress-track"><div class="progress-fill"></div></div>
+          </div>
+        </aside>
+      </section>
+    </main>
+  </div>
+
+
+  <div class="billing-overlay" id="billingOverlay" aria-hidden="true">
+    <div class="billing-modal" role="dialog" aria-modal="true" aria-labelledby="billingTitle">
+      <button class="billing-close" type="button" id="billingClose" aria-label="Close billing plan modal">×</button>
+      <div class="billing-modal-head">
+        <div>
+          <h2 id="billingTitle">Your trial ends in 14 days</h2>
+          <div class="billing-subtitle">Choose your Connexion Two plan</div>
+        </div>
+
+        <div class="billing-save-card">
+          <div class="billing-save-top">You’re saving up to 33%</div>
+          <div class="billing-select-box">
+            <div>
+              <div class="billing-select-label">Subscription type</div>
+              <div class="billing-select-value">Annual | Billed monthly</div>
+            </div>
+            <span class="billing-chevron" aria-hidden="true"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="billing-modal-body">
+        <div class="billing-plan-card">
+          <div class="billing-radio" aria-hidden="true"></div>
+          <div class="billing-recommended">Recommended</div>
+          <div class="billing-plan-title">Standard</div>
+          <div class="billing-price"><strong>$30</strong><span>/user/month</span></div>
+          <div class="billing-billing-line">Annual | Billed monthly</div>
+          <div class="billing-small">This is an annual commitment of $360.</div>
+          <div class="billing-small">Additional tax may apply.</div>
+
+          <div class="billing-feature-title">Key features:</div>
+          <ul class="billing-features">
+            <li>Send a total of 100 envelopes per user per year</li>
+            <li>Share templates easily with your team members</li>
+            <li>Add comments in real time with collaborative commenting</li>
+            <li>Use your own branding to build trust and brand awareness</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="billing-modal-footer">
+        <button class="billing-secondary-btn" type="button" id="viewPlansBtn">View All Plans</button>
+        <button class="billing-next-btn" type="button" id="billingNextBtn">Next</button>
+      </div>
+    </div>
+  </div>
+
+
+  <script>
+    const SB_URL = 'https://xbwuvaxtnylqvagdvpxp.supabase.co';
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc';
+    const BUCKET = 'documents';
+    const LOGIN_URL = 'https://www.connexiontwo.com/';
+    const WELCOME_URL = 'https://www.connexiontwo.com/welcome';
+    const sb = supabase.createClient(SB_URL, SB_KEY);
+    let userId = null;
+    let allFiles = [];
+
+
+    const buyNowBtn = document.getElementById('buyNowBtn');
+    const billingOverlay = document.getElementById('billingOverlay');
+    const billingClose = document.getElementById('billingClose');
+    const billingNextBtn = document.getElementById('billingNextBtn');
+    const viewPlansBtn = document.getElementById('viewPlansBtn');
+
+    function openBillingModal(){
+      if(!billingOverlay) return;
+      billingOverlay.classList.add('open');
+      billingOverlay.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeBillingModal(){
+      if(!billingOverlay) return;
+      billingOverlay.classList.remove('open');
+      billingOverlay.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+    }
+
+    buyNowBtn?.addEventListener('click', openBillingModal);
+    billingClose?.addEventListener('click', closeBillingModal);
+    billingOverlay?.addEventListener('click', (event) => {
+      if(event.target === billingOverlay) closeBillingModal();
+    });
+    billingNextBtn?.addEventListener('click', () => { window.location.href = '/pay-now'; });
+    viewPlansBtn?.addEventListener('click', () => { window.location.href = '/plans'; });
+    document.addEventListener('keydown', (event) => {
+      if(event.key === 'Escape') closeBillingModal();
+    });
+
+
+    function userPath(name){ return userId + '/' + name; }
+
+    const WORD=['doc','docx','docm','dot','dotx','odt','ott','rtf','txt','html','htm'];
+    const CELL=['xls','xlsx','xlsm','xlt','xltx','ods','ots','csv'];
+    const SLIDE=['ppt','pptx','pptm','pps','ppsx','pot','potx','odp','otp'];
+
+    function fileStyle(ext){
+      ext=(ext||'').toLowerCase();
+      if(CELL.includes(ext))  return {c:'var(--cell)',  t:'XLS'};
+      if(SLIDE.includes(ext)) return {c:'var(--slide)', t:'PPT'};
+      if(ext==='pdf')         return {c:'var(--pdf)',   t:'PDF'};
+      if(WORD.includes(ext))  return {c:'var(--word)',  t:'DOC'};
+      return {c:'var(--gray)', t:(ext||'?').slice(0,3).toUpperCase()};
+    }
+
+    function fmtSize(b){
+      if(b==null) return '';
+      if(b<1024) return b+' B';
+      if(b<1048576) return (b/1024).toFixed(0)+' KB';
+      return (b/1048576).toFixed(1)+' MB';
+    }
+
+    function fmtDate(iso){
+      if(!iso) return '';
+      const d=new Date(iso);
+      return d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
+    }
+
+    function updateUsage(){
+      document.getElementById('docCount').textContent = String(allFiles.length);
+      const total = allFiles.reduce((sum, f) => sum + ((f.metadata && f.metadata.size) || 0), 0);
+      document.getElementById('storageTotal').textContent = fmtSize(total) || '0 MB';
+    }
+
+    async function requireSession(){
+      const { data:{ session } } = await sb.auth.getSession();
+      if(!session){
+        // If OAuth just returned here, Supabase may need a moment to hydrate the session.
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const { data:{ session: retrySession } } = await sb.auth.getSession();
+        if(!retrySession){ window.location.replace(LOGIN_URL); return null; }
+        userId = retrySession.user.id;
+        return retrySession;
+      }
+      userId = session.user.id;
+      return session;
+    }
+
+    async function loadFiles(){
+      const list = document.getElementById('fileList');
+      const { data, error } = await sb.storage.from(BUCKET).list(userId, { sortBy:{ column:'updated_at', order:'desc' } });
+      if(error){ list.innerHTML = '<div class="loading">Could not load files.</div>'; return; }
+      allFiles = (data||[]).filter(f => f.id && !f.name.startsWith('.'));
+      updateUsage();
+      render();
+    }
+
+    function render(){
+      const list = document.getElementById('fileList');
+      const q = (document.getElementById('search').value||'').trim().toLowerCase();
+      const files = q ? allFiles.filter(f => f.name.toLowerCase().includes(q)) : allFiles;
+      document.getElementById('count').textContent = allFiles.length ? allFiles.length + (allFiles.length===1?' item':' items') : '';
+
+      if(!files.length){
+        list.innerHTML = q
+          ? '<div class="empty"><div class="big">No matches</div><div class="t">No matches</div><div class="s">Nothing matches that search.</div></div>'
+          : '<div class="empty"><div class="big">Files</div><div class="t">No documents yet</div><div class="s">Use <b>Upload</b> to add your first file.</div></div>';
+        return;
+      }
+
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      files.forEach(f => {
+        const ext = (f.name.split('.').pop()||'');
+        const st = fileStyle(ext);
+        const size = fmtSize(f.metadata && f.metadata.size);
+        const date = fmtDate(f.updated_at || f.created_at);
+        const meta = [date, size].filter(Boolean).join(' · ');
+        const card = document.createElement('div');
+        card.className = 'file';
+        card.innerHTML =
+          '<button class="fdel" title="Delete">Delete</button>' +
+          '<div class="ftop">' +
+            '<div class="ficon" style="background:'+st.c+'">'+st.t+'</div>' +
+            '<div class="fmeta"><div class="fname"></div><div class="fsub">'+meta+'</div></div>' +
+          '</div>';
+        card.querySelector('.fname').textContent = f.name;
+        card.addEventListener('click', () => openDoc(f.name));
+        card.querySelector('.fdel').addEventListener('click', (e) => { e.stopPropagation(); deleteFile(f.name); });
+        grid.appendChild(card);
+      });
+      list.innerHTML = '';
+      list.appendChild(grid);
+    }
+
+    async function deleteFile(name){
+      if(!confirm('Delete "'+name+'"?\n\nThis permanently removes the file and cannot be undone.')) return;
+      const { error } = await sb.storage.from(BUCKET).remove([userPath(name)]);
+      if(error){ alert('Could not delete: '+error.message); return; }
+      allFiles = allFiles.filter(f => f.name !== name);
+      updateUsage();
+      render();
+    }
+
+    // Office editor removed — clicking a file now downloads it via a short-lived signed link.
+    async function openDoc(name){
+      const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(userPath(name), 60, { download: true });
+      if(error){ alert('Could not open document: '+error.message); return; }
+      window.open(data.signedUrl, '_blank');
+    }
+
+    function triggerUpload(){ document.getElementById('fileInput').click(); }
+    document.getElementById('uploadBtn').addEventListener('click', triggerUpload);
+
+    document.getElementById('fileInput').addEventListener('change', async (e)=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      const finalName = uniqueName(file.name);
+      const { error } = await sb.storage.from(BUCKET).upload(userPath(finalName), file, { upsert:false });
+      e.target.value = '';
+      if(error){ alert('Upload failed: '+error.message); return; }
+      loadFiles();
+    });
+
+    function uniqueName(fileName){
+      const taken = new Set(allFiles.map(f => f.name.toLowerCase()));
+      if(!taken.has(fileName.toLowerCase())) return fileName;
+      const dot = fileName.lastIndexOf('.');
+      const base = dot > 0 ? fileName.slice(0, dot) : fileName;
+      const ext  = dot > 0 ? fileName.slice(dot) : '';
+      let i = 1, candidate;
+      do { candidate = base + ' (' + i + ')' + ext; i++; } while(taken.has(candidate.toLowerCase()));
+      return candidate;
+    }
+
+    document.getElementById('search').addEventListener('input', render);
+    document.getElementById('refreshFiles').addEventListener('click', (e)=>{ e.preventDefault(); loadFiles(); });
+
+    document.getElementById('signout').addEventListener('click', async (e)=>{
+      e.preventDefault();
+      await sb.auth.signOut();
+      window.location.replace(LOGIN_URL);
+    });
+
+    const leftSidebar = document.getElementById('leftSidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    const openSidebar = document.getElementById('openSidebar');
+    const openMobileSidebar = document.getElementById('openMobileSidebar');
+    const closeSidebar = document.getElementById('closeSidebar');
+
+    function showSidebar(){
+      leftSidebar.classList.add('open');
+      sidebarOverlay.classList.add('open');
+    }
+
+    function hideSidebar(){
+      leftSidebar.classList.remove('open');
+      sidebarOverlay.classList.remove('open');
+    }
+
+    openSidebar.addEventListener('click', showSidebar);
+    openMobileSidebar.addEventListener('click', showSidebar);
+    closeSidebar.addEventListener('click', hideSidebar);
+    sidebarOverlay.addEventListener('click', hideSidebar);
+
+    document.querySelectorAll('[data-sidebar-tab]').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.sidebarTab;
+
+        document.querySelectorAll('[data-sidebar-tab]').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.sidebar-panel').forEach(panel => panel.classList.remove('active'));
+
+        tab.classList.add('active');
+        document.getElementById('sidebar-' + target).classList.add('active');
+      });
+    });
+
+    (async ()=>{
+      const session = await requireSession();
+      if(session) loadFiles();
+    })();
+  </script>
+</body>
+</html>
