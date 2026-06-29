@@ -428,6 +428,136 @@
       .addons { grid-template-columns: 1fr; }
       section.content-section { padding: 62px 0; }
     }
+
+
+    /* FULL PHOTO HERO — added below banner */
+    .full-photo-hero {
+      position: relative;
+      width: 100%;
+      overflow: hidden;
+      background: var(--blue-950);
+    }
+
+    .full-photo-hero img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .full-photo-hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        75deg,
+        rgba(2, 6, 23, 0.9) 0%,
+        rgba(2, 6, 23, 0.6) 40%,
+        rgba(2, 6, 23, 0) 100%
+      );
+      z-index: 1;
+    }
+
+    .hero-content {
+      position: absolute;
+      z-index: 2;
+      top: 50%;
+      left: 7%;
+      transform: translate(0, -50%);
+      text-align: left;
+      color: #fff;
+      font-family: Inter, sans-serif;
+      width: 70vw;
+    }
+
+    .hero-title {
+      max-width: 760px;
+      font-size: clamp(2.15rem, 4.3vw, 5.35rem);
+      font-weight: 850;
+      line-height: 0.98;
+      margin-bottom: clamp(16px, 1.8vw, 26px);
+      letter-spacing: -0.07em;
+    }
+
+    .hero-buttons {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: clamp(12px, 1.2vw, 18px);
+      margin-bottom: clamp(16px, 2vw, 28px);
+    }
+
+    .hero-buttons a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(10px, 0.7vw, 14px) clamp(18px, 1.2vw, 24px);
+      font-size: clamp(1rem, 1.25vw, 1.32rem);
+      border-radius: 999px;
+      font-weight: 900;
+      text-decoration: none;
+      text-align: center;
+      color: #fff;
+      width: max-content;
+      min-width: clamp(210px, 18vw, 300px);
+      min-height: 50px;
+      transition: 0.2s ease;
+    }
+
+    .full-photo-hero .btn-primary {
+      background: var(--blue-700);
+      color: #fff;
+      box-shadow: 0 14px 32px rgba(0, 84, 209, 0.26);
+      border: 1px solid var(--blue-700);
+    }
+
+    .full-photo-hero .btn-primary:hover {
+      background: var(--blue-800);
+      border-color: var(--blue-800);
+      transform: translateY(-3px) scale(1.02);
+    }
+
+    .full-photo-hero .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      color: #fff;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .full-photo-hero .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.32);
+      transform: translateY(-3px) scale(1.02);
+    }
+
+    .hero-subtext {
+      max-width: 680px;
+      font-size: clamp(1rem, 1.35vw, 1.45rem);
+      opacity: 0.92;
+      margin: 0 0 clamp(22px, 2.4vw, 38px);
+      line-height: 1.45;
+      color: rgba(255,255,255,0.9);
+    }
+
+    .c2-hero-label {
+      font-size: clamp(10px, 0.8vw, 13px);
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5em;
+      color: #7eb6ff;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    @media (max-width: 760px) {
+      .full-photo-hero img { min-height: 420px; object-fit: cover; object-position: center; }
+      .hero-content { width: 86vw; left: 6%; }
+      .hero-title { font-size: 2.1rem; }
+      .hero-buttons { flex-direction: column; }
+      .hero-buttons a { min-width: 240px; }
+    }
+
   </style>
 </head>
 <body>
@@ -463,6 +593,29 @@
       </div>
     </header>
 
+    <div class="full-photo-hero">
+      <img src="https://rfdvogakvyodixgpvqvz.supabase.co/storage/v1/object/public/ai-images/Connexion%20Two%20Staffing%20Picture.jpg" alt="Connexion Two document workflow control">
+
+      <div class="hero-content">
+        <span class="c2-hero-label">Connexion Two</span>
+
+        <div class="hero-title">
+          Own Your Document Workflows
+        </div>
+
+        <div class="hero-subtext">
+          Private signing links, template workflows, audit trails, browser-based DOCX, XLSX, and presentation creation — deployed so your organization controls the data, infrastructure, and archive.
+        </div>
+
+        <div class="hero-buttons">
+          <a href="#get-started" class="btn-primary">Start 7-day free trial</a>
+          <a href="#what-you-get" class="btn-secondary">See the workflow system</a>
+        </div>
+      </div>
+    </div>
+
+
+
     <main>
       <section class="hero">
         <div class="container hero-grid">
@@ -474,14 +627,16 @@
 
             <h1>Sovereign Document Workflow System</h1>
 
-            <h2>For EU-Focused Organizations That Need Document Control Without SaaS Lock-In</h2>
+            <h2>For EU Focused Organizations That Need Document Control Without SaaS Lock In</h2>
 
             <div class="hero-copy">
-              <p>This is for small government contractors, regulated service firms, municipalities, compliance teams, and EU-focused organizations that need a private document signing and office workflow system they can own, host, audit, and control.</p>
+              <p>This is for small government contractors, regulated service firms, municipalities, compliance teams, and EU focused organizations that need a private document signing and office workflow system they can own, host, audit, and control.</p>
+
+              <p>Connexion Two can also replace Microsoft Word, Excel, and PowerPoint style document creation inside your workflow. Your team can create DOCX files, XLSX spreadsheets, and PPTX presentationS in the browser, so you do not need to keep paying for every Microsoft seat just to draft proposals, agreements, cost sheets, templates, and internal documents.</p>
 
               <p>In 30 days, we help you replace scattered signing tools, shared document folders, and foreign SaaS dependency with a private document workflow portal deployed on your infrastructure.</p>
 
-              <p>You get secure signing links, template-based workflows, audit trails, document storage, browser-based document editing, and full source-code handoff — without monthly seat fees, per-signature charges, or vendor-controlled archives.</p>
+              <p>You get secure signing links, template based workflows, audit trails, document storage, browser based document editing, and full source code handoff — without monthly seat fees, per-signature charges, or vendor-controlled archives.</p>
             </div>
 
             <div class="hero-actions">
@@ -515,12 +670,12 @@
 
               <div class="form-group">
                 <label class="form-label">Full Name</label>
-                <input class="form-input" id="auth-name" type="text" placeholder="e.g. Aaron Parker">
+                <input class="form-input" id="auth-name" type="text" placeholder="e.g. John Doe">
               </div>
 
               <div class="form-group">
                 <label class="form-label">Email Address</label>
-                <input class="form-input" id="auth-email" type="email" placeholder="aaron@example.com">
+                <input class="form-input" id="auth-email" type="email" placeholder="john@example.com">
               </div>
 
               <div class="form-group">
