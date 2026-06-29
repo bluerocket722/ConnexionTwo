@@ -954,6 +954,28 @@
     const APP_URL = WELCOME_URL;
     const TRIAL_DAYS = 7;
 
+    function markWelcomeRedirect() {
+      try { localStorage.setItem('c2_after_auth_redirect', 'welcome'); } catch (_) {}
+    }
+
+    function clearWelcomeRedirect() {
+      try { localStorage.removeItem('c2_after_auth_redirect'); } catch (_) {}
+    }
+
+    function shouldGoToWelcomeAfterAuth() {
+      try {
+        if (localStorage.getItem('c2_after_auth_redirect') === 'welcome') return true;
+      } catch (_) {}
+      return window.location.search.includes('code=') ||
+        window.location.hash.includes('access_token=') ||
+        window.location.hash.includes('refresh_token=');
+    }
+
+    function goToWelcome() {
+      clearWelcomeRedirect();
+      window.location.replace(WELCOME_URL);
+    }
+
     function showStep(id) {
       ['step-auth', 'step-login', 'step-profile', 'step-success'].forEach(stepId => {
         const step = document.getElementById(stepId);
@@ -1025,8 +1047,20 @@
     document.getElementById('back-to-login')?.addEventListener('click', event => { event.preventDefault(); showStep('step-login'); });
 
     async function googleSignIn() {
-      const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: WELCOME_URL } });
-      if (error) alert('Google sign-in failed: ' + error.message);
+      markWelcomeRedirect();
+      const { error } = await sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: WELCOME_URL,
+          queryParams: {
+            prompt: 'select_account'
+          }
+        }
+      });
+      if (error) {
+        clearWelcomeRedirect();
+        alert('Google sign-in failed: ' + error.message);
+      }
     }
 
     document.getElementById('btn-google')?.addEventListener('click', googleSignIn);
@@ -1069,10 +1103,14 @@
       if (!email) return showError('login-error', 'Please enter your email address.');
       if (!password) return showError('login-error', 'Please enter your password.');
       setLoading(button, true);
+      markWelcomeRedirect();
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
       setLoading(button, false);
-      if (error) return showError('login-error', error.message);
-      if (data.session) routeForSession(data.session);
+      if (error) {
+        clearWelcomeRedirect();
+        return showError('login-error', error.message);
+      }
+      if (data.session) goToWelcome();
     });
 
     document.getElementById('btn-save-profile')?.addEventListener('click', async () => {
@@ -1089,14 +1127,20 @@
       setLoading(button, false);
       if (error) return showError('profile-error', error.message);
       const { data: sessionData } = await sb.auth.getSession();
-      if (sessionData.session) showLoggedInState(sessionData.session);
+      if (sessionData.session) goToWelcome();
     });
 
     document.getElementById('sign-out-btn')?.addEventListener('click', async () => { await sb.auth.signOut(); });
 
     sb.auth.onAuthStateChange((event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) routeForSession(session);
-      else if (event === 'SIGNED_OUT') { showAuthCard(); showStep('step-auth'); }
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+        if (shouldGoToWelcomeAfterAuth()) goToWelcome();
+        else routeForSession(session);
+      } else if (event === 'SIGNED_OUT') {
+        clearWelcomeRedirect();
+        showAuthCard();
+        showStep('step-auth');
+      }
     });
   </script>
 </body>
