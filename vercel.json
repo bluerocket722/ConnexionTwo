@@ -11,8 +11,8 @@
       "destination": "/welcome-2.html"
     },
     {
-      "source": "/welcome",
-      "destination": "/welcome.html"
+      "source": "/dashboard",
+      "destination": "/dashboard.html"
     }
   ]
 }
