@@ -15,6 +15,10 @@
       "destination": "/sign.html"
     },
     {
+      "source": "/templates",
+      "destination": "/templates.html"
+    },
+    {
       "source": "/welcome",
       "destination": "/welcome.html"
     }
