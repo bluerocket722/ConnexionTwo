@@ -27,6 +27,10 @@
       "destination": "/pay-now.html"
     },
     {
+      "source": "/plans",
+      "destination": "/plans.html"
+    },
+    {
       "source": "/welcome",
       "destination": "/welcome.html"
     }
