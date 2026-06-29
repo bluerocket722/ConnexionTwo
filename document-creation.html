@@ -94,7 +94,7 @@ hr { border: 0; border-top: 1px solid var(--border2); margin: 18px 0; }
 .signer-row { background: linear-gradient(180deg, #ffffff, #f8fbff); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
 .signer-row-label { font-size: 12px; font-weight: 900; color: var(--primary-dark); text-transform: uppercase; letter-spacing: .075em; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
 .signer-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--signer-color, var(--primary)); box-shadow:0 0 0 4px rgba(0,104,255,.10); }
-.signer-row-grid { display:grid; grid-template-columns: auto 1fr 1fr 1fr; gap: 12px; align-items:end; }
+.signer-row-grid { display:grid; grid-template-columns: auto 1fr 1fr; gap: 12px; align-items:end; }
 .signer-row-grid.simple { grid-template-columns: 1fr 1fr auto; }
 .remove-signer-btn { border:1px solid #ffd4d4; background:#fff5f5; color:#b91c1c; border-radius:10px; height:42px; padding:0 12px; cursor:pointer; font-size:12px; font-weight:850; }
 .cal-pick-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-sub); margin-bottom: 7px; font-weight:700; }
@@ -179,6 +179,10 @@ hr { border: 0; border-top: 1px solid var(--border2); margin: 18px 0; }
 
 @media (max-width: 980px) { .dashboard-grid { grid-template-columns: 1fr; } .card[style*="sticky"] { position:static!important; } }
 @media (max-width: 720px) { .topbar { padding:0 16px; } .topbar-sep,.topbar-title { display:none; } .page-wrap { padding:22px 16px 46px; } .page-header { display:block; } .signer-row-grid, .signer-row-grid.simple { grid-template-columns: 1fr; } .dashboard-grid { gap:14px; } .card { padding:18px; border-radius:16px; } #pdf-container { height:540px; padding:14px; } }
+.topbar-nav { display:flex; align-items:center; gap:4px; margin-left:18px; }
+.topbar-nav a { padding:7px 12px; border-radius:9px; font-size:13px; font-weight:800; color:var(--text-sub); transition:.15s ease; }
+.topbar-nav a:hover { background:var(--surface3); color:var(--primary); }
+@media (max-width:720px){ .topbar-nav{ display:none; } }
 </style>
 </head>
 <body>
@@ -202,6 +206,11 @@ hr { border: 0; border-top: 1px solid var(--border2); margin: 18px 0; }
   </a>
   <div class="topbar-sep"></div>
   <span class="topbar-title">Signature Dispatch</span>
+  <nav class="topbar-nav">
+    <a href="/welcome">Dashboard</a>
+    <a href="/agreements">Agreements</a>
+    <a href="/templates">Templates</a>
+  </nav>
   <div class="topbar-spacer"></div>
   <span class="topbar-badge">Sovereign Workflow Portal</span>
 </div>
@@ -216,14 +225,14 @@ hr { border: 0; border-top: 1px solid var(--border2); margin: 18px 0; }
     <div class="dashboard-grid">
       <div class="main-col">
 
-        <!-- QUICK RESOURCES -->
+        <!-- TEMPLATES -->
         <div class="card">
-          <div class="section-title">Quick Resources</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button type="button" class="resource-btn" onclick="requestResourceDoc('QB Instructions')">QB Instructions</button>
-            <button type="button" class="resource-btn" onclick="requestResourceDoc('Supply List')">Supply List</button>
-            <button type="button" class="resource-btn" onclick="requestResourceDoc('Login Instructions')">Login Instructions</button>
-            <button type="button" class="resource-btn" onclick="requestResourceDoc('Schedule Instructions')">Schedule Instructions</button>
+          <div class="section-title">Start From a Template</div>
+          <div class="form-group" style="margin:0;">
+            <label>Templates</label>
+            <select class="boxed" id="template-picker" onchange="onTemplatePick(this.value)">
+              <option value="">— Select a saved template —</option>
+            </select>
           </div>
         </div>
 
@@ -245,13 +254,6 @@ hr { border: 0; border-top: 1px solid var(--border2); margin: 18px 0; }
                 Signer 1
               </div>
 
-              <div class="form-group">
-                <div class="cal-pick-badge"><span class="dot"></span><span id="cal-clients-label">Loading from calendar…</span></div>
-                <select class="cal-client-select" id="cal-client-select" onchange="fillSignerFromCalendar()">
-                  <option value="">— Select from calendar to auto-fill —</option>
-                </select>
-              </div>
-
               <div class="signer-row-grid">
                 <div>
                   <label>&nbsp;</label>
@@ -265,10 +267,6 @@ hr { border: 0; border-top: 1px solid var(--border2); margin: 18px 0; }
                 <div>
                   <label>Email</label>
                   <input type="email" id="signer1_email" placeholder="email@example.com" oninput="updateSendButton()">
-                </div>
-                <div>
-                  <label>Job / Jira Code</label>
-                  <input type="text" id="jira_code" placeholder="HR-1245">
                 </div>
               </div>
             </div>
@@ -693,7 +691,7 @@ function showDropdown(list) {
 function applyCandidate(c) {
   document.getElementById("signer1_name").value  = c.name||"";
   document.getElementById("signer1_email").value = c.email||"";
-  document.getElementById("jira_code").value     = c.jira_code||"";
+  const _jc=document.getElementById("jira_code"); if(_jc) _jc.value=c.jira_code||"";
   document.getElementById("candidate-dropdown").classList.add("hidden");
   updateSendButton();
 }
@@ -788,7 +786,6 @@ const { data:doc, error:docError } = await sb.from("signer_documents").insert({
 (async function() {
   const { data: { session } } = await sb.auth.getSession();
   if (session) document.getElementById('login-overlay').style.display = 'none';
-  loadCalendarClients();
 })();
 </script>
 
@@ -1001,5 +998,53 @@ async function submitData() {
 })();
 </script>
 
+<script>
+/* Template picker — pull saved templates, load the PDF + auto-place saved fields */
+async function loadTemplateOptions(){
+  try{
+    const { data, error } = await sb.from('document_templates').select('id,name').eq('status','active').order('updated_at',{ascending:false});
+    if(error) return;
+    const sel=document.getElementById('template-picker'); if(!sel) return;
+    (data||[]).forEach(t=>{ const o=document.createElement('option'); o.value=t.id; o.textContent=t.name||'Untitled template'; sel.appendChild(o); });
+  }catch(_){}
+}
+function onTemplatePick(id){ if(id) loadTemplateIntoDoc(id); }
+async function loadTemplateIntoDoc(templateId){
+  try{
+    const { data:tpl } = await sb.from('document_templates').select('name,file_path').eq('id',templateId).single();
+    if(!tpl){ alert('Template not found'); return; }
+    const url = sb.storage.from('template-files').getPublicUrl(tpl.file_path).data.publicUrl;
+    window.UPLOADED_PDF_URL = url;
+    const { data:tfields } = await sb.from('template_fields').select('*').eq('template_id',templateId).order('signer_order');
+    const maxSigner=(tfields||[]).reduce((m,f)=>Math.max(m,Number(f.signer_order||1)),1);
+    while(c2SignerCount<maxSigner) addSignerRow();
+    document.getElementById('step-document-card').style.display='';
+    document.getElementById('annotation-zone').style.display='';
+    refreshStepChips('fields');
+    const ti=document.getElementById('document_title'); if(ti && !ti.value) ti.value=tpl.name||'';
+    document.getElementById('upload-text').innerHTML='\u2713 '+(tpl.name||'Template');
+    await renderPDF(url);
+    document.querySelectorAll('.signature-box').forEach(el=>el.remove());
+    fieldList=[];
+    (tfields||[]).forEach(f=>{
+      const pageEl=document.querySelector('.page-container[data-page="'+Number(f.page||1)+'"]'); if(!pageEl) return;
+      const signer=Number(f.signer_order||1);
+      const box=createSignatureBox(f.field_type,signer);
+      box.style.left=(Number(f.x_pct||0)*100)+'%';
+      box.style.top=(Number(f.y_pct||0)*100)+'%';
+      box.style.width=Math.max(80,Number(f.w_pct||0.18)*pageEl.offsetWidth)+'px';
+      box.style.height=Math.max(30,Number(f.h_pct||0.05)*pageEl.offsetHeight)+'px';
+      pageEl.appendChild(box);
+      const field={id:crypto.randomUUID(),signer,type:f.field_type,value:'',page:Number(f.page||1),xPct:Number(f.x_pct||0),yPct:Number(f.y_pct||0),wPct:Number(f.w_pct||0.18),hPct:Number(f.h_pct||0.05)};
+      box.__field=field; fieldList.push(field);
+    });
+    if(typeof updateSignerToolbar==='function') updateSignerToolbar();
+    if(typeof enforceSignerLock==='function') enforceSignerLock();
+    updateSendButton();
+    document.getElementById('annotation-zone').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(err){ console.error('template load failed',err); alert('Could not load template.'); }
+}
+loadTemplateOptions();
+</script>
 </body>
 </html>
