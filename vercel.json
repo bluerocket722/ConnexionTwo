@@ -11,6 +11,10 @@
       "destination": "/welcome-2.html"
     },
     {
+      "source": "/sign",
+      "destination": "/sign.html"
+    },
+    {
       "source": "/dashboard",
       "destination": "/dashboard.html"
     }
