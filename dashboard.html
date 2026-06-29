@@ -393,11 +393,6 @@
       line-height: 1.5;
     }
 
-    .editor-screen { position: fixed; inset: 0; z-index: 1000; background: #fff; display: none; }
-    .editor-screen.open { display: block; }
-    #placeholder { width: 100%; height: 100%; }
-    #logoBlock { position: absolute; top: 0; left: 0; width: 165px; height: 30px; z-index: 1001; background: transparent; cursor: default; }
-
     .mobile-menu { display: none; }
 
     @media (max-width: 1120px) {
@@ -566,38 +561,22 @@
 
     <div class="system-strip">
       <span class="info-dot">i</span>
-      <span>Your document workspace is ready. Create DOCX, XLSX, and presentation-style files inside Connexion Two.</span>
+      <span>Your document workspace is ready. Upload, store, and manage your files inside Connexion Two.</span>
     </div>
 
     <main>
       <section class="hero-panel">
         <div class="hero-inner">
-          <div class="welcome-label"><span class="status-light"></span> Browser office suite</div>
+          <div class="welcome-label"><span class="status-light"></span> Private document workspace</div>
           <h1>Welcome back, Aaron P</h1>
-          <p class="hero-sub">Draft documents, build spreadsheets, create presentations, upload files, and open them in the browser without leaving your private Connexion Two workspace.</p>
+          <p class="hero-sub">Upload, store, organize, and download your files inside your private Connexion Two workspace.</p>
 
           <div class="main-actions">
-            <button class="primary-action" type="button" id="heroNewDoc"><span>Start</span><span class="action-icon">⌄</span></button>
-            <button class="outline-action" type="button" id="heroUpload"><span class="action-icon">⇧</span>Upload Document</button>
+            <button class="primary-action" type="button" id="heroUpload"><span class="action-icon">⇧</span>Upload Document</button>
             <button class="outline-action" type="button" onclick="document.getElementById('libraryPanel').scrollIntoView({behavior:'smooth'})"><span class="action-icon">□</span>Open Library</button>
           </div>
 
-          <div class="secondary-actions" aria-label="Create new files">
-            <button class="quick-card" type="button" data-new-type="docx">
-              <div class="quick-icon">W</div>
-              <div class="quick-title">Create DOCX File</div>
-              <div class="quick-desc">Draft agreements, proposals, forms, and supporting documents.</div>
-            </button>
-            <button class="quick-card" type="button" data-new-type="xlsx">
-              <div class="quick-icon">X</div>
-              <div class="quick-title">Create XLSX File</div>
-              <div class="quick-desc">Build pricing sheets, trackers, and simple spreadsheets.</div>
-            </button>
-            <button class="quick-card" type="button" data-new-type="pptx">
-              <div class="quick-icon">P</div>
-              <div class="quick-title">Create Presentation</div>
-              <div class="quick-desc">Build PowerPoint-style decks and capability presentations.</div>
-            </button>
+          <div class="secondary-actions" aria-label="Quick actions">
             <button class="quick-card" type="button" id="heroUploadCard">
               <div class="quick-icon">⇧</div>
               <div class="quick-title">Upload Document</div>
@@ -615,15 +594,7 @@
           </div>
           <div class="docs-body">
             <div class="cmdbar">
-              <div class="menu-anchor">
-                <button class="btn btn-primary" id="newBtn" type="button"><span class="ic">＋</span> New</button>
-                <div class="menu" id="newMenu">
-                  <div class="menu-item" data-type="docx"><div class="mi-icon" style="background:var(--word)">W</div><div>Document<small>Word-style document</small></div></div>
-                  <div class="menu-item" data-type="xlsx"><div class="mi-icon" style="background:var(--cell)">X</div><div>Spreadsheet<small>Excel-style sheet</small></div></div>
-                  <div class="menu-item" data-type="pptx"><div class="mi-icon" style="background:var(--slide)">P</div><div>Presentation<small>PowerPoint-style deck</small></div></div>
-                </div>
-              </div>
-              <button class="btn" id="uploadBtn" type="button"><span class="ic">⬆</span> Upload</button>
+              <button class="btn btn-primary" id="uploadBtn" type="button"><span class="ic">⬆</span> Upload</button>
               <input type="file" id="fileInput" style="display:none" accept=".docx,.xlsx,.pptx,.doc,.xls,.ppt,.odt,.ods,.odp,.txt,.csv,.pdf">
               <div class="spacer"></div>
               <div class="search"><span class="si">🔍</span><input type="text" id="search" placeholder="Search documents"></div>
@@ -640,26 +611,11 @@
             <div class="usage-row"><span>Trial status</span><strong>7 days left</strong></div>
             <div class="usage-row"><span>Documents</span><strong id="docCount">0</strong></div>
             <div class="usage-row"><span>Storage</span><strong id="storageTotal">0 MB</strong></div>
-            <div class="usage-row"><span>Office formats</span><strong>DOCX / XLSX / PPTX</strong></div>
             <div class="progress-track"><div class="progress-fill"></div></div>
-          </div>
-
-          <div class="panel side-card">
-            <div class="panel-title">Create Quickly</div>
-            <div class="template-list">
-              <button class="template-item" type="button" data-new-type="docx"><span class="template-icon">W</span><span>New DOCX Agreement</span></button>
-              <button class="template-item" type="button" data-new-type="xlsx"><span class="template-icon">X</span><span>New XLSX Cost Sheet</span></button>
-              <button class="template-item" type="button" data-new-type="pptx"><span class="template-icon">P</span><span>New Presentation Deck</span></button>
-            </div>
           </div>
         </aside>
       </section>
     </main>
-  </div>
-
-  <div class="editor-screen" id="editorScreen">
-    <div id="placeholder"></div>
-    <div id="logoBlock"></div>
   </div>
 
   <script>
@@ -668,18 +624,9 @@
     const BUCKET = 'documents';
     const LOGIN_URL = 'https://www.connexiontwo.com/';
     const WELCOME_URL = 'https://www.connexiontwo.com/welcome';
-    const DOCS_API_SRC = 'https://docs.bisondoc.com/web-apps/apps/api/documents/api.js';
-    const TEMPLATES = { docx: 'blank.docx', xlsx: 'blank.xlsx', pptx: 'blank.pptx' };
     const sb = supabase.createClient(SB_URL, SB_KEY);
-    let editor = null;
     let userId = null;
     let allFiles = [];
-    const screen = document.getElementById('editorScreen');
-
-    // Safety guard: if this page ever opens on the old Bison domain, move it back to Connexion Two.
-    if (window.location.hostname.includes('bisondoc.com')) {
-      window.location.replace(WELCOME_URL);
-    }
 
     function userPath(name){ return userId + '/' + name; }
 
@@ -747,7 +694,7 @@
       if(!files.length){
         list.innerHTML = q
           ? '<div class="empty"><div class="big">🔍</div><div class="t">No matches</div><div class="s">Nothing matches that search.</div></div>'
-          : '<div class="empty"><div class="big">▤</div><div class="t">No documents yet</div><div class="s">Use <b>+ New</b> or <b>Upload</b> to add your first file.</div></div>';
+          : '<div class="empty"><div class="big">▤</div><div class="t">No documents yet</div><div class="s">Use <b>Upload</b> to add your first file.</div></div>';
         return;
       }
 
@@ -785,87 +732,12 @@
       render();
     }
 
-    function ensureDocsApi(){
-      return new Promise((resolve, reject) => {
-        if (window.DocsAPI && window.DocsAPI.DocEditor) {
-          resolve();
-          return;
-        }
-
-        const existing = document.querySelector('script[data-docs-api="true"]');
-        if (existing) {
-          existing.addEventListener('load', resolve, { once: true });
-          existing.addEventListener('error', () => reject(new Error('Could not load document editor.')), { once: true });
-          return;
-        }
-
-        const script = document.createElement('script');
-        script.src = DOCS_API_SRC;
-        script.async = true;
-        script.dataset.docsApi = 'true';
-        script.onload = resolve;
-        script.onerror = () => reject(new Error('Could not load document editor.'));
-        document.head.appendChild(script);
-      });
-    }
-
+    // Office editor removed — clicking a file now downloads it via a short-lived signed link.
     async function openDoc(name){
-      screen.classList.add('open');
-      const { data:{ session } } = await sb.auth.getSession();
-      if(!session){ window.location.replace(LOGIN_URL); return; }
-      try { await ensureDocsApi(); }
-      catch (err) { alert(err.message || 'Could not load document editor.'); closeEditor(); return; }
-
-      const res = await fetch('/api/onlyoffice-config?file=' + encodeURIComponent(userPath(name)), {
-        headers:{ Authorization:'Bearer ' + session.access_token }
-      });
-      if(!res.ok){ alert('Could not open document.'); closeEditor(); return; }
-      const config = await res.json();
-      config.width='100%'; config.height='100%';
-      config.type = (window.innerWidth<=768) ? 'mobile' : 'desktop';
-      config.events = { onRequestClose: closeEditor };
-      if(editor){ editor.destroyEditor(); editor=null; }
-      editor = new DocsAPI.DocEditor('placeholder', config);
+      const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(userPath(name), 60, { download: true });
+      if(error){ alert('Could not open document: '+error.message); return; }
+      window.open(data.signedUrl, '_blank');
     }
-
-    function closeEditor(){
-      if(editor){ editor.destroyEditor(); editor=null; }
-      screen.classList.remove('open');
-      loadFiles();
-    }
-
-    function uniqueName(fileName){
-      const taken = new Set(allFiles.map(f => f.name.toLowerCase()));
-      if(!taken.has(fileName.toLowerCase())) return fileName;
-      const dot = fileName.lastIndexOf('.');
-      const base = dot > 0 ? fileName.slice(0, dot) : fileName;
-      const ext  = dot > 0 ? fileName.slice(dot) : '';
-      let i = 1, candidate;
-      do { candidate = base + ' (' + i + ')' + ext; i++; } while(taken.has(candidate.toLowerCase()));
-      return candidate;
-    }
-
-    async function createNew(type){
-      let name = prompt('Name your new file:', 'Untitled');
-      if(!name) return;
-      name = name.replace(/[^a-zA-Z0-9 _-]/g,'').trim();
-      if(!name) return;
-      const fileName = uniqueName(name + '.' + type);
-      const { error } = await sb.storage.from(BUCKET).copy(TEMPLATES[type], userPath(fileName));
-      if(error){ alert('Could not create file: '+error.message); return; }
-      openDoc(fileName);
-    }
-
-    const newBtn = document.getElementById('newBtn');
-    const newMenu = document.getElementById('newMenu');
-    newBtn.addEventListener('click', (e)=>{ e.stopPropagation(); newMenu.classList.toggle('open'); });
-    document.addEventListener('click', ()=> newMenu.classList.remove('open'));
-    newMenu.querySelectorAll('.menu-item').forEach(mi=>{
-      mi.addEventListener('click', ()=>{ newMenu.classList.remove('open'); createNew(mi.dataset.type); });
-    });
-
-    document.querySelectorAll('[data-new-type]').forEach(el => el.addEventListener('click', () => createNew(el.dataset.newType)));
-    document.getElementById('heroNewDoc').addEventListener('click', () => createNew('docx'));
 
     function triggerUpload(){ document.getElementById('fileInput').click(); }
     document.getElementById('uploadBtn').addEventListener('click', triggerUpload);
@@ -879,8 +751,19 @@
       const { error } = await sb.storage.from(BUCKET).upload(userPath(finalName), file, { upsert:false });
       e.target.value = '';
       if(error){ alert('Upload failed: '+error.message); return; }
-      openDoc(finalName);
+      loadFiles();
     });
+
+    function uniqueName(fileName){
+      const taken = new Set(allFiles.map(f => f.name.toLowerCase()));
+      if(!taken.has(fileName.toLowerCase())) return fileName;
+      const dot = fileName.lastIndexOf('.');
+      const base = dot > 0 ? fileName.slice(0, dot) : fileName;
+      const ext  = dot > 0 ? fileName.slice(dot) : '';
+      let i = 1, candidate;
+      do { candidate = base + ' (' + i + ')' + ext; i++; } while(taken.has(candidate.toLowerCase()));
+      return candidate;
+    }
 
     document.getElementById('search').addEventListener('input', render);
     document.getElementById('refreshFiles').addEventListener('click', (e)=>{ e.preventDefault(); loadFiles(); });
