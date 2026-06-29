@@ -166,23 +166,15 @@ button, input, select { font: inherit; }
   </div>
 
 <script>
-const SB_URL = 'https://xbwuvaxtnylqvagdvpxp.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc';
+const SB_URL = 'https://rfdvogakvyodixgpvqvz.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
 const TEMPLATE_BUCKET = 'template-files';
 const LOGIN_URL = 'https://www.connexiontwo.com/';
 const sb = supabase.createClient(SB_URL, SB_KEY);
-let currentUser = null;
 let allTemplates = [];
 
 function fmtDate(value) { if(!value) return ''; return new Date(value).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }); }
 function escapeHtml(value) { return String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-async function requireSession() {
-  const { data: { session } } = await sb.auth.getSession();
-  if(!session) { window.location.replace(LOGIN_URL); return null; }
-  currentUser = session.user;
-  return session;
-}
 
 async function loadTemplates() {
   const rows = document.getElementById('templateRows');
@@ -221,14 +213,13 @@ function useTemplate(id) { window.location.href = '/document-creation?template='
 function startCreateTemplate() { document.getElementById('templateFileInput').click(); }
 
 async function createTemplateFromFile(file) {
-  if(!currentUser) return;
   const name = prompt('Template name:', file.name.replace(/\.pdf$/i,''));
   if(!name) return;
   const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
-  const path = `${currentUser.id}/${Date.now()}-${safe}`;
+  const path = `tpl/${Date.now()}-${safe}`;
   const upload = await sb.storage.from(TEMPLATE_BUCKET).upload(path, file, { upsert:false, contentType:file.type || 'application/pdf' });
   if(upload.error) { alert('Upload failed: ' + upload.error.message); return; }
-  const insert = await sb.from('document_templates').insert({ user_id: currentUser.id, name, category:'General', file_path:path, file_name:file.name }).select().single();
+  const insert = await sb.from('document_templates').insert({ name, category:'General', file_path:path, file_name:file.name }).select().single();
   if(insert.error) { alert('Template record failed: ' + insert.error.message); return; }
   await loadTemplates();
 }
@@ -239,7 +230,8 @@ document.getElementById('templateFileInput').addEventListener('change', async e 
 document.getElementById('searchInput').addEventListener('input', renderTemplates);
 document.getElementById('clearSearch').addEventListener('click', () => { document.getElementById('searchInput').value=''; renderTemplates(); });
 
-(async()=>{ const session = await requireSession(); if(session) loadTemplates(); })();
+// Auth lives in another project — load directly with the anon key.
+loadTemplates();
 </script>
 </body>
 </html>
