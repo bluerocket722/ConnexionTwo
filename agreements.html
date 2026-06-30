@@ -209,6 +209,341 @@ button, input, select { font: inherit; }
   .table-row .status-cell { grid-column: 1 / -1; }
   .row-updated { display: none; }
 }
+
+/* MOBILE FRIENDLY PATCH — desktop stays the same */
+.hamburger {
+  display: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--violet);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+.hamburger span {
+  width: 20px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--violet);
+  transition: .18s ease;
+}
+.hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.hamburger.open span:nth-child(2) { opacity: 0; }
+.hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+.mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(6,26,58,.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: .18s ease;
+}
+.mobile-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.mobile-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 90;
+  width: min(86vw, 340px);
+  height: 100vh;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  box-shadow: -18px 0 50px rgba(6,26,58,.18);
+  transform: translateX(105%);
+  transition: .2s ease;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.mobile-drawer.open {
+  transform: translateX(0);
+}
+.mobile-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.mobile-drawer-title {
+  color: var(--violet);
+  font-weight: 850;
+  letter-spacing: -.02em;
+}
+.mobile-close {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--violet);
+  cursor: pointer;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+.mobile-drawer-section {
+  display: grid;
+  gap: 8px;
+}
+.mobile-drawer-label {
+  color: var(--faint);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.mobile-drawer a,
+.mobile-drawer .mobile-folder,
+.mobile-drawer .mobile-action {
+  min-height: 42px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+}
+.mobile-drawer a.active,
+.mobile-drawer .mobile-folder.active {
+  background: var(--indigo-050);
+  color: var(--indigo-700);
+  border-color: var(--indigo-050);
+}
+.mobile-action.primary {
+  justify-content: center;
+  background: var(--indigo-700);
+  color: #fff;
+  border-color: var(--indigo-700);
+}
+
+@media (max-width: 760px) {
+  body {
+    overflow-x: hidden;
+    font-size: 14px;
+  }
+
+  .top-nav {
+    height: auto;
+    min-height: 60px;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+
+  .brand {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .brand-name {
+    font-size: .95rem;
+    max-width: 170px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hamburger {
+    display: inline-flex;
+  }
+
+  .nav-tabs {
+    display: none;
+  }
+
+  .top-actions {
+    gap: 8px;
+    margin-left: 0;
+  }
+
+  .trial-left {
+    display: none;
+  }
+
+  .buy-btn {
+    height: 36px;
+    padding: 0 12px;
+    font-size: .8rem;
+  }
+
+  .avatar {
+    width: 34px;
+    height: 34px;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+    min-height: calc(100vh - 60px);
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .content {
+    padding: 20px 14px 42px;
+    overflow: visible;
+  }
+
+  .content-top {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+
+  .page-title {
+    font-size: 1.35rem;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .search {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .filter-select,
+  .filter-btn {
+    width: 100%;
+  }
+
+  .table-card {
+    border-radius: 14px;
+    overflow: visible;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .table-head {
+    display: none;
+  }
+
+  #agreementRows {
+    display: grid;
+    gap: 12px;
+  }
+
+  .table-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    min-height: 0;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+
+  .table-row:hover {
+    background: var(--surface);
+  }
+
+  .doc-cell {
+    align-items: flex-start;
+  }
+
+  .item-title {
+    white-space: normal;
+    line-height: 1.35;
+  }
+
+  .item-sub {
+    white-space: normal;
+  }
+
+  .table-row .status-cell {
+    grid-column: auto;
+    padding: 10px 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .mini-track {
+    width: 100%;
+  }
+
+  .row-updated {
+    display: block;
+    color: var(--faint);
+    font-size: .8rem;
+  }
+
+  .row-updated::before {
+    content: "Updated: ";
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  .row-action {
+    width: 100%;
+    height: 40px;
+    justify-self: stretch;
+  }
+
+  .empty-state,
+  .loading,
+  .error {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+}
+
+@media (max-width: 420px) {
+  .top-nav {
+    padding: 9px 12px;
+  }
+
+  .c2-logo {
+    width: 30px;
+    height: 30px;
+  }
+
+  .brand-name {
+    max-width: 130px;
+    font-size: .9rem;
+  }
+
+  .buy-btn {
+    display: none;
+  }
+
+  .content {
+    padding: 18px 12px 38px;
+  }
+
+  .table-row {
+    padding: 14px;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -217,6 +552,11 @@ button, input, select { font: inherit; }
       <div class="c2-logo">C2</div>
       <div class="brand-name">Connexion Two</div>
     </a>
+    <button class="hamburger" type="button" id="mobileMenuBtn" aria-label="Open mobile menu" aria-expanded="false">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
     <nav class="nav-tabs" aria-label="Main navigation">
       <a href="/document-creation" class="active">Agreements</a>
       <a href="/templates">Templates</a>
@@ -227,6 +567,32 @@ button, input, select { font: inherit; }
       <div class="avatar">AP</div>
     </div>
   </header>
+
+  <div class="mobile-backdrop" id="mobileBackdrop"></div>
+  <aside class="mobile-drawer" id="mobileDrawer" aria-label="Mobile navigation">
+    <div class="mobile-drawer-head">
+      <div class="mobile-drawer-title">Connexion Two</div>
+      <button class="mobile-close" type="button" id="mobileClose" aria-label="Close mobile menu">×</button>
+    </div>
+
+    <div class="mobile-drawer-section">
+      <div class="mobile-drawer-label">Navigation</div>
+      <a href="/document-creation" class="active">Agreements</a>
+      <a href="/templates">Templates</a>
+      <a href="/welcome">Home</a>
+    </div>
+
+    <div class="mobile-drawer-section">
+      <div class="mobile-drawer-label">Folders</div>
+      <button class="mobile-folder active" type="button" data-folder="inbox">All</button>
+      <button class="mobile-folder" type="button" data-folder="sent">Awaiting Signature</button>
+      <button class="mobile-folder" type="button" data-folder="completed">Completed</button>
+    </div>
+
+    <div class="mobile-drawer-section">
+      <button class="mobile-action primary" type="button" onclick="window.location.href='/document-creation'">New Agreement</button>
+    </div>
+  </aside>
 
   <div class="layout">
     <aside class="sidebar">
@@ -433,6 +799,41 @@ document.getElementById('sortUpdated').addEventListener('click', () => {
 });
 document.querySelectorAll('[data-folder]').forEach(btn => {
   btn.addEventListener('click', () => { currentFolder = btn.dataset.folder; document.getElementById('searchInput').value=''; renderAgreements(); });
+});
+
+
+const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+const mobileDrawer = document.getElementById('mobileDrawer');
+const mobileBackdrop = document.getElementById('mobileBackdrop');
+const mobileClose = document.getElementById('mobileClose');
+
+function openMobileMenu() {
+  if(!mobileDrawer || !mobileBackdrop || !mobileMenuBtn) return;
+  mobileDrawer.classList.add('open');
+  mobileBackdrop.classList.add('open');
+  mobileMenuBtn.classList.add('open');
+  mobileMenuBtn.setAttribute('aria-expanded', 'true');
+  document.body.style.overflow = 'hidden';
+}
+function closeMobileMenu() {
+  if(!mobileDrawer || !mobileBackdrop || !mobileMenuBtn) return;
+  mobileDrawer.classList.remove('open');
+  mobileBackdrop.classList.remove('open');
+  mobileMenuBtn.classList.remove('open');
+  mobileMenuBtn.setAttribute('aria-expanded', 'false');
+  document.body.style.overflow = '';
+}
+mobileMenuBtn?.addEventListener('click', () => {
+  if(mobileDrawer?.classList.contains('open')) closeMobileMenu();
+  else openMobileMenu();
+});
+mobileClose?.addEventListener('click', closeMobileMenu);
+mobileBackdrop?.addEventListener('click', closeMobileMenu);
+mobileDrawer?.querySelectorAll('a, [data-folder], .mobile-action').forEach(item => {
+  item.addEventListener('click', closeMobileMenu);
+});
+document.addEventListener('keydown', event => {
+  if(event.key === 'Escape') closeMobileMenu();
 });
 
 // Load immediately — auth lives in a different project, so don't gate/redirect here.
