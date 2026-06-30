@@ -751,33 +751,23 @@ let myShareCode = null;
 function fmtDate(value) { if(!value) return ''; return new Date(value).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }); }
 function escapeHtml(value) { return String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-// Compute everything client-side from the base tables — no SQL view needed.
-// Reads signer_documents, then the matching signers, and works out progress here.
+// Read the signing-progress view; fall back to the raw table if the view is missing.
 async function loadAgreements() {
   const rows = document.getElementById('agreementRows');
-
-  const docRes = await sb.from('signer_documents')
+  let result = await sb.from('v_agreement_progress')
     .select('*')
-    .order('created_at', { ascending:false });
-  if(docRes.error) {
-    rows.innerHTML = '<div class="error">Could not load agreements: ' + escapeHtml(docRes.error.message) + '</div>';
+    .order('updated_at', { ascending:false });
+
+  if(result.error) {
+    result = await sb.from('signer_documents')
+      .select('*')
+      .order('created_at', { ascending:false });
+  }
+  if(result.error) {
+    rows.innerHTML = '<div class="error">Could not load agreements. Run the agreements SQL (v_agreement_progress view) in this Supabase project.</div>';
     return;
   }
-  const docs = docRes.data || [];
-
-  // pull all signers for these documents in one query, then group by doc
-  const ids = docs.map(d => d.doc_id).filter(Boolean);
-  const signersByDoc = {};
-  if(ids.length) {
-    const sigRes = await sb.from('signers')
-      .select('doc_id,signer_order,name,email,status')
-      .in('doc_id', ids);
-    if(!sigRes.error) {
-      for(const s of (sigRes.data || [])) { (signersByDoc[s.doc_id] = signersByDoc[s.doc_id] || []).push(s); }
-    }
-  }
-
-  allAgreements = docs.map(d => normalize(d, signersByDoc[d.doc_id] || []));
+  allAgreements = (result.data || []).map(normalize);
   // Scope to this account: keep rows owned by this email (legacy rows with no
   // owner stay visible so nothing already created disappears).
   if(currentEmail) {
@@ -786,31 +776,25 @@ async function loadAgreements() {
   renderAgreements();
 }
 
-function normalize(d, signers) {
-  signers = signers || [];
-  const total = signers.length;
-  const signed = signers.filter(s => String(s.status || '').toLowerCase() === 'signed').length;
-  const statusRaw = String(d.status || '').toLowerCase();
-  const completed = statusRaw.includes('complete') || (total > 0 && signed >= total) || !!d.completed_at;
+function normalize(a) {
+  const total = Number(a.total_signers || 0);
+  const signed = Number(a.signed_count || 0);
+  const statusRaw = String(a.status || '').toLowerCase();
+  const completed = statusRaw.includes('complete') || (total > 0 && signed >= total) || !!a.completed_at;
   let phase;
   if(completed) phase = 'completed';
   else if(statusRaw.includes('progress') || statusRaw.includes('pending') || signed > 0 || total > 0) phase = 'progress';
   else phase = 'draft';
-  // current signer = lowest-order one who hasn't signed yet
-  const pending = signers
-    .filter(s => String(s.status || '').toLowerCase() !== 'signed')
-    .sort((a,b) => (a.signer_order || 0) - (b.signer_order || 0));
-  const cur = pending[0];
-  const updated = d.updated_at || d.created_at;
+  const updated = a.updated_at || a.created_at;
   return {
-    doc_id: d.doc_id,
-    title: d.title || 'Untitled Agreement',
-    owner_email: (d.owner_email || '').toLowerCase() || null,
+    doc_id: a.doc_id,
+    title: a.title || 'Untitled Agreement',
+    owner_email: (a.owner_email || '').toLowerCase() || null,
     updated,
     updatedMs: updated ? new Date(updated).getTime() : 0,
     total, signed, phase,
-    current_order: cur ? cur.signer_order : null,
-    current_name: cur ? (cur.name || '') : '',
+    current_order: a.current_signer_order,
+    current_name: a.current_signer_name || '',
   };
 }
 
