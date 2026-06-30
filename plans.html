@@ -549,7 +549,7 @@
         <nav class="nav-actions" aria-label="Plans navigation">
           <a href="https://www.connexiontwo.com/" class="nav-link">Home</a>
           <a href="https://www.connexiontwo.com/#login" class="nav-link">Login</a>
-          <a href="https://buy.stripe.com/cNi00ieLedtedDL24vafS02" class="nav-pill">Start free trial</a>
+          <a href="https://buy.stripe.com/cNi00ieLedtedDL24vafS02" class="nav-pill" data-checkout-link>Start free trial</a>
         </nav>
       </header>
 
@@ -594,8 +594,8 @@
           <div class="divider"></div>
 
           <div class="price">
-            <span class="amount">€15</span>
-            <span class="term">/month</span>
+            <span class="amount" id="starterPriceAmount">€15</span>
+            <span class="term" id="starterPriceTerm">/month</span>
           </div>
 
           <p class="price-note">7-day free trial, then monthly subscription</p>
@@ -607,7 +607,7 @@
             <li><span class="check">✓</span> Email support</li>
           </ul>
 
-          <a href="https://buy.stripe.com/cNi00ieLedtedDL24vafS02" class="button">
+          <a href="https://buy.stripe.com/cNi00ieLedtedDL24vafS02" class="button" data-checkout-link>
             Start 7-Day Trial
           </a>
         </article>
@@ -685,5 +685,84 @@
 
     </div>
   </main>
+
+  <script>
+    /*
+      Location-based starter currency.
+      EUR countries show €15/month.
+      United Kingdom shows £15/month.
+
+      IMPORTANT:
+      Replace GBP_STRIPE_LINK with your real GBP Stripe Payment Link when you create it.
+      EUR_STRIPE_LINK is your current live Stripe link from this page.
+    */
+    const EUR_STRIPE_LINK = "https://buy.stripe.com/cNi00ieLedtedDL24vafS02";
+    const GBP_STRIPE_LINK = "REPLACE_WITH_YOUR_GBP_STRIPE_PAYMENT_LINK";
+
+    const EURO_COUNTRIES = new Set([
+      "AT", "BE", "HR", "CY", "EE", "FI", "FR", "DE", "GR", "IE",
+      "IT", "LV", "LT", "LU", "MT", "NL", "PT", "SK", "SI", "ES"
+    ]);
+
+    function getCountryFromLocale(locale) {
+      if (!locale) return "";
+      const parts = String(locale).split("-");
+      return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : "";
+    }
+
+    function detectClientCountry() {
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+      const languages = navigator.languages && navigator.languages.length
+        ? navigator.languages
+        : [navigator.language];
+
+      for (const lang of languages) {
+        const country = getCountryFromLocale(lang);
+        if (country) return country;
+      }
+
+      if (timeZone === "Europe/London") return "GB";
+      if (timeZone === "Europe/Dublin") return "IE";
+      if (timeZone.startsWith("Europe/")) return "EU";
+
+      return "EU";
+    }
+
+    function getCurrencyForCountry(country) {
+      if (country === "GB") return "GBP";
+      if (EURO_COUNTRIES.has(country) || country === "EU") return "EUR";
+      return "EUR";
+    }
+
+    function formatStarterPrice(currency) {
+      return new Intl.NumberFormat(currency === "GBP" ? "en-GB" : "en-IE", {
+        style: "currency",
+        currency,
+        maximumFractionDigits: 0
+      }).format(15);
+    }
+
+    function applyLocalizedCurrency() {
+      const country = detectClientCountry();
+      const currency = getCurrencyForCountry(country);
+      const priceAmount = document.getElementById("starterPriceAmount");
+      const priceTerm = document.getElementById("starterPriceTerm");
+      const checkoutLinks = document.querySelectorAll("[data-checkout-link]");
+
+      if (priceAmount) priceAmount.textContent = formatStarterPrice(currency);
+      if (priceTerm) priceTerm.textContent = "/month";
+
+      checkoutLinks.forEach(link => {
+        if (currency === "GBP" && GBP_STRIPE_LINK !== "REPLACE_WITH_YOUR_GBP_STRIPE_PAYMENT_LINK") {
+          link.href = GBP_STRIPE_LINK;
+        } else {
+          link.href = EUR_STRIPE_LINK;
+        }
+      });
+    }
+
+    applyLocalizedCurrency();
+  </script>
+
 </body>
 </html>
