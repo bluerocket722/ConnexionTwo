@@ -97,6 +97,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
 
 const params=new URLSearchParams(location.search);
 const templateId=params.get('id');
+let currentUserId=null;
 
 const FIELD_TYPES=[
   {t:'signature',label:'Signature',ic:'Sig',w:.24,h:.06},
@@ -104,10 +105,6 @@ const FIELD_TYPES=[
   {t:'name',     label:'Full Name',ic:'Nm', w:.22,h:.04},
   {t:'date',     label:'Date',     ic:'Dt', w:.16,h:.04},
   {t:'text',     label:'Text',     ic:'Tx', w:.22,h:.04},
-  {t:'address',  label:'Address',  ic:'Ad', w:.30,h:.05},
-  {t:'ssn',      label:'SSN',      ic:'SSN',w:.18,h:.04},
-  {t:'ein',      label:'EIN',      ic:'EIN',w:.18,h:.04},
-  {t:'checkbox', label:'Checkbox', ic:'☑',  w:.03,h:.03},
 ];
 const SIGNER_COLORS=['#0054d1','#0f9f6e','#b7791f','#7c3aed','#d6336c','#0891b2','#ea580c','#475569'];
 
@@ -147,7 +144,9 @@ async function renderPdf(url){
   const stage=document.getElementById('stage');
   stage.innerHTML='';
   const pdf=await pdfjsLib.getDocument(url).promise;
-  const scale=Math.min(1.4,(stage.clientWidth-60)/ (await pdf.getPage(1)).getViewport({scale:1}).width);
+  const avail=Math.max(360,(stage.clientWidth||900)-52);
+  const base=(await pdf.getPage(1)).getViewport({scale:1});
+  const scale=Math.min(1.5, avail/base.width);
   for(let p=1;p<=pdf.numPages;p++){
     const page=await pdf.getPage(p);
     const vp=page.getViewport({scale});
@@ -156,11 +155,9 @@ async function renderPdf(url){
     wrap.style.width=vp.width+'px'; wrap.style.height=vp.height+'px';
     wrap.dataset.page=p;
     const canvas=document.createElement('canvas');
-    const dpr=window.devicePixelRatio||1;
-    canvas.width=Math.floor(vp.width*dpr); canvas.height=Math.floor(vp.height*dpr);
-    canvas.style.width=vp.width+'px'; canvas.style.height=vp.height+'px';
-    const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
-    await page.render({canvasContext:ctx,viewport:vp}).promise;
+    canvas.width=vp.width; canvas.height=vp.height;
+    canvas.style.display='block';
+    await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
     wrap.appendChild(canvas);
     wrap.addEventListener('pointerdown',e=>onPageClick(e,wrap,p));
     stage.appendChild(wrap);
@@ -257,6 +254,8 @@ async function saveFields(){
     const ins=await sb.from('template_fields').insert(rows);
     if(ins.error){ alert('Save failed: '+ins.error.message); btn.disabled=false; btn.textContent='Save Fields'; return; }
   }
+  // tag this template to the current user (per-user ownership)
+  if(currentUserId){ try{ await sb.from('document_templates').update({ user_id: currentUserId }).eq('id',templateId); }catch(_){} }
   // record signer roles too (optional, best-effort)
   try{
     await sb.from('template_signers').delete().eq('template_id',templateId);
@@ -269,6 +268,7 @@ document.getElementById('saveBtn').addEventListener('click',saveFields);
 
 // ---------- boot ----------
 (async()=>{
+  try{ const { data:{ session } } = await sb.auth.getSession(); currentUserId = session?.user?.id || null; }catch(_){}
   if(!templateId){ document.getElementById('stage').innerHTML='<div class="loading">Missing template id (open from the Templates page).</div>'; return; }
   const { data, error }=await sb.from('document_templates').select('name,file_path').eq('id',templateId).single();
   if(error||!data){ document.getElementById('stage').innerHTML='<div class="loading">Template not found.</div>'; return; }
