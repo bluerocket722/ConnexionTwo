@@ -544,6 +544,46 @@ button, input, select { font: inherit; }
   }
 }
 
+/* ── TRIAL / UPGRADE MODALS (added) ── */
+.c2-overlay {
+  position: fixed; inset: 0; z-index: 120;
+  background: rgba(6,26,58,.5);
+  display: none; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.c2-overlay.open { display: flex; }
+.c2-modal {
+  width: 100%; max-width: 520px;
+  background: var(--surface); border-radius: 18px;
+  box-shadow: 0 30px 80px rgba(6,26,58,.35);
+  position: relative; overflow: hidden;
+}
+.c2-modal.narrow { max-width: 480px; }
+.c2-modal-body { padding: 44px 36px; text-align: center; }
+.c2-modal-body.left { text-align: left; }
+.c2-modal h2 { font-size: 1.6rem; margin-bottom: 10px; letter-spacing: -.03em; color: var(--violet); }
+.c2-modal p { color: var(--muted); margin-bottom: 22px; line-height: 1.55; }
+.c2-pay {
+  width: 100%; min-height: 52px; border: none; border-radius: 11px; cursor: pointer;
+  background: var(--indigo-700); color: #fff; font-weight: 800; font-size: .98rem;
+  margin-bottom: 16px; transition: .15s ease;
+}
+.c2-pay:hover { background: var(--violet); }
+.c2-or { color: var(--muted); font-size: .85rem; margin-bottom: 10px; }
+.c2-copyrow { display: flex; gap: 8px; }
+.c2-copyrow input {
+  flex: 1; height: 46px; border: 1px solid var(--line); border-radius: 10px;
+  padding: 0 12px; font-size: .9rem; background: var(--indigo-050); color: var(--violet);
+}
+.c2-copyrow button {
+  min-height: 46px; padding: 0 18px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--indigo-700); background: var(--indigo-700); color: #fff; font-weight: 800;
+}
+.c2-modal-close {
+  position: absolute; top: 14px; right: 14px;
+  width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--surface); color: var(--violet); font-size: 1.3rem; line-height: 1; cursor: pointer;
+}
 </style>
 </head>
 <body>
@@ -562,8 +602,8 @@ button, input, select { font: inherit; }
       <a href="/templates">Templates</a>
     </nav>
     <div class="top-actions">
-      <span class="trial-left">14 days left</span>
-      <button class="buy-btn" type="button">Upgrade</button>
+      <span class="trial-left" id="trialLeft">—</span>
+      <button class="buy-btn" type="button" id="buyBtn">Upgrade</button>
       <div class="avatar">AP</div>
     </div>
   </header>
@@ -591,6 +631,7 @@ button, input, select { font: inherit; }
 
     <div class="mobile-drawer-section">
       <button class="mobile-action primary" type="button" onclick="window.location.href='/document-creation'">New Agreement</button>
+      <button class="mobile-action" type="button" id="mobileInvite">Invite a Friend (+7 days)</button>
     </div>
   </aside>
 
@@ -655,14 +696,57 @@ button, input, select { font: inherit; }
     </main>
   </div>
 
+  <!-- Invite a friend modal -->
+  <div class="c2-overlay" id="inviteOverlay" aria-hidden="true">
+    <div class="c2-modal narrow">
+      <button class="c2-modal-close" type="button" id="inviteClose" aria-label="Close">×</button>
+      <div class="c2-modal-body left">
+        <h2>Invite a friend, get 7 days</h2>
+        <p>Share your personal link. When a friend joins, your trial extends by another 7 days.</p>
+        <div class="c2-copyrow">
+          <input id="inviteLinkInput" readonly>
+          <button id="inviteCopy" type="button">Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trial-ended forced modal -->
+  <div class="c2-overlay" id="trialEndedOverlay" aria-hidden="true">
+    <div class="c2-modal">
+      <div class="c2-modal-body">
+        <h2>Your free trial has ended</h2>
+        <p>Continue with Connexion Two by upgrading — or extend free for 7 more days by inviting a friend.</p>
+        <button id="endedPay" class="c2-pay" type="button">Upgrade for €15/month</button>
+        <div class="c2-or">— or invite a friend for +7 days —</div>
+        <div class="c2-copyrow">
+          <input id="endedLinkInput" readonly>
+          <button id="endedCopy" type="button">Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 <script>
+// ── Signing data lives in the rfd project ──
 const SB_URL = 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
 const sb = supabase.createClient(SB_URL, SB_KEY);
+
+// ── Auth + trials live in the xbw project (same one the login uses) ──
+const AUTH_URL = 'https://xbwuvaxtnylqvagdvpxp.supabase.co';
+const AUTH_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc';
+const sbAuth = supabase.createClient(AUTH_URL, AUTH_KEY);
+
+const PAY_LINK   = 'https://buy.stripe.com/cNi00ieLedtedDL24vafS02';
+const SHARE_BASE = 'https://www.connexiontwo.com/?ref=';
+
 let allAgreements = [];
 let currentFolder = 'inbox';
 let rangeDays = 30;      // default: last 30 days
 let sortAsc = false;     // default: newest first
+let currentEmail = null; // this account's email — used to scope agreements
+let myShareCode = null;
 
 function fmtDate(value) { if(!value) return ''; return new Date(value).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }); }
 function escapeHtml(value) { return String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -671,12 +755,12 @@ function escapeHtml(value) { return String(value || '').replace(/[&<>"']/g, c =>
 async function loadAgreements() {
   const rows = document.getElementById('agreementRows');
   let result = await sb.from('v_agreement_progress')
-    .select('doc_id,title,status,created_at,updated_at,completed_at,total_signers,signed_count,current_signer_order,current_signer_name,current_signer_email')
+    .select('*')
     .order('updated_at', { ascending:false });
 
   if(result.error) {
     result = await sb.from('signer_documents')
-      .select('doc_id,title,status,created_at')
+      .select('*')
       .order('created_at', { ascending:false });
   }
   if(result.error) {
@@ -684,6 +768,11 @@ async function loadAgreements() {
     return;
   }
   allAgreements = (result.data || []).map(normalize);
+  // Scope to this account: keep rows owned by this email (legacy rows with no
+  // owner stay visible so nothing already created disappears).
+  if(currentEmail) {
+    allAgreements = allAgreements.filter(a => !a.owner_email || a.owner_email === currentEmail);
+  }
   renderAgreements();
 }
 
@@ -700,6 +789,7 @@ function normalize(a) {
   return {
     doc_id: a.doc_id,
     title: a.title || 'Untitled Agreement',
+    owner_email: (a.owner_email || '').toLowerCase() || null,
     updated,
     updatedMs: updated ? new Date(updated).getTime() : 0,
     total, signed, phase,
@@ -830,14 +920,88 @@ mobileMenuBtn?.addEventListener('click', () => {
 mobileClose?.addEventListener('click', closeMobileMenu);
 mobileBackdrop?.addEventListener('click', closeMobileMenu);
 mobileDrawer?.querySelectorAll('a, [data-folder], .mobile-action').forEach(item => {
+  // the invite button opens a modal — don't let it also bubble to nav handlers
+  if(item.id === 'mobileInvite') return;
   item.addEventListener('click', closeMobileMenu);
 });
 document.addEventListener('keydown', event => {
   if(event.key === 'Escape') closeMobileMenu();
 });
 
-// Load immediately — auth lives in a different project, so don't gate/redirect here.
-loadAgreements();
+// ── Trial countdown + upgrade / invite popups ──
+function daysLeft(t) { if(t?.paid) return 999; return Math.ceil((new Date(t.trial_ends_at).getTime() - Date.now()) / 86400000); }
+
+async function ensureTrial(u) {
+  let { data } = await sbAuth.from('trials').select('*').eq('user_id', u.id).maybeSingle();
+  if(!data) {
+    const created = u.created_at ? new Date(u.created_at) : new Date();
+    const ends = new Date(created.getTime() + 7*86400000).toISOString();
+    const ins = await sbAuth.from('trials').insert({
+      user_id: u.id, email: u.email, full_name: u.user_metadata?.full_name || '',
+      trial_started_at: created.toISOString(), trial_ends_at: ends
+    }).select().single();
+    data = ins.data;
+  }
+  return data;
+}
+
+function applyTrialUI(t) {
+  myShareCode = t.share_code;
+  const d = daysLeft(t);
+  const tl = document.getElementById('trialLeft');
+  if(tl) tl.textContent = t.paid ? 'Active' : (d > 0 ? d + ' day' + (d===1?'':'s') + ' left' : 'Trial ended');
+  if(!t.paid && d <= 0) openTrialEnded();
+}
+
+async function maybeCredit() {
+  const url = new URLSearchParams(location.search);
+  let ref = url.get('ref'); if(ref) localStorage.setItem('c2_pending_ref', ref);
+  ref = ref || localStorage.getItem('c2_pending_ref');
+  if(!ref) return;
+  if(ref === myShareCode) { localStorage.removeItem('c2_pending_ref'); return; }
+  if(localStorage.getItem('c2_credited_' + ref)) return;
+  try { await sbAuth.rpc('credit_referral', { code: ref }); localStorage.setItem('c2_credited_' + ref, '1'); localStorage.removeItem('c2_pending_ref'); } catch(_) {}
+}
+
+function shareLink() { return SHARE_BASE + (myShareCode || ''); }
+function openInvite() { const i = document.getElementById('inviteLinkInput'); if(i) i.value = shareLink(); document.getElementById('inviteOverlay').classList.add('open'); document.body.style.overflow='hidden'; }
+function closeInvite() { document.getElementById('inviteOverlay').classList.remove('open'); document.body.style.overflow=''; }
+function openTrialEnded() { const i = document.getElementById('endedLinkInput'); if(i) i.value = shareLink(); document.getElementById('trialEndedOverlay').classList.add('open'); document.body.style.overflow='hidden'; }
+function copyVal(id, btn) {
+  const el = document.getElementById(id); el.select(); el.setSelectionRange(0, 99999);
+  const done = () => { const o = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = o, 1500); };
+  if(navigator.clipboard) { navigator.clipboard.writeText(el.value).then(done).catch(() => { document.execCommand('copy'); done(); }); }
+  else { document.execCommand('copy'); done(); }
+}
+
+document.getElementById('buyBtn')?.addEventListener('click', () => { window.location.href = PAY_LINK; });
+document.getElementById('endedPay')?.addEventListener('click', () => { window.location.href = PAY_LINK; });
+document.getElementById('inviteClose')?.addEventListener('click', closeInvite);
+document.getElementById('inviteOverlay')?.addEventListener('click', e => { if(e.target.id === 'inviteOverlay') closeInvite(); });
+document.getElementById('inviteCopy')?.addEventListener('click', e => copyVal('inviteLinkInput', e.target));
+document.getElementById('endedCopy')?.addEventListener('click', e => copyVal('endedLinkInput', e.target));
+document.getElementById('mobileInvite')?.addEventListener('click', () => { closeMobileMenu(); openInvite(); });
+
+// ── Boot: figure out who's signed in (scopes the list), load agreements, run trial ──
+(async () => {
+  let user = null;
+  try { const { data:{ session } } = await sbAuth.auth.getSession(); user = session?.user || null; } catch(_) {}
+  if(user) currentEmail = (user.email || '').toLowerCase() || null;
+
+  await loadAgreements();
+
+  if(user) {
+    try {
+      const t = await ensureTrial(user);
+      if(t) { applyTrialUI(t); await maybeCredit();
+        const { data: t2 } = await sbAuth.from('trials').select('*').eq('user_id', user.id).maybeSingle();
+        if(t2) applyTrialUI(t2);
+      }
+    } catch(_) {}
+  } else {
+    const tl = document.getElementById('trialLeft'); if(tl) tl.textContent = '';
+  }
+})();
 </script>
 </body>
 </html>
