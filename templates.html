@@ -97,14 +97,156 @@ button, input, select { font: inherit; }
 .error { padding: 36px 24px; color: #b91c1c; text-align: center; }
 .hidden { display: none !important; }
 
+/* MOBILE HAMBURGER + RESPONSIVE PATCH — functionality unchanged */
+.hamburger {
+  display: none;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--navy);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+.hamburger span {
+  width: 20px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--navy);
+  display: block;
+  transition: .2s ease;
+}
+.hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.hamburger.open span:nth-child(2) { opacity: 0; }
+.hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+.mobile-nav {
+  display: none;
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 10px;
+  flex-direction: column;
+  gap: 4px;
+}
+.mobile-nav a,
+.mobile-nav button {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 750;
+  text-align: left;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.mobile-nav a:hover,
+.mobile-nav button:hover {
+  background: var(--blue-050);
+  color: var(--blue-700);
+}
+.mobile-nav .mobile-upgrade {
+  background: var(--blue-700);
+  color: #fff;
+  justify-content: center;
+  margin-top: 6px;
+}
+.mobile-nav .mobile-upgrade:hover {
+  background: var(--navy);
+  color: #fff;
+}
+
 @media (max-width: 900px) {
+  .top-nav {
+    height: auto;
+    min-height: 60px;
+    padding: 10px 16px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .brand { flex: 1; min-width: 0; }
+  .brand-name {
+    max-width: 165px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hamburger { display: inline-flex; }
+  .hamburger.open + .mobile-nav,
+  .mobile-nav.open { display: flex; }
+  .nav-tabs,
+  .top-actions { display: none; }
   .layout { grid-template-columns: 1fr; }
   .sidebar { display: none; }
   .content { padding: 22px 16px 44px; }
   .table-head { display: none; }
-  .table-row { grid-template-columns: 1fr auto; gap: 10px; padding: 16px; }
+  .content-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .search {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+  .filter-btn {
+    width: 100%;
+  }
+  .table-card {
+    border-radius: 14px;
+  }
+  .table-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 16px;
+  }
+  .table-row > div:nth-child(2) {
+    justify-self: start;
+  }
+  .table-row > div:last-child {
+    width: 100%;
+    justify-content: stretch !important;
+  }
+  .row-action {
+    flex: 1;
+    min-height: 38px;
+  }
   .row-updated { display: none; }
+  .doc-cell {
+    align-items: flex-start;
+  }
+  .item-title {
+    white-space: normal;
+    line-height: 1.35;
+  }
 }
+
+@media (max-width: 480px) {
+  .top-nav { padding: 9px 12px; }
+  .c2-logo { width: 30px; height: 30px; border-radius: 8px; }
+  .brand-name { font-size: .92rem; max-width: 145px; }
+  .content { padding: 18px 12px 38px; }
+  .page-title { font-size: 1.28rem; }
+  .table-row { padding: 14px; }
+  .doc-icon { width: 34px; height: 34px; }
+}
+
 </style>
 </head>
 <body>
@@ -113,8 +255,22 @@ button, input, select { font: inherit; }
       <div class="c2-logo">C2</div>
       <div class="brand-name">Connexion Two</div>
     </a>
+
+    <button class="hamburger" type="button" id="hamburgerBtn" aria-label="Open menu" aria-expanded="false">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+
+    <nav class="mobile-nav" id="mobileNav" aria-label="Mobile navigation">
+      <a href="/agreements">Agreements</a>
+      <a href="/templates">Templates</a>
+      <button type="button" id="mobileCreateTemplateBtn">New Template</button>
+      <button type="button" class="mobile-upgrade" id="mobileUpgradeBtn">Upgrade</button>
+    </nav>
+
     <nav class="nav-tabs" aria-label="Main navigation">
-      <a href="/document-creation">Agreements</a>
+      <a href="/agreements">Agreements</a>
       <a href="/templates" class="active">Templates</a>
     </nav>
     <div class="top-actions">
@@ -234,6 +390,30 @@ document.getElementById('emptyCreateBtn').addEventListener('click', startCreateT
 document.getElementById('templateFileInput').addEventListener('change', async e => { const file = e.target.files[0]; e.target.value=''; if(file) await createTemplateFromFile(file); });
 document.getElementById('searchInput').addEventListener('input', renderTemplates);
 document.getElementById('clearSearch').addEventListener('click', () => { document.getElementById('searchInput').value=''; renderTemplates(); });
+
+const hamburgerBtn = document.getElementById('hamburgerBtn');
+const mobileNav = document.getElementById('mobileNav');
+hamburgerBtn?.addEventListener('click', () => {
+  const isOpen = mobileNav.classList.toggle('open');
+  hamburgerBtn.classList.toggle('open', isOpen);
+  hamburgerBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+});
+mobileNav?.querySelectorAll('a').forEach(link => {
+  link.addEventListener('click', () => {
+    mobileNav.classList.remove('open');
+    hamburgerBtn.classList.remove('open');
+    hamburgerBtn.setAttribute('aria-expanded', 'false');
+  });
+});
+document.getElementById('mobileCreateTemplateBtn')?.addEventListener('click', () => {
+  mobileNav.classList.remove('open');
+  hamburgerBtn.classList.remove('open');
+  hamburgerBtn.setAttribute('aria-expanded', 'false');
+  startCreateTemplate();
+});
+document.getElementById('mobileUpgradeBtn')?.addEventListener('click', () => {
+  window.location.href = '/plans';
+});
 
 // Auth lives in another project — load directly with the anon key.
 loadTemplates();
