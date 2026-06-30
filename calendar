@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connexion Two | Book a Call</title>
+
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,800,900&display=swap" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --navy: #0a1628;
+      --navy2: #0f1f3d;
+      --navy3: #162444;
+      --blue: #2563eb;
+      --blue-light: #3b82f6;
+      --blue-glow: rgba(37, 99, 235, 0.2);
+      --blue-circle: rgba(59, 130, 246, 0.18);
+      --blue-circle-border: rgba(59, 130, 246, 0.55);
+      --green: #16a34a;
+      --red: #ef4444;
+      --text: #e2e8f0;
+      --text-sub: #94a3b8;
+      --text-dim: #64748b;
+      --border: rgba(255, 255, 255, 0.08);
+      --white: #ffffff;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: 'Satoshi', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top center, rgba(59, 130, 246, 0.18), transparent 35%),
+        linear-gradient(135deg, #07111f, var(--navy) 45%, #10254a);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page {
+      min-height: 100vh;
+      padding: 48px 20px;
+      display: grid;
+      place-items: center;
+    }
+
+    .shell {
+      width: min(1120px, 100%);
+      display: grid;
+      grid-template-columns: 1fr 440px;
+      gap: 56px;
+      align-items: center;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+      color: var(--white);
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--blue), var(--blue-light));
+      color: var(--white);
+      font-weight: 900;
+      letter-spacing: -0.06em;
+      box-shadow: 0 16px 36px rgba(37, 99, 235, 0.25);
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.1;
+    }
+
+    .brand-text strong {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--white);
+    }
+
+    .brand-text span {
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    .hero-label {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--blue-light);
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: clamp(38px, 6vw, 62px);
+      font-weight: 900;
+      line-height: 1.02;
+      letter-spacing: -2.5px;
+      color: var(--white);
+      margin-bottom: 24px;
+    }
+
+    h1 em {
+      font-style: normal;
+      color: var(--blue-light);
+    }
+
+    .hero-sub {
+      max-width: 580px;
+      color: var(--text-sub);
+      font-size: 18px;
+      line-height: 1.75;
+      margin-bottom: 32px;
+    }
+
+    .trust-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .trust-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--text-sub);
+      font-weight: 500;
+    }
+
+    .trust-check {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: rgba(22, 163, 74, 0.15);
+      border: 1px solid rgba(22, 163, 74, 0.3);
+      color: var(--green);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .booking-card {
+      background: rgba(15, 31, 61, 0.92);
+      border: 1px solid rgba(59, 130, 246, 0.22);
+      border-radius: 18px;
+      padding: 32px 28px;
+      box-shadow:
+        0 0 60px rgba(37, 99, 235, 0.12),
+        0 24px 48px rgba(0, 0, 0, 0.42);
+      backdrop-filter: blur(14px);
+    }
+
+    .card-headline {
+      font-size: 19px;
+      font-weight: 800;
+      color: var(--white);
+      margin-bottom: 7px;
+      letter-spacing: -0.35px;
+    }
+
+    .card-sub {
+      font-size: 14px;
+      color: var(--text-sub);
+      margin-bottom: 22px;
+      line-height: 1.65;
+    }
+
+    .step-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 22px;
+    }
+
+    .step-dot {
+      flex: 1;
+      height: 4px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      transition: background 0.3s;
+    }
+
+    .step-dot.active {
+      background: var(--blue);
+    }
+
+    .step-dot.done {
+      background: var(--green);
+    }
+
+    .step-panel {
+      display: none;
+    }
+
+    .step-panel.active {
+      display: block;
+    }
+
+    .step-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 14px;
+    }
+
+    .cal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .cal-month {
+      flex: 1;
+      text-align: center;
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--white);
+    }
+
+    .month-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      font-size: 20px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .month-btn:hover {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: var(--white);
+    }
+
+    .month-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+
+    .cal-dow {
+      text-align: center;
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      padding: 4px 0;
+    }
+
+    .cal-day {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: var(--text-dim);
+      border-radius: 50%;
+      border: 1px solid transparent;
+      cursor: default;
+      transition: all 0.15s;
+    }
+
+    .cal-day.available {
+      color: var(--white);
+      background: var(--blue-circle);
+      border-color: var(--blue-circle-border);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .cal-day.available:hover {
+      background: var(--blue);
+      border-color: var(--blue);
+    }
+
+    .cal-day.selected {
+      background: var(--blue);
+      color: var(--white);
+      border-color: var(--blue);
+    }
+
+    .cal-day.closed {
+      opacity: 0.22;
+    }
+
+    .cal-day.empty {
+      cursor: default;
+    }
+
+    .selected-summary {
+      font-size: 13px;
+      color: var(--blue-light);
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    .form-field {
+      margin-bottom: 14px;
+    }
+
+    .form-field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 6px;
+    }
+
+    .form-field input,
+    .form-field select,
+    .form-field textarea {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px 13px;
+      color: var(--white);
+      font-family: 'Satoshi', sans-serif;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-field input:focus,
+    .form-field select:focus,
+    .form-field textarea:focus {
+      border-color: var(--blue-light);
+      box-shadow: 0 0 0 3px var(--blue-glow);
+    }
+
+    .form-field select option {
+      background: #0f1f3d;
+      color: var(--white);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .time-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      max-height: 250px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .time-slot {
+      padding: 10px 6px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+
+    .time-slot:hover {
+      border-color: var(--blue-light);
+    }
+
+    .time-slot.selected {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: var(--white);
+    }
+
+    .time-slot.taken {
+      opacity: 0.35;
+      cursor: not-allowed;
+      text-decoration: line-through;
+    }
+
+    .time-empty {
+      grid-column: 1 / -1;
+      font-size: 13px;
+      color: var(--text-dim);
+      padding: 14px 0;
+      text-align: center;
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: var(--blue);
+      color: var(--white);
+      border: none;
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      margin-top: 8px;
+    }
+
+    .btn-primary:hover {
+      background: var(--blue-light);
+    }
+
+    .btn-primary:active {
+      transform: scale(0.99);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .btn-back {
+      background: none;
+      border: none;
+      color: var(--text-sub);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 8px 0;
+      margin-top: 8px;
+    }
+
+    .btn-back:hover {
+      color: var(--white);
+    }
+
+    .card-note {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 14px;
+    }
+
+    .card-note span {
+      color: var(--green);
+    }
+
+    .success-state {
+      display: none;
+      text-align: center;
+      padding: 24px 0;
+    }
+
+    .success-icon-box {
+      width: 52px;
+      height: 52px;
+      background: rgba(22, 163, 74, 0.12);
+      border: 1px solid rgba(22, 163, 74, 0.25);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 18px;
+      font-size: 20px;
+      color: var(--green);
+    }
+
+    .success-state h3 {
+      font-size: 21px;
+      font-weight: 800;
+      color: var(--white);
+      margin-bottom: 10px;
+    }
+
+    .success-state p {
+      font-size: 14px;
+      color: var(--text-sub);
+      line-height: 1.65;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      background: var(--navy2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      transform: translateY(80px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 9999;
+      max-width: 300px;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast.success {
+      border-color: rgba(22, 163, 74, 0.35);
+    }
+
+    .toast.error {
+      border-color: rgba(220, 38, 38, 0.35);
+    }
+
+    @media (max-width: 960px) {
+      .shell {
+        grid-template-columns: 1fr;
+        gap: 42px;
+      }
+
+      .booking-card {
+        width: min(520px, 100%);
+        margin: 0 auto;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .page {
+        padding: 32px 16px;
+      }
+
+      .booking-card {
+        padding: 26px 20px;
+      }
+
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+
+      .time-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      h1 {
+        letter-spacing: -1.8px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page">
+    <div class="shell">
+
+      <section>
+        <a href="https://www.connexiontwo.com/" class="brand" aria-label="Connexion Two home">
+          <div class="brand-mark">C2</div>
+          <div class="brand-text">
+            <strong>Connexion Two</strong>
+            <span>Sovereign Document Workflow System</span>
+          </div>
+        </a>
+
+        <div class="hero-label">Book a deployment call</div>
+
+        <h1>
+          Schedule a call<br>
+          in your <em>EU timezone</em>
+        </h1>
+
+        <p class="hero-sub">
+          Choose a Monday–Saturday appointment slot in your local EU timezone.
+          Your booking is saved in Supabase using UTC, so scheduling stays accurate across
+          EU countries and daylight saving time.
+        </p>
+
+        <div class="trust-list">
+          <div class="trust-item">
+            <div class="trust-check">✓</div>
+            Monday through Saturday availability
+          </div>
+          <div class="trust-item">
+            <div class="trust-check">✓</div>
+            EU timezone selector included
+          </div>
+          <div class="trust-item">
+            <div class="trust-check">✓</div>
+            Supabase appointment storage
+          </div>
+          <div class="trust-item">
+            <div class="trust-check">✓</div>
+            Make webhook confirmation trigger
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="booking-card">
+          <div id="c-flow">
+            <div class="card-headline">Book your Connexion Two call</div>
+            <div class="card-sub">
+              Select a date, choose your EU timezone, pick a time, and submit your details.
+            </div>
+
+            <div class="step-indicator">
+              <div class="step-dot active" id="c-dot-1"></div>
+              <div class="step-dot" id="c-dot-2"></div>
+              <div class="step-dot" id="c-dot-3"></div>
+            </div>
+
+            <div class="step-panel active" id="c-panel-1">
+              <div class="step-title">Select a date</div>
+
+              <div class="cal">
+                <div class="cal-head">
+                  <button type="button" class="month-btn" id="c-prev-month" aria-label="Previous month">‹</button>
+                  <div class="cal-month" id="c-cal-month"></div>
+                  <button type="button" class="month-btn" id="c-next-month" aria-label="Next month">›</button>
+                </div>
+
+                <div class="cal-grid" id="c-cal-grid"></div>
+              </div>
+            </div>
+
+            <div class="step-panel" id="c-panel-2">
+              <div class="selected-summary" id="c-sum-date"></div>
+
+              <div class="form-field">
+                <label>Timezone</label>
+                <select id="c-tz" onchange="CFLOW.tzChange()">
+                  <option value="Europe/Dublin">Ireland — Dublin</option>
+                  <option value="Europe/Lisbon">Portugal — Lisbon</option>
+                  <option value="Europe/Madrid">Spain — Madrid</option>
+                  <option value="Europe/Paris">France — Paris</option>
+                  <option value="Europe/Brussels">Belgium — Brussels</option>
+                  <option value="Europe/Amsterdam">Netherlands — Amsterdam</option>
+                  <option value="Europe/Berlin">Germany — Berlin</option>
+                  <option value="Europe/Rome">Italy — Rome</option>
+                  <option value="Europe/Vienna">Austria — Vienna</option>
+                  <option value="Europe/Prague">Czechia — Prague</option>
+                  <option value="Europe/Warsaw">Poland — Warsaw</option>
+                  <option value="Europe/Copenhagen">Denmark — Copenhagen</option>
+                  <option value="Europe/Stockholm">Sweden — Stockholm</option>
+                  <option value="Europe/Helsinki">Finland — Helsinki</option>
+                  <option value="Europe/Tallinn">Estonia — Tallinn</option>
+                  <option value="Europe/Riga">Latvia — Riga</option>
+                  <option value="Europe/Vilnius">Lithuania — Vilnius</option>
+                  <option value="Europe/Athens">Greece — Athens</option>
+                  <option value="Europe/Bucharest">Romania — Bucharest</option>
+                  <option value="Europe/Sofia">Bulgaria — Sofia</option>
+                  <option value="Europe/Zagreb">Croatia — Zagreb</option>
+                  <option value="Europe/Ljubljana">Slovenia — Ljubljana</option>
+                  <option value="Europe/Bratislava">Slovakia — Bratislava</option>
+                  <option value="Europe/Budapest">Hungary — Budapest</option>
+                  <option value="Europe/Malta">Malta</option>
+                  <option value="Europe/Nicosia">Cyprus — Nicosia</option>
+                </select>
+              </div>
+
+              <div class="step-title">Select a time</div>
+              <div class="time-grid" id="c-time-grid"></div>
+
+              <button type="button" class="btn-back" onclick="CFLOW.goto(1)">
+                ← Back to dates
+              </button>
+            </div>
+
+            <div class="step-panel" id="c-panel-3">
+              <div class="selected-summary" id="c-sum-full"></div>
+
+              <form id="c-form" onsubmit="CFLOW.submit(event)">
+                <div class="form-row">
+                  <div class="form-field">
+                    <label>Full Name <span style="color:#ef4444">*</span></label>
+                    <input type="text" id="c-name" placeholder="Your name" required />
+                  </div>
+
+                  <div class="form-field">
+                    <label>Organization <span style="color:#ef4444">*</span></label>
+                    <input type="text" id="c-biz" placeholder="Organization name" required />
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-field">
+                    <label>Phone <span style="color:#ef4444">*</span></label>
+                    <input type="tel" id="c-phone" placeholder="+33 6 00 00 00 00" required />
+                  </div>
+
+                  <div class="form-field">
+                    <label>Email <span style="color:#ef4444">*</span></label>
+                    <input type="email" id="c-email" placeholder="name@company.eu" required />
+                  </div>
+                </div>
+
+                <div class="form-field">
+                  <label>Anything we should know? Optional</label>
+                  <textarea id="c-notes" rows="3" placeholder="Current document workflow, signing needs, organization type..."></textarea>
+                </div>
+
+                <button type="submit" class="btn-primary" id="c-btn">
+                  Book My Call
+                </button>
+              </form>
+
+              <button type="button" class="btn-back" onclick="CFLOW.goto(2)">
+                ← Back to times
+              </button>
+            </div>
+
+            <p class="card-note">
+              <span>✓</span> No credit card required. Your selected timezone is saved with the booking.
+            </p>
+          </div>
+
+          <div class="success-state" id="c-success">
+            <div class="success-icon-box">✓</div>
+            <h3>You're on the calendar</h3>
+            <p>
+              Check your email for confirmation. Your appointment was saved using UTC
+              and your selected local timezone.
+            </p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+    const supabase = createClient(
+      "https://rfdvogakvyodixgpvqvz.supabase.co",
+      "sb_publishable_zJJjwZoMP0N9dod1KIxLEQ_h7hWDLuv"
+    );
+
+    const WEBHOOK_URL = "https://hook.us1.make.com/e3av1w86ovv5w89fs3hwq50aln33oq3c";
+
+    /*
+      EU booking settings:
+      - Monday through Saturday open
+      - Sunday closed
+      - Full calendar across the next 60 days
+      - Times are displayed in the user's selected EU timezone
+      - Supabase stores appointment_utc in UTC
+    */
+
+    const BOOKING_WINDOW_DAYS = 60;
+    const CLOSED_DAYS = [0]; // Sunday
+    const SLOT_START_HOUR = 9;
+    const SLOT_END_HOUR = 17;
+    const SLOT_INTERVAL_MINUTES = 15;
+
+    const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+    const MONTHS = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+
+    const EU_TIMEZONES = [
+      "Europe/Dublin",
+      "Europe/Lisbon",
+      "Europe/Madrid",
+      "Europe/Paris",
+      "Europe/Brussels",
+      "Europe/Amsterdam",
+      "Europe/Berlin",
+      "Europe/Rome",
+      "Europe/Vienna",
+      "Europe/Prague",
+      "Europe/Warsaw",
+      "Europe/Copenhagen",
+      "Europe/Stockholm",
+      "Europe/Helsinki",
+      "Europe/Tallinn",
+      "Europe/Riga",
+      "Europe/Vilnius",
+      "Europe/Athens",
+      "Europe/Bucharest",
+      "Europe/Sofia",
+      "Europe/Zagreb",
+      "Europe/Ljubljana",
+      "Europe/Bratislava",
+      "Europe/Budapest",
+      "Europe/Malta",
+      "Europe/Nicosia"
+    ];
+
+    const ALL_SLOTS = [];
+
+    for (let h = SLOT_START_HOUR; h <= SLOT_END_HOUR; h++) {
+      for (let m = 0; m < 60; m += SLOT_INTERVAL_MINUTES) {
+        if (h === SLOT_END_HOUR && m > 0) break;
+
+        const hh = String(h).padStart(2, "0");
+        const mm = String(m).padStart(2, "0");
+
+        const label = `${((h % 12) || 12)}:${mm} ${h < 12 ? "AM" : "PM"}`;
+
+        ALL_SLOTS.push({
+          label,
+          value: `${hh}:${mm}`
+        });
+      }
+    }
+
+    function detectTz() {
+      try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone;
+      } catch {
+        return "Europe/Paris";
+      }
+    }
+
+    function fmtDate(d) {
+      return (
+        d.getFullYear() +
+        "-" +
+        String(d.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(d.getDate()).padStart(2, "0")
+      );
+    }
+
+    function prettyDate(ds) {
+      const d = new Date(`${ds}T12:00:00`);
+      return DOW[d.getDay()] + ", " + MONTHS[d.getMonth()] + " " + d.getDate();
+    }
+
+    function timezoneLabel(tz) {
+      return tz.replace("Europe/", "").replace("_", " ");
+    }
+
+    /*
+      Converts a date/time selected in the user's chosen timezone into UTC.
+      This is what gets stored in Supabase.
+    */
+    function localToUtc(dateStr, timeStr, tz) {
+      const localDt = new Date(`${dateStr}T${timeStr}:00`);
+
+      const tzDate = new Date(
+        localDt.toLocaleString("en-US", {
+          timeZone: tz
+        })
+      );
+
+      return new Date(localDt.getTime() + (localDt - tzDate)).toISOString();
+    }
+
+    function utcToLocalSlot(utcStr, tz) {
+      const d = new Date(utcStr);
+
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      }).formatToParts(d);
+
+      const hh = parts.find(p => p.type === "hour").value;
+      const mm = parts.find(p => p.type === "minute").value;
+
+      return `${hh.padStart(2, "0")}:${mm}`;
+    }
+
+    /*
+      A 30-minute appointment blocks:
+      - selected 15-minute slot
+      - the next 15-minute slot
+    */
+    function slotsCovered(hhmm) {
+      const [h, m] = hhmm.split(":").map(Number);
+      const out = [hhmm];
+
+      let nm = m + 15;
+      let nh = h;
+
+      if (nm >= 60) {
+        nm -= 60;
+        nh += 1;
+      }
+
+      out.push(
+        String(nh).padStart(2, "0") +
+        ":" +
+        String(nm).padStart(2, "0")
+      );
+
+      return out;
+    }
+
+    function showToast(msg, type = "success") {
+      const t = document.getElementById("toast");
+
+      t.textContent = msg;
+      t.className = `toast ${type} show`;
+
+      setTimeout(() => {
+        t.className = "toast";
+      }, 4500);
+    }
+
+    function availableDays() {
+      const days = [];
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      for (let i = 0; i < BOOKING_WINDOW_DAYS; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+
+        if (!CLOSED_DAYS.includes(d.getDay())) {
+          days.push(new Date(d));
+        }
+      }
+
+      return days;
+    }
+
+    async function bookAppointment({
+      name,
+      clientName,
+      phone,
+      email,
+      date,
+      time,
+      tz,
+      notes
+    }) {
+      const appointmentUtc = localToUtc(date, time, tz);
+
+      const payload = {
+        name,
+        client_name: clientName,
+        phone,
+        email,
+        notes: notes || null,
+        appointment_utc: appointmentUtc,
+        timezone: tz
+      };
+
+      const { data, error } = await supabase
+        .from("appointments")
+        .insert([payload])
+        .select();
+
+      if (error) throw error;
+
+      const apptId = data && data[0] ? data[0].id : null;
+
+      fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "created",
+          ...payload,
+          appointment_id: apptId
+        })
+      }).catch(err => console.warn("Webhook failed:", err));
+
+      return data;
+    }
+
+    function makeFlow(prefix) {
+      const allowed = availableDays();
+      const allowedSet = new Set(allowed.map(fmtDate));
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const minMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const maxDay = new Date(today);
+      maxDay.setDate(today.getDate() + BOOKING_WINDOW_DAYS - 1);
+      const maxMonth = new Date(maxDay.getFullYear(), maxDay.getMonth(), 1);
+
+      const state = {
+        date: null,
+        time: null,
+        viewYear: today.getFullYear(),
+        viewMonth: today.getMonth()
+      };
+
+      function el(id) {
+        return document.getElementById(`${prefix}-${id}`);
+      }
+
+      function monthIndex(year, month) {
+        return year * 12 + month;
+      }
+
+      function updateMonthButtons() {
+        const current = monthIndex(state.viewYear, state.viewMonth);
+        const min = monthIndex(minMonth.getFullYear(), minMonth.getMonth());
+        const max = monthIndex(maxMonth.getFullYear(), maxMonth.getMonth());
+
+        el("prev-month").disabled = current <= min;
+        el("next-month").disabled = current >= max;
+      }
+
+      function changeMonth(delta) {
+        state.viewMonth += delta;
+
+        if (state.viewMonth < 0) {
+          state.viewMonth = 11;
+          state.viewYear -= 1;
+        }
+
+        if (state.viewMonth > 11) {
+          state.viewMonth = 0;
+          state.viewYear += 1;
+        }
+
+        renderCal();
+      }
+
+      function renderCal() {
+        el("cal-month").textContent =
+          MONTHS[state.viewMonth] + " " + state.viewYear;
+
+        const grid = el("cal-grid");
+        grid.innerHTML = "";
+
+        for (const d of DOW) {
+          const h = document.createElement("div");
+          h.className = "cal-dow";
+          h.textContent = d;
+          grid.appendChild(h);
+        }
+
+        const monthStart = new Date(state.viewYear, state.viewMonth, 1);
+        const startPad = monthStart.getDay();
+        const daysInMonth = new Date(state.viewYear, state.viewMonth + 1, 0).getDate();
+
+        for (let i = 0; i < startPad; i++) {
+          const empty = document.createElement("div");
+          empty.className = "cal-day empty";
+          grid.appendChild(empty);
+        }
+
+        for (let day = 1; day <= daysInMonth; day++) {
+          const dObj = new Date(state.viewYear, state.viewMonth, day);
+          const ds = fmtDate(dObj);
+
+          const cell = document.createElement("div");
+          cell.className = "cal-day";
+          cell.textContent = day;
+
+          if (dObj.getDay() === 0) {
+            cell.classList.add("closed");
+          }
+
+          if (allowedSet.has(ds)) {
+            cell.classList.add("available");
+
+            if (state.date === ds) {
+              cell.classList.add("selected");
+            }
+
+            cell.onclick = () => selectDate(ds);
+          }
+
+          grid.appendChild(cell);
+        }
+
+        updateMonthButtons();
+      }
+
+      async function selectDate(ds) {
+        state.date = ds;
+        state.time = null;
+
+        renderCal();
+
+        el("sum-date").textContent = prettyDate(ds);
+
+        goto(2);
+
+        await loadTimes(ds);
+      }
+
+      async function loadTimes(ds) {
+        const tz = el("tz").value;
+        const grid = el("time-grid");
+
+        grid.innerHTML = '<div class="time-empty">Checking availability...</div>';
+
+        let blocked = new Set();
+
+        try {
+          const dayStart = localToUtc(ds, "00:00", tz);
+          const dayEnd = localToUtc(ds, "23:59", tz);
+
+          const { data: booked, error } = await supabase
+            .from("appointments")
+            .select("appointment_utc")
+            .gte("appointment_utc", dayStart)
+            .lte("appointment_utc", dayEnd);
+
+          if (error) throw error;
+
+          for (const a of booked || []) {
+            const start = utcToLocalSlot(a.appointment_utc, tz);
+
+            for (const s of slotsCovered(start)) {
+              blocked.add(s);
+            }
+          }
+        } catch (err) {
+          console.error("Availability failed:", err);
+        }
+
+        grid.innerHTML = "";
+
+        let any = false;
+
+        for (const slot of ALL_SLOTS) {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "time-slot";
+          b.textContent = slot.label;
+
+          if (blocked.has(slot.value)) {
+            b.classList.add("taken");
+            b.disabled = true;
+          } else {
+            any = true;
+
+            b.onclick = () => selectTime(slot);
+
+            if (state.time === slot.value) {
+              b.classList.add("selected");
+            }
+          }
+
+          grid.appendChild(b);
+        }
+
+        if (!any) {
+          grid.innerHTML = '<div class="time-empty">No availability on this date.</div>';
+        }
+      }
+
+      function selectTime(slot) {
+        state.time = slot.value;
+
+        el("sum-full").textContent =
+          prettyDate(state.date) +
+          " at " +
+          slot.label +
+          " (" +
+          timezoneLabel(el("tz").value) +
+          ")";
+
+        goto(3);
+      }
+
+      function goto(step) {
+        for (let i = 1; i <= 3; i++) {
+          el("panel-" + i).classList.toggle("active", i === step);
+
+          const dot = el("dot-" + i);
+
+          dot.classList.toggle("active", i === step);
+          dot.classList.toggle("done", i < step);
+        }
+      }
+
+      function tzChange() {
+        if (state.date) {
+          loadTimes(state.date);
+        }
+      }
+
+      async function submit(e) {
+        e.preventDefault();
+
+        const btn = el("btn");
+
+        if (!state.date || !state.time) {
+          showToast("Please select a date and time first.", "error");
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = "Booking...";
+
+        try {
+          const organization = el("biz").value.trim();
+          const clientName = el("name").value.trim();
+
+          await bookAppointment({
+            name: `Connexion Two Call — ${organization}`,
+            clientName,
+            phone: el("phone").value.trim(),
+            email: el("email").value.trim(),
+            date: state.date,
+            time: state.time,
+            tz: el("tz").value,
+            notes: el("notes").value.trim()
+          });
+
+          el("flow").style.display = "none";
+          el("success").style.display = "block";
+
+          showToast("Booked. Check your email for confirmation.", "success");
+        } catch (err) {
+          console.error(err);
+
+          showToast("Something went wrong. Please try again.", "error");
+
+          btn.disabled = false;
+          btn.textContent = "Book My Call";
+        }
+      }
+
+      function setDefaultTimezone() {
+        const detected = detectTz();
+        const sel = el("tz");
+
+        if (EU_TIMEZONES.includes(detected)) {
+          sel.value = detected;
+        } else {
+          sel.value = "Europe/Paris";
+        }
+      }
+
+      el("prev-month").onclick = () => changeMonth(-1);
+      el("next-month").onclick = () => changeMonth(1);
+
+      setDefaultTimezone();
+      renderCal();
+
+      return {
+        goto,
+        tzChange,
+        submit
+      };
+    }
+
+    window.CFLOW = makeFlow("c");
+  </script>
+</body>
+</html>
