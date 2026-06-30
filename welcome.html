@@ -228,6 +228,107 @@
 
     .mobile-menu { display: none; }
 
+    /* Mobile hamburger navigation */
+    .hamburger-btn {
+      width: 44px;
+      height: 44px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--blue-800);
+      border-radius: 10px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 5px;
+      box-shadow: 0 10px 22px rgba(6, 26, 58, 0.06);
+    }
+    .hamburger-btn span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: var(--blue-900);
+      border-radius: 999px;
+      transition: 0.22s ease;
+    }
+    .hamburger-btn.active span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .hamburger-btn.active span:nth-child(2) { opacity: 0; }
+    .hamburger-btn.active span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+    .mobile-nav-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 26, 58, 0.38);
+      z-index: 740;
+      opacity: 0;
+      pointer-events: none;
+      transition: 0.18s ease;
+    }
+    .mobile-nav-overlay.open { opacity: 1; pointer-events: auto; }
+    .mobile-nav-drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(86vw, 360px);
+      height: 100vh;
+      background: #fff;
+      border-left: 1px solid var(--line);
+      box-shadow: -30px 0 80px rgba(6, 26, 58, 0.18);
+      z-index: 760;
+      transform: translateX(105%);
+      transition: 0.22s ease;
+      display: flex;
+      flex-direction: column;
+    }
+    .mobile-nav-drawer.open { transform: translateX(0); }
+    .mobile-nav-head {
+      min-height: 86px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--line);
+    }
+    .mobile-nav-title { color: var(--blue-900); font-weight: 950; letter-spacing: -0.02em; }
+    .mobile-nav-close {
+      min-width: 44px;
+      height: 44px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--blue-800);
+      cursor: pointer;
+      font-weight: 950;
+    }
+    .mobile-nav-links {
+      display: grid;
+      gap: 10px;
+      padding: 20px;
+    }
+    .mobile-nav-links a, .mobile-nav-links button {
+      min-height: 48px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--blue-900);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      font-weight: 900;
+      cursor: pointer;
+      font-family: inherit;
+      text-align: left;
+    }
+    .mobile-nav-links a:hover, .mobile-nav-links button:hover { background: var(--blue-050); border-color: #aac8ef; }
+    .mobile-nav-links .mobile-pay-link { background: var(--blue-700); color: #fff; border-color: var(--blue-700); justify-content: center; }
+    .mobile-nav-note { padding: 0 20px 20px; color: var(--muted); font-size: 0.84rem; line-height: 1.5; }
+
+    .mobile-locked-note { display: none; }
+
     @media (max-width: 1120px) {
       .top-nav { grid-template-columns: auto 1fr auto; }
       .nav-tabs a { padding: 0 14px; font-size: 0.92rem; }
@@ -237,16 +338,34 @@
     @media (max-width: 780px) {
       .top-nav { height: auto; min-height: 76px; grid-template-columns: 1fr auto; padding: 12px 16px; }
       .nav-tabs { display: none; }
-      .trial-left, .buy-btn { display: none; }
-      .avatar { width: 42px; height: 42px; }
-      .mobile-menu { display: grid; }
-      .system-strip { justify-content: flex-start; }
+      .trial-left, .buy-btn, #openSidebar, #signout, .avatar { display: none; }
+      .hamburger-btn.mobile-menu { display: inline-flex; }
+      .system-strip { justify-content: flex-start; align-items: flex-start; }
       .hero-panel { padding: 44px 16px 52px; }
       .main-actions { flex-direction: column; align-items: stretch; }
       .primary-action, .outline-action { width: 100%; }
-      .workspace { padding: 22px 16px 42px; }
+      .workspace { padding: 22px 16px 42px; grid-template-columns: 1fr; }
       .cmdbar { align-items: stretch; }
       .search, .search input { width: 100%; max-width: 100%; }
+      .side-stack { display: none; }
+      .panel { border-radius: 12px; }
+      .docs-body { padding: 18px; }
+      .grid { grid-template-columns: 1fr; }
+      .file { cursor: default; }
+      .file:hover { transform: none; }
+      .fdel { opacity: 1; }
+      .mobile-locked-note {
+        display: block;
+        margin: 12px 0 16px;
+        background: var(--blue-050);
+        border: 1px solid #bcd3ef;
+        color: var(--blue-900);
+        padding: 12px 14px;
+        border-radius: 12px;
+        font-size: 0.88rem;
+        line-height: 1.45;
+        font-weight: 750;
+      }
     }
 
     /* Billing plan modal */
@@ -404,9 +523,32 @@
         <button class="icon-btn" type="button" id="openSidebar" aria-label="Open workspace menu">Menu</button>
         <button class="icon-btn" type="button" id="signout" aria-label="Sign out">Sign out</button>
         <div class="avatar">AP</div>
-        <button class="icon-btn mobile-menu" type="button" id="openMobileSidebar" aria-label="Open workspace menu">Menu</button>
+        <button class="hamburger-btn mobile-menu" type="button" id="openMobileNav" aria-label="Open mobile menu" aria-expanded="false"><span></span><span></span><span></span></button>
       </div>
     </header>
+
+    <div class="mobile-nav-overlay" id="mobileNavOverlay"></div>
+    <nav class="mobile-nav-drawer" id="mobileNavDrawer" aria-label="Mobile navigation" aria-hidden="true">
+      <div class="mobile-nav-head">
+        <div class="sidebar-brand-row">
+          <div class="c2-logo sidebar-logo" aria-hidden="true">C2</div>
+          <div>
+            <div class="mobile-nav-title">Connexion Two</div>
+            <div class="brand-sub">Document OS</div>
+          </div>
+        </div>
+        <button class="mobile-nav-close" type="button" id="closeMobileNav" aria-label="Close mobile menu">Close</button>
+      </div>
+      <div class="mobile-nav-links">
+        <a href="/welcome">Home <span>›</span></a>
+        <a href="agreements">Agreements <span>›</span></a>
+        <a href="/templates">Templates <span>›</span></a>
+        <a href="/plans">Plans <span>›</span></a>
+        <a href="https://buy.stripe.com/cNi00ieLedtedDL24vafS02" class="mobile-pay-link">Upgrade for €15/month</a>
+        <button type="button" id="mobileSignout">Sign out <span>›</span></button>
+      </div>
+      <div class="mobile-nav-note">Document editing is locked on mobile so your files do not open in the browser editor by accident. Use desktop to create and edit DOCX, XLSX, and PPTX files.</div>
+    </nav>
 
     <div class="system-strip">
       <span class="info-dot">i</span>
@@ -449,6 +591,8 @@
               <div class="search"><input type="text" id="search" placeholder="Search documents"></div>
             </div>
 
+            <div class="mobile-locked-note">Mobile view is read-only for the document library. To open, edit, or create files in the browser editor, use desktop.</div>
+
             <div class="sec-head"><h2>Files</h2><span class="count" id="count"></span></div>
             <div id="fileList"><div class="loading">Loading…</div></div>
           </div>
@@ -477,16 +621,16 @@
       <button class="billing-close" type="button" id="billingClose" aria-label="Close billing plan modal">×</button>
       <div class="billing-modal-head">
         <div>
-          <h2 id="billingTitle">Your trial ends in 14 days</h2>
+          <h2 id="billingTitle">Your trial ends in 7 days</h2>
           <div class="billing-subtitle">Choose your Connexion Two plan</div>
         </div>
 
         <div class="billing-save-card">
-          <div class="billing-save-top">You’re saving up to 33%</div>
+          <div class="billing-save-top">Start for €15/month</div>
           <div class="billing-select-box">
             <div>
               <div class="billing-select-label">Subscription type</div>
-              <div class="billing-select-value">Annual | Billed monthly</div>
+              <div class="billing-select-value">Monthly subscription</div>
             </div>
             <span class="billing-chevron" aria-hidden="true"></span>
           </div>
@@ -498,10 +642,10 @@
           <div class="billing-radio" aria-hidden="true"></div>
           <div class="billing-recommended">Recommended</div>
           <div class="billing-plan-title">Standard</div>
-          <div class="billing-price"><strong>$30</strong><span>/user/month</span></div>
-          <div class="billing-billing-line">Annual | Billed monthly</div>
-          <div class="billing-small">This is an annual commitment of $360.</div>
-          <div class="billing-small">Additional tax may apply.</div>
+          <div class="billing-price"><strong>€15</strong><span>/month</span></div>
+          <div class="billing-billing-line">Monthly subscription</div>
+          <div class="billing-small">Start with your trial, then continue for €15/month.</div>
+          <div class="billing-small">Cancel anytime from your account settings.</div>
 
           <div class="billing-feature-title">Key features:</div>
           <ul class="billing-features">
@@ -526,6 +670,7 @@
     const BUCKET = 'documents';
     const LOGIN_URL = 'https://www.connexiontwo.com/';
     const WELCOME_URL = 'https://www.connexiontwo.com/welcome';
+    const PAY_LINK = 'https://buy.stripe.com/cNi00ieLedtedDL24vafS02';
     const TEMPLATES = { docx: 'blank.docx', xlsx: 'blank.xlsx', pptx: 'blank.pptx' };
     const sb = supabase.createClient(SB_URL, SB_KEY);
     let editor = null;
@@ -554,9 +699,9 @@
     buyNowBtn?.addEventListener('click', openBillingModal);
     billingClose?.addEventListener('click', closeBillingModal);
     billingOverlay?.addEventListener('click', (event) => { if(event.target === billingOverlay) closeBillingModal(); });
-    billingNextBtn?.addEventListener('click', () => { window.location.href = '/pay-now'; });
+    billingNextBtn?.addEventListener('click', () => { window.location.href = PAY_LINK; });
     viewPlansBtn?.addEventListener('click', () => { window.location.href = '/plans'; });
-    document.addEventListener('keydown', (event) => { if(event.key === 'Escape') closeBillingModal(); });
+    document.addEventListener('keydown', (event) => { if(event.key === 'Escape') { closeBillingModal(); if(typeof hideMobileNav === 'function') hideMobileNav(); } });
 
     function userPath(name){ return userId + '/' + name; }
 
@@ -663,6 +808,10 @@
 
     // Open a file in the in-browser editor (OnlyOffice via docs.bisondoc.com).
     async function openDoc(name){
+      if(window.innerWidth <= 780){
+        alert('Document editing is locked on mobile. Please use desktop to open and edit files.');
+        return;
+      }
       screen.classList.add('open');
       const { data:{ session } } = await sb.auth.getSession();
       if(!session){ window.location.replace(LOGIN_URL); return; }
@@ -698,6 +847,7 @@
     // Create a new DOCX / XLSX / PPTX: copies a blank template into the user's
     // private storage (saved to the database) then opens it in the editor.
     async function createNew(type){
+      if(window.innerWidth <= 780){ alert('Document creation is locked on mobile. Please use desktop to create DOCX, XLSX, or PPTX files.'); return; }
       let name = prompt('Name your new file:', 'Untitled');
       if(!name) return;
       name = name.replace(/[^a-zA-Z0-9 _-]/g,'').trim();
@@ -716,7 +866,7 @@
       mi.addEventListener('click', ()=>{ newMenu.classList.remove('open'); createNew(mi.dataset.type); });
     });
 
-    function triggerUpload(){ document.getElementById('fileInput').click(); }
+    function triggerUpload(){ if(window.innerWidth <= 780){ alert('Uploading and opening files is locked on mobile. Please use desktop.'); return; } document.getElementById('fileInput').click(); }
     document.getElementById('uploadBtn').addEventListener('click', triggerUpload);
 
     document.getElementById('fileInput').addEventListener('change', async (e)=>{
@@ -741,16 +891,44 @@
     const leftSidebar = document.getElementById('leftSidebar');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
     const openSidebar = document.getElementById('openSidebar');
-    const openMobileSidebar = document.getElementById('openMobileSidebar');
     const closeSidebar = document.getElementById('closeSidebar');
+    const openMobileNav = document.getElementById('openMobileNav');
+    const mobileNavDrawer = document.getElementById('mobileNavDrawer');
+    const mobileNavOverlay = document.getElementById('mobileNavOverlay');
+    const closeMobileNav = document.getElementById('closeMobileNav');
+    const mobileSignout = document.getElementById('mobileSignout');
 
-    function showSidebar(){ leftSidebar.classList.add('open'); sidebarOverlay.classList.add('open'); }
+    function showSidebar(){
+      if(window.innerWidth <= 780){ return; }
+      leftSidebar.classList.add('open'); sidebarOverlay.classList.add('open');
+    }
     function hideSidebar(){ leftSidebar.classList.remove('open'); sidebarOverlay.classList.remove('open'); }
 
+    function showMobileNav(){
+      mobileNavDrawer.classList.add('open');
+      mobileNavOverlay.classList.add('open');
+      mobileNavDrawer.setAttribute('aria-hidden', 'false');
+      openMobileNav.classList.add('active');
+      openMobileNav.setAttribute('aria-expanded', 'true');
+      document.body.style.overflow = 'hidden';
+    }
+    function hideMobileNav(){
+      mobileNavDrawer.classList.remove('open');
+      mobileNavOverlay.classList.remove('open');
+      mobileNavDrawer.setAttribute('aria-hidden', 'true');
+      openMobileNav.classList.remove('active');
+      openMobileNav.setAttribute('aria-expanded', 'false');
+      document.body.style.overflow = '';
+    }
+
     openSidebar.addEventListener('click', showSidebar);
-    openMobileSidebar.addEventListener('click', showSidebar);
     closeSidebar.addEventListener('click', hideSidebar);
     sidebarOverlay.addEventListener('click', hideSidebar);
+    openMobileNav.addEventListener('click', () => mobileNavDrawer.classList.contains('open') ? hideMobileNav() : showMobileNav());
+    closeMobileNav.addEventListener('click', hideMobileNav);
+    mobileNavOverlay.addEventListener('click', hideMobileNav);
+    mobileNavDrawer.querySelectorAll('a').forEach(link => link.addEventListener('click', hideMobileNav));
+    mobileSignout.addEventListener('click', async () => { await sb.auth.signOut(); window.location.replace(LOGIN_URL); });
 
     document.querySelectorAll('[data-sidebar-tab]').forEach(tab => {
       tab.addEventListener('click', () => {
