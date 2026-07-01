@@ -4,765 +4,249 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Connexion Two | Plans</title>
-
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <style>
     :root {
-      --bg-1: #020817;
-      --bg-2: #071a33;
-      --bg-3: #0b2f5b;
-      --card: rgba(255, 255, 255, 0.07);
-      --card-strong: rgba(255, 255, 255, 0.11);
-      --border: rgba(148, 163, 184, 0.22);
-      --border-strong: rgba(56, 189, 248, 0.85);
-      --text: #f8fafc;
-      --muted: rgba(226, 232, 240, 0.76);
-      --soft: rgba(203, 213, 225, 0.58);
-      --accent: #38bdf8;
-      --accent-2: #0ea5e9;
-      --accent-3: #22c55e;
-      --dark: #020617;
-      --navy: #061a3a;
-      --steel: #94a3b8;
+      --blue-950: #041124;
+      --blue-900: #061a3a;
+      --blue-800: #082b61;
+      --blue-700: #0054d1;
+      --blue-600: #0068ff;
+      --blue-500: #1683ff;
+      --blue-100: #eaf3ff;
+      --blue-050: #f5f9ff;
+      --text: #111827;
+      --muted: #5f6b7a;
+      --line: #d9e2ef;
+      --panel: #ffffff;
+      --bg: #f7f9fc;
+      --success: #0f9f6e;
+      --shadow: 0 22px 70px rgba(6, 26, 58, 0.10);
+      --max: 1180px;
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    html {
-      scroll-behavior: smooth;
-    }
-
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
     body {
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       min-height: 100vh;
+      background: var(--bg);
       color: var(--text);
+      font-family: Inter, Arial, Helvetica, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.6;
+    }
+    a { color: inherit; text-decoration: none; }
+
+    .page {
       background:
-        radial-gradient(circle at top center, rgba(56, 189, 248, 0.18), transparent 34%),
-        radial-gradient(circle at left center, rgba(14, 165, 233, 0.16), transparent 28%),
-        radial-gradient(circle at right bottom, rgba(34, 197, 94, 0.1), transparent 30%),
-        linear-gradient(135deg, var(--bg-1), var(--bg-2) 48%, var(--bg-3));
-      overflow-x: hidden;
-    }
-
-    .pricing-page {
-      position: relative;
+        radial-gradient(circle at 88% 5%, rgba(0, 104, 255, 0.16), transparent 25%),
+        radial-gradient(circle at 10% 0%, rgba(22, 131, 255, 0.12), transparent 22%),
+        linear-gradient(180deg, #ffffff 0%, #f7f9fc 42%, #ffffff 100%);
+      overflow: hidden;
       min-height: 100vh;
-      padding: 64px 24px 56px;
-      isolation: isolate;
     }
 
-    .pricing-page::before,
-    .pricing-page::after {
-      content: "";
-      position: absolute;
-      width: 520px;
-      height: 520px;
-      border-radius: 999px;
-      filter: blur(90px);
-      z-index: -1;
-    }
+    .container { width: min(94%, var(--max)); margin: 0 auto; }
 
-    .pricing-page::before {
-      top: 120px;
-      left: -220px;
-      background: rgba(56, 189, 248, 0.14);
+    .trial-bar {
+      background: linear-gradient(90deg, var(--blue-900), var(--blue-700));
+      color: #ffffff;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
     }
-
-    .pricing-page::after {
-      right: -240px;
-      bottom: 80px;
-      background: rgba(34, 197, 94, 0.1);
+    .trial-bar-inner {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      text-align: center;
+      flex-wrap: wrap;
     }
+    .trial-bar .material-icons-round { font-size: 18px; opacity: 0.9; }
 
-    .container {
-      width: min(1200px, 100%);
-      margin: 0 auto;
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(255,255,255,0.88);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(14px);
     }
-
-    .top-bar {
+    .nav {
+      height: 76px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 18px;
-      margin-bottom: 56px;
-    }
-
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
-      color: #fff;
-      text-decoration: none;
-    }
-
-    .brand-mark {
-      width: 42px;
-      height: 42px;
-      display: grid;
-      place-items: center;
-      border-radius: 14px;
-      background: linear-gradient(135deg, #0ea5e9, #38bdf8);
-      color: #020617;
-      font-weight: 900;
-      letter-spacing: -0.06em;
-      box-shadow: 0 18px 42px rgba(14, 165, 233, 0.28);
-    }
-
-    .brand-text {
-      display: flex;
-      flex-direction: column;
-      line-height: 1.1;
-    }
-
-    .brand-text strong {
-      font-size: 16px;
-      letter-spacing: -0.02em;
-    }
-
-    .brand-text span {
-      color: var(--soft);
-      font-size: 12px;
-      margin-top: 3px;
-    }
-
-    .nav-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .nav-link {
-      color: var(--muted);
-      font-size: 14px;
-      font-weight: 650;
-      text-decoration: none;
-      transition: color 0.2s ease;
-    }
-
-    .nav-link:hover {
-      color: #fff;
-    }
-
-    .nav-pill {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 40px;
-      padding: 10px 16px;
-      border: 1px solid rgba(56, 189, 248, 0.38);
-      border-radius: 999px;
-      color: #e0f2fe;
-      background: rgba(14, 165, 233, 0.08);
-      font-size: 14px;
-      font-weight: 750;
-      text-decoration: none;
-    }
-
-    .hero {
-      text-align: center;
-      margin-bottom: 34px;
-    }
-
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 14px;
-      margin-bottom: 18px;
-      border: 1px solid rgba(56, 189, 248, 0.28);
-      border-radius: 999px;
-      background: rgba(14, 165, 233, 0.08);
-      color: #bae6fd;
-      font-size: 14px;
-      font-weight: 700;
-      backdrop-filter: blur(16px);
-    }
-
-    .hero h1 {
-      font-size: clamp(48px, 8vw, 92px);
-      line-height: 0.95;
-      font-weight: 600;
-      letter-spacing: -0.065em;
-      margin-bottom: 18px;
-      color: #f8fafc;
-    }
-
-    .hero p {
-      max-width: 760px;
-      margin: 0 auto;
-      color: var(--muted);
-      font-size: clamp(17px, 2vw, 21px);
-      line-height: 1.6;
-    }
-
-    .tabs {
-      display: flex;
-      align-items: stretch;
-      gap: 14px;
-      padding-bottom: 22px;
-      margin: 34px 0 42px;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.16);
-    }
-
-    .tab {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      min-width: 250px;
-      padding: 18px 22px;
-      border: 1px solid transparent;
-      border-radius: 14px 14px 0 0;
-      color: var(--muted);
-    }
-
-    .tab.active {
-      background: rgba(15, 23, 42, 0.58);
-      border-color: rgba(148, 163, 184, 0.2);
-      box-shadow: inset 0 -3px 0 #38bdf8;
-      color: #fff;
-    }
-
-    .tab-icon {
-      width: 34px;
-      height: 34px;
-      display: grid;
-      place-items: center;
-      border-radius: 10px;
-      background: rgba(56, 189, 248, 0.1);
-      border: 1px solid rgba(56, 189, 248, 0.16);
-      color: #7dd3fc;
-      font-size: 18px;
-    }
-
-    .tab strong {
-      display: block;
-      font-size: 15px;
-      margin-bottom: 3px;
-    }
-
-    .tab span {
-      display: block;
-      font-size: 13px;
-      color: var(--soft);
-    }
-
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
       gap: 28px;
-      align-items: stretch;
     }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 190px; }
+    .brand-mark {
+      width: 42px; height: 42px; border-radius: 14px;
+      background: linear-gradient(135deg, var(--blue-600), var(--blue-900));
+      color: #ffffff; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; letter-spacing: -0.08em;
+      box-shadow: 0 14px 30px rgba(0, 104, 255, 0.22);
+    }
+    .brand-text { display: flex; flex-direction: column; line-height: 1.05; }
+    .brand-name { font-size: 1.05rem; font-weight: 900; letter-spacing: -0.04em; }
+    .brand-sub { font-size: 0.72rem; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }
+
+    .nav-actions { display: flex; align-items: center; gap: 12px; }
+    .login-link { color: var(--blue-800); font-size: 0.88rem; font-weight: 900; padding: 10px 12px; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 46px; padding: 0 20px; border-radius: 999px;
+      font-weight: 900; border: 1px solid transparent; transition: 0.2s ease; cursor: pointer;
+    }
+    .btn-primary { background: var(--blue-700); color: #ffffff; box-shadow: 0 14px 32px rgba(0, 84, 209, 0.22); }
+    .btn-primary:hover { background: var(--blue-800); transform: translateY(-1px); }
+    .btn-secondary { background: #ffffff; color: var(--blue-800); border-color: var(--line); }
+    .btn-secondary:hover { border-color: var(--blue-500); box-shadow: 0 14px 28px rgba(6,26,58,0.08); transform: translateY(-1px); }
+
+    section.content-section { padding: 72px 0 90px; }
+    .section-header { max-width: 840px; margin: 0 auto 44px; text-align: center; }
+    .section-eyebrow { color: var(--blue-700); font-size: 0.78rem; font-weight: 950; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 14px; }
+    .section-header h2 { font-size: clamp(2.4rem, 5vw, 4rem); line-height: 0.98; letter-spacing: -0.07em; color: var(--blue-950); margin-bottom: 18px; }
+    .section-header p { color: var(--muted); font-size: 1.08rem; }
+
+    .addons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; align-items: stretch; }
 
     .card {
-      position: relative;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 30px;
+      box-shadow: 0 12px 38px rgba(6, 26, 58, 0.05);
       display: flex;
       flex-direction: column;
-      min-height: 600px;
-      padding: 34px;
-      border: 1px solid var(--border);
-      border-radius: 28px;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.035)),
-        rgba(2, 8, 23, 0.76);
-      box-shadow:
-        0 22px 60px rgba(0, 0, 0, 0.32),
-        inset 0 1px 0 rgba(255, 255, 255, 0.12);
-      backdrop-filter: blur(18px);
+    }
+    .card h3 { font-size: 1.34rem; letter-spacing: -0.035em; color: var(--blue-950); margin-bottom: 10px; }
+    .card p { color: var(--muted); margin-bottom: 14px; }
+
+    ul { list-style: none; display: grid; gap: 10px; margin: 6px 0 12px; flex: 1; }
+    li { position: relative; padding-left: 24px; color: var(--muted); line-height: 1.5; }
+    li::before {
+      content: ''; position: absolute; left: 0; top: 8px; width: 8px; height: 8px;
+      background: var(--blue-600); border-radius: 50%;
+    }
+    .card ul strong { color: var(--blue-950); }
+
+    .price { color: #fff; font-weight: 950; letter-spacing: -0.06em; }
+    .offer-topline {
+      display: inline-flex; align-items: center; gap: 8px; align-self: flex-start;
+      padding: 6px 12px; border-radius: 999px; font-size: 0.74rem; font-weight: 950;
+      text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px;
     }
 
-    .card.featured {
-      border-color: var(--border-strong);
-      box-shadow:
-        0 0 0 1px rgba(56, 189, 248, 0.2),
-        0 0 42px rgba(56, 189, 248, 0.22),
-        0 28px 80px rgba(0, 0, 0, 0.38),
-        inset 0 1px 0 rgba(255, 255, 255, 0.16);
-      transform: translateY(-18px);
-    }
+    .talk-line { text-align: center; margin-top: 30px; font-weight: 800; color: var(--blue-950); font-size: 1.02rem; }
+    .talk-line a { color: var(--blue-700); }
 
-    .badge {
-      position: absolute;
-      top: 18px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 8px 16px;
-      border-radius: 999px;
-      background: linear-gradient(135deg, #0284c7, #38bdf8);
-      color: #020617;
-      font-size: 13px;
-      font-weight: 900;
-      letter-spacing: 0.04em;
-      box-shadow: 0 10px 28px rgba(56, 189, 248, 0.28);
-      white-space: nowrap;
-    }
-
-    .icon {
-      width: 62px;
-      height: 62px;
-      display: grid;
-      place-items: center;
-      margin: 18px auto 22px;
-      border-radius: 50%;
-      background: rgba(56, 189, 248, 0.12);
-      border: 1px solid rgba(56, 189, 248, 0.18);
-      color: #7dd3fc;
-      font-size: 28px;
-    }
-
-    .card h2 {
-      text-align: center;
-      font-size: 28px;
-      line-height: 1.2;
-      letter-spacing: -0.03em;
-      margin-bottom: 12px;
-    }
-
-    .description {
-      min-height: 78px;
-      text-align: center;
-      color: var(--muted);
-      font-size: 15.5px;
-      line-height: 1.55;
-      margin-bottom: 26px;
-    }
-
-    .divider {
-      height: 1px;
-      background: rgba(148, 163, 184, 0.16);
-      margin-bottom: 26px;
-    }
-
-    .price {
-      text-align: center;
-      margin-bottom: 8px;
-    }
-
-    .price .amount {
-      color: #7dd3fc;
-      font-size: 48px;
-      font-weight: 700;
-      letter-spacing: -0.05em;
-    }
-
-    .price .term {
-      color: #f8fafc;
-      font-size: 17px;
-      font-weight: 550;
-      margin-left: 4px;
-    }
-
-    .price-note {
-      text-align: center;
-      color: var(--soft);
-      font-size: 15px;
-      margin-bottom: 28px;
-    }
-
-    .custom-price {
-      text-align: center;
-      margin-bottom: 8px;
-    }
-
-    .custom-price .amount {
-      color: #7dd3fc;
-      font-size: 38px;
-      font-weight: 700;
-      letter-spacing: -0.04em;
-    }
-
-    .features {
-      list-style: none;
-      margin-bottom: 30px;
-      flex: 1;
-    }
-
-    .features li {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 0;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-      color: rgba(248, 250, 252, 0.9);
-      font-size: 15px;
-      line-height: 1.35;
-    }
-
-    .check {
-      flex: 0 0 auto;
-      width: 23px;
-      height: 23px;
-      display: grid;
-      place-items: center;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #0ea5e9, #38bdf8);
-      color: #020617;
-      font-size: 13px;
-      font-weight: 950;
-    }
-
-    .button {
-      display: inline-flex;
-      justify-content: center;
-      align-items: center;
-      width: 100%;
-      min-height: 52px;
-      padding: 14px 20px;
-      border-radius: 12px;
-      border: 1px solid transparent;
-      background: linear-gradient(135deg, #0284c7, #38bdf8);
-      color: #020617;
-      font-size: 16px;
-      font-weight: 850;
-      text-decoration: none;
-      cursor: pointer;
-      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
-      box-shadow: 0 14px 34px rgba(14, 165, 233, 0.24);
-    }
-
-    .button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 18px 44px rgba(14, 165, 233, 0.34);
-    }
-
-    .button.secondary {
-      background: rgba(15, 23, 42, 0.48);
-      border-color: rgba(56, 189, 248, 0.58);
-      color: #e0f2fe;
-      box-shadow: none;
-    }
-
-    .button.secondary:hover {
-      background: rgba(14, 165, 233, 0.12);
-      border-color: rgba(56, 189, 248, 0.92);
-    }
-
-    .trust-note {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 10px;
-      margin-top: 34px;
-      color: rgba(226, 232, 240, 0.72);
-      font-size: 14px;
-      text-align: center;
-    }
-
-    .trust-note strong {
-      color: #fff;
-      font-weight: 750;
-    }
+    footer { padding: 34px 0; color: var(--muted); border-top: 1px solid var(--line); background: #fff; text-align: center; }
 
     @media (max-width: 980px) {
-      .pricing-page {
-        padding-top: 42px;
-      }
-
-      .top-bar {
-        margin-bottom: 40px;
-      }
-
-      .tabs {
-        overflow-x: auto;
-        padding-bottom: 16px;
-      }
-
-      .cards {
-        grid-template-columns: 1fr;
-      }
-
-      .card,
-      .card.featured {
-        transform: none;
-        min-height: auto;
-      }
-
-      .description {
-        min-height: auto;
-      }
+      .addons { grid-template-columns: 1fr; max-width: 460px; margin: 0 auto; }
+      .nav-links { display: none; }
     }
-
-    @media (max-width: 560px) {
-      .pricing-page {
-        padding: 28px 16px 42px;
-      }
-
-      .top-bar {
-        align-items: flex-start;
-        flex-direction: column;
-      }
-
-      .nav-actions {
-        width: 100%;
-        justify-content: space-between;
-      }
-
-      .hero h1 {
-        font-size: 48px;
-      }
-
-      .hero p {
-        font-size: 16px;
-      }
-
-      .tabs {
-        gap: 10px;
-        margin-top: 28px;
-      }
-
-      .tab {
-        min-width: 230px;
-        padding: 16px;
-      }
-
-      .card {
-        padding: 28px 22px;
-        border-radius: 22px;
-      }
-
-      .price .amount {
-        font-size: 42px;
-      }
-
-      .custom-price .amount {
-        font-size: 34px;
-      }
+    @media (max-width: 640px) {
+      .nav { height: auto; padding: 16px 0; gap: 14px; }
+      .brand-sub { display: none; }
+      .btn { width: 100%; }
+      .nav-actions .login-link { padding: 8px 6px; }
+      section.content-section { padding: 52px 0 68px; }
+      .card { padding: 24px; }
     }
   </style>
 </head>
-
 <body>
-  <main class="pricing-page">
-    <div class="container">
+  <div class="page">
+    <div class="trial-bar">
+      <div class="container trial-bar-inner">
+        <span class="material-icons-round">bolt</span>
+        <span>Try the whole platform free for 7 days. Invite a friend — when they join, you get 7 more days free.</span>
+      </div>
+    </div>
 
-      <header class="top-bar">
-        <a href="https://www.connexiontwo.com/" class="brand" aria-label="Connexion Two home">
+    <header>
+      <div class="container nav">
+        <a href="/" class="brand" aria-label="Connexion Two Home">
           <div class="brand-mark">C2</div>
           <div class="brand-text">
-            <strong>Connexion Two</strong>
-            <span>Sovereign Document Workflow System</span>
+            <span class="brand-name">Connexion Two</span>
+            <span class="brand-sub">Document Workflow System</span>
           </div>
         </a>
-
-        <nav class="nav-actions" aria-label="Plans navigation">
-          <a href="https://www.connexiontwo.com/" class="nav-link">Home</a>
-          <a href="https://www.connexiontwo.com/#login" class="nav-link">Login</a>
-          <a href="https://buy.stripe.com/cNi00ieLedtedDL24vafS02" class="nav-pill" data-checkout-link>Start free trial</a>
-        </nav>
-      </header>
-
-      <section class="hero">
-        <div class="eyebrow">🛡️ Secure document workflow pricing</div>
-        <h1>Choose your plan</h1>
-        <p>
-          Professional e-signature access, document setup, and custom workflow implementation
-          for organizations that need secure document control.
-        </p>
-      </section>
-
-      <section class="tabs" aria-label="Pricing categories">
-        <div class="tab active">
-          <div class="tab-icon">✍</div>
-          <div>
-            <strong>eSignature Plans</strong>
-            <span>Core signing access</span>
-          </div>
+        <div class="nav-actions">
+          <a href="/#get-started" class="login-link">Login</a>
+          <a href="/#get-started" class="btn btn-primary">START FREE TRIAL!</a>
         </div>
-
-        <div class="tab">
-          <div class="tab-icon">⚙</div>
-          <div>
-            <strong>Setup & Workflow</strong>
-            <span>Implementation and custom systems</span>
-          </div>
-        </div>
-      </section>
-
-      <section class="cards">
-
-        <article class="card">
-          <div class="icon">👤</div>
-
-          <h2>Starter</h2>
-
-          <p class="description">
-            For individuals and small businesses that need simple, secure e-signature access.
-          </p>
-
-          <div class="divider"></div>
-
-          <div class="price">
-            <span class="amount" id="starterPriceAmount">€15</span>
-            <span class="term" id="starterPriceTerm">/month</span>
-          </div>
-
-          <p class="price-note">7-day free trial, then monthly subscription</p>
-
-          <ul class="features">
-            <li><span class="check">✓</span> Basic e-signature access</li>
-            <li><span class="check">✓</span> Simple document sending</li>
-            <li><span class="check">✓</span> Secure signer links</li>
-            <li><span class="check">✓</span> Email support</li>
-          </ul>
-
-          <a href="https://buy.stripe.com/cNi00ieLedtedDL24vafS02" class="button" data-checkout-link>
-            Start 7-Day Trial
-          </a>
-        </article>
-
-        <article class="card featured">
-          <div class="badge">SETUP PACKAGE</div>
-
-          <div class="icon">📄</div>
-
-          <h2>DocuSign + DOCX Setup</h2>
-
-          <p class="description">
-            A professional done-for-you setup for teams that need a document signing workflow
-            and DOCX template system.
-          </p>
-
-          <div class="divider"></div>
-
-          <div class="custom-price">
-            <span class="amount">Custom setup</span>
-          </div>
-
-          <p class="price-note">Scoped after a short deployment call</p>
-
-          <ul class="features">
-            <li><span class="check">✓</span> DocuSign-style signing workflow setup</li>
-            <li><span class="check">✓</span> DOCX document template setup</li>
-            <li><span class="check">✓</span> Document process configuration</li>
-            <li><span class="check">✓</span> Basic onboarding and handoff</li>
-            <li><span class="check">✓</span> Launch support</li>
-          </ul>
-
-          <a href="https://www.connexiontwo.com/calendar" class="button">
-            Book Deployment Call
-          </a>
-        </article>
-
-        <article class="card">
-          <div class="icon">🏢</div>
-
-          <h2>Custom Package</h2>
-
-          <p class="description">
-            For organizations that need a tailored document workflow system with advanced
-            customization and implementation support.
-          </p>
-
-          <div class="divider"></div>
-
-          <div class="custom-price">
-            <span class="amount">Custom deployment</span>
-          </div>
-
-          <p class="price-note">Final scope confirmed after consultation</p>
-
-          <ul class="features">
-            <li><span class="check">✓</span> Custom workflow build</li>
-            <li><span class="check">✓</span> Advanced document automations</li>
-            <li><span class="check">✓</span> Template customization</li>
-            <li><span class="check">✓</span> Integration support</li>
-            <li><span class="check">✓</span> Priority implementation support</li>
-          </ul>
-
-          <a href="https://www.connexiontwo.com/calendar" class="button secondary">
-            Schedule Custom Call
-          </a>
-        </article>
-
-      </section>
-
-      <div class="trust-note">
-        <span>🛡️</span>
-        <span><strong>Secure. Professional. Controlled.</strong> Built for teams that need reliable document workflows.</span>
       </div>
+    </header>
 
-    </div>
-  </main>
+    <main>
+      <section class="content-section" id="offer">
+        <div class="container">
+          <div class="section-header">
+            <div class="section-eyebrow">Choose Your Path</div>
+            <h2>Use It, Or Own It.</h2>
+            <p>Start on the platform for €15/month — or have us build and hand you your own custom system. Both custom builds are a one-time setup fee + €49/month.</p>
+          </div>
 
-  <script>
-    /*
-      Location-based starter currency.
-      EUR countries show €15/month.
-      United Kingdom shows £15/month.
+          <div class="addons">
+            <div class="card">
+              <h3>Starter</h3>
+              <div class="price" style="color:var(--blue-950);font-size:2.6rem;margin:6px 0 14px;">€15<span style="font-size:1rem;font-weight:700;color:var(--muted);">/month</span></div>
+              <p>Use the full platform yourself. No setup, no call — just log in and go.</p>
+              <ul>
+                <li>Private signing portal + audit trail</li>
+                <li>Microsoft Office alternative — create Word, Excel &amp; PowerPoint in the browser</li>
+                <li>Reusable templates &amp; signing workflows</li>
+                <li>Secure headers, access control &amp; protected signer links</li>
+                <li>7-day free trial included</li>
+              </ul>
+              <a href="/pay-now" class="btn btn-primary" style="width:100%;margin-top:16px;">GET INSTANT ACCESS!</a>
+            </div>
 
-      IMPORTANT:
-      Replace GBP_STRIPE_LINK with your real GBP Stripe Payment Link when you create it.
-      EUR_STRIPE_LINK is your current live Stripe link from this page.
-    */
-    const EUR_STRIPE_LINK = "https://buy.stripe.com/cNi00ieLedtedDL24vafS02";
-    const GBP_STRIPE_LINK = "REPLACE_WITH_YOUR_GBP_STRIPE_PAYMENT_LINK";
+            <div class="card" style="border-color:var(--blue-600);box-shadow:0 18px 50px rgba(0,84,209,0.16);">
+              <div class="offer-topline" style="background:var(--blue-100);border-color:var(--blue-100);color:var(--blue-800);">Most Popular</div>
+              <h3>Business — Custom Build</h3>
+              <div class="price" style="color:var(--blue-950);font-size:2.2rem;margin:6px 0 14px;">Setup fee + €49<span style="font-size:1rem;font-weight:700;color:var(--muted);">/month</span></div>
+              <p>The platform, plus two features built the way <em>you</em> want — deployed on your infrastructure.</p>
+              <ul>
+                <li>Everything in Starter</li>
+                <li><strong>2 custom features of your choice</strong></li>
+                <li>Your branding on the portal</li>
+                <li>The full source code — your own GitHub repository</li>
+                <li>Basic cybersecurity layer included</li>
+                <li>Priority support</li>
+              </ul>
+              <a href="/calendar" class="btn btn-primary" style="width:100%;margin-top:16px;">BOOK MY BUILD CALL!</a>
+            </div>
 
-    const EURO_COUNTRIES = new Set([
-      "AT", "BE", "HR", "CY", "EE", "FI", "FR", "DE", "GR", "IE",
-      "IT", "LV", "LT", "LU", "MT", "NL", "PT", "SK", "SI", "ES"
-    ]);
+            <div class="card">
+              <h3>Control — Custom Build</h3>
+              <div class="price" style="color:var(--blue-950);font-size:2.2rem;margin:6px 0 14px;">Setup fee + €49<span style="font-size:1rem;font-weight:700;color:var(--muted);">/month</span></div>
+              <p>Your system, your rules — more custom control and your own private infrastructure.</p>
+              <ul>
+                <li>Everything in Business</li>
+                <li><strong>A 3rd custom feature + deeper control</strong></li>
+                <li>Private / dedicated infrastructure option</li>
+                <li>Advanced workflows &amp; permissions</li>
+                <li>Enhanced security + exportable audit logs</li>
+                <li>Dedicated support</li>
+              </ul>
+              <a href="/calendar" class="btn btn-primary" style="width:100%;margin-top:16px;">BOOK MY BUILD CALL!</a>
+            </div>
+          </div>
 
-    function getCountryFromLocale(locale) {
-      if (!locale) return "";
-      const parts = String(locale).split("-");
-      return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : "";
-    }
+          <p class="talk-line">Prefer to talk to a human first? Call <a href="tel:+12242063770">224-206-3770</a>.</p>
+        </div>
+      </section>
+    </main>
 
-    function detectClientCountry() {
-      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-      const languages = navigator.languages && navigator.languages.length
-        ? navigator.languages
-        : [navigator.language];
-
-      for (const lang of languages) {
-        const country = getCountryFromLocale(lang);
-        if (country) return country;
-      }
-
-      if (timeZone === "Europe/London") return "GB";
-      if (timeZone === "Europe/Dublin") return "IE";
-      if (timeZone.startsWith("Europe/")) return "EU";
-
-      return "EU";
-    }
-
-    function getCurrencyForCountry(country) {
-      if (country === "GB") return "GBP";
-      if (EURO_COUNTRIES.has(country) || country === "EU") return "EUR";
-      return "EUR";
-    }
-
-    function formatStarterPrice(currency) {
-      return new Intl.NumberFormat(currency === "GBP" ? "en-GB" : "en-IE", {
-        style: "currency",
-        currency,
-        maximumFractionDigits: 0
-      }).format(15);
-    }
-
-    function applyLocalizedCurrency() {
-      const country = detectClientCountry();
-      const currency = getCurrencyForCountry(country);
-      const priceAmount = document.getElementById("starterPriceAmount");
-      const priceTerm = document.getElementById("starterPriceTerm");
-      const checkoutLinks = document.querySelectorAll("[data-checkout-link]");
-
-      if (priceAmount) priceAmount.textContent = formatStarterPrice(currency);
-      if (priceTerm) priceTerm.textContent = "/month";
-
-      checkoutLinks.forEach(link => {
-        if (currency === "GBP" && GBP_STRIPE_LINK !== "REPLACE_WITH_YOUR_GBP_STRIPE_PAYMENT_LINK") {
-          link.href = GBP_STRIPE_LINK;
-        } else {
-          link.href = EUR_STRIPE_LINK;
-        }
-      });
-    }
-
-    applyLocalizedCurrency();
-  </script>
-
+    <footer><div class="container"><p>© Connexion Two. Sovereign Document Workflow System.</p></div></footer>
+  </div>
 </body>
 </html>
