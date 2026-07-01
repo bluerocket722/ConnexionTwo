@@ -183,6 +183,30 @@ hr { border: 0; border-top: 1px solid var(--border2); margin: 18px 0; }
 .topbar-nav a { padding:7px 12px; border-radius:9px; font-size:13px; font-weight:800; color:var(--text-sub); transition:.15s ease; }
 .topbar-nav a:hover { background:var(--surface3); color:var(--primary); }
 @media (max-width:720px){ .topbar-nav{ display:none; } }
+
+/* ── TRIAL COUNTDOWN + UPGRADE / INVITE (added, matches welcome page) ── */
+.trial-left { color: var(--primary-dark); font-weight: 900; font-size: .9rem; white-space: nowrap; }
+.topbar-invite { height: 38px; padding: 0 14px; border: 1px solid var(--primary); border-radius: 8px; background: #fff; color: var(--primary); font-weight: 800; font-size: .85rem; cursor: pointer; white-space: nowrap; }
+.topbar-invite:hover { background: var(--surface3); }
+.topbar-upgrade { height: 38px; padding: 0 16px; border: none; border-radius: 8px; background: var(--primary); color: #fff; font-weight: 800; font-size: .87rem; cursor: pointer; white-space: nowrap; }
+.topbar-upgrade:hover { background: var(--primary-dark); }
+@media (max-width:720px){ .trial-left, .topbar-invite { display:none; } }
+
+.c2-overlay { position: fixed; inset: 0; z-index: 400; background: rgba(6,26,58,.5); display: none; align-items: center; justify-content: center; padding: 20px; }
+.c2-overlay.open { display: flex; }
+.c2-modal { width: 100%; max-width: 520px; background: var(--surface); border-radius: 18px; box-shadow: 0 30px 80px rgba(6,26,58,.35); position: relative; overflow: hidden; }
+.c2-modal.narrow { max-width: 480px; }
+.c2-modal-body { padding: 44px 36px; text-align: center; }
+.c2-modal-body.left { text-align: left; }
+.c2-modal h2 { font-size: 1.6rem; margin-bottom: 10px; letter-spacing: -.03em; color: var(--primary-dark); }
+.c2-modal p { color: var(--muted); margin-bottom: 22px; line-height: 1.55; }
+.c2-pay { width: 100%; min-height: 52px; border: none; border-radius: 11px; cursor: pointer; background: var(--primary); color: #fff; font-weight: 800; font-size: .98rem; margin-bottom: 16px; }
+.c2-pay:hover { background: var(--primary-dark); }
+.c2-or { color: var(--muted); font-size: .85rem; margin-bottom: 10px; }
+.c2-copyrow { display: flex; gap: 8px; }
+.c2-copyrow input { flex: 1; height: 46px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; font-size: .9rem; background: var(--surface3); color: var(--primary-dark); }
+.c2-copyrow button { min-height: 46px; padding: 0 18px; border-radius: 10px; cursor: pointer; border: 1px solid var(--primary); background: var(--primary); color: #fff; font-weight: 800; }
+.c2-modal-close { position: absolute; top: 14px; right: 14px; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--primary-dark); font-size: 1.3rem; line-height: 1; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -219,6 +243,9 @@ hr { border: 0; border-top: 1px solid var(--border2); margin: 18px 0; }
     <a href="/templates">Templates</a>
   </nav>
   <div class="topbar-spacer"></div>
+  <span class="trial-left" id="trialLeft">—</span>
+  <button class="topbar-invite" type="button" id="inviteFriendBtn">Invite +7 days</button>
+  <button class="topbar-upgrade" type="button" id="buyNowBtn">Upgrade</button>
   <span class="topbar-badge">Sovereign Workflow Portal</span>
 </div>
 
@@ -374,30 +401,39 @@ hr { border: 0; border-top: 1px solid var(--border2); margin: 18px 0; }
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+// ── DATA project (rfd): documents, signers, fields, templates, storage ──
 const SUPABASE_URL      = "https://rfdvogakvyodixgpvqvz.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ── AUTH project (xbw): SAME project the home page logs in with, so a login on
+//    the home page carries straight through to this page (shared session on the
+//    connexiontwo.com origin). All login/session checks use sbAuth below. ──
+const AUTH_URL      = "https://xbwuvaxtnylqvagdvpxp.supabase.co";
+const AUTH_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc";
+const sbAuth = window.supabase.createClient(AUTH_URL, AUTH_ANON_KEY);
+
     async function doLogin() {
   const email = document.getElementById('lo-email').value.trim();
   const pass  = document.getElementById('lo-pass').value;
   document.getElementById('lo-err').textContent = '';
-const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  const { error } = await sbAuth.auth.signInWithPassword({ email, password: pass });
   if (error) { document.getElementById('lo-err').textContent = error.message; return; }
   document.getElementById('login-overlay').style.display = 'none';
 }
 
 async function signInWithGoogle() {
   document.getElementById('lo-err').textContent = '';
-  const { error } = await sb.auth.signInWithOAuth({
+  const { error } = await sbAuth.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: window.location.origin + window.location.pathname }
   });
   if (error) document.getElementById('lo-err').textContent = error.message;
 }
 
-// Auto let through the instant a session exists — covers the Google redirect
-// coming back as well as an already-signed-in user.
-sb.auth.onAuthStateChange((_event, session) => {
+// Auto let through the instant an xbw session exists — covers the Google
+// redirect coming back AND a user who already logged in on the home page.
+sbAuth.auth.onAuthStateChange((_event, session) => {
   if (session) document.getElementById('login-overlay').style.display = 'none';
 });
 </script>
@@ -766,7 +802,7 @@ async function submitData() {
       { signer_order:4, name:document.getElementById("signer4_name").value, email:document.getElementById("signer4_email").value }
     ].filter(s => s.email);
 
-    const { data:{ user } } = await sb.auth.getUser();
+    const { data:{ user } } = await sbAuth.auth.getUser();
 const { data:doc, error:docError } = await sb.from("signer_documents").insert({
   owner_id:    user?.id || null,
   jira_code:   document.getElementById("jira_code")?.value || "",
@@ -806,7 +842,7 @@ const { data:doc, error:docError } = await sb.from("signer_documents").insert({
 
 /* ── INIT ── */
 (async function() {
-  const { data: { session } } = await sb.auth.getSession();
+  const { data: { session } } = await sbAuth.auth.getSession();
   if (session) document.getElementById('login-overlay').style.display = 'none';
 })();
 </script>
@@ -1044,7 +1080,7 @@ async function loadTemplateIntoDoc(templateId){
     document.getElementById('annotation-zone').style.display='';
     refreshStepChips('fields');
     const ti=document.getElementById('document_title'); if(ti && !ti.value) ti.value=tpl.name||'';
-    document.getElementById('upload-text').innerHTML='\u2713 '+(tpl.name||'Template');
+    document.getElementById('upload-text').innerHTML='✓ '+(tpl.name||'Template');
     await renderPDF(url);
     document.querySelectorAll('.signature-box').forEach(el=>el.remove());
     fieldList=[];
@@ -1067,6 +1103,101 @@ async function loadTemplateIntoDoc(templateId){
   }catch(err){ console.error('template load failed',err); alert('Could not load template.'); }
 }
 loadTemplateOptions();
+</script>
+
+<!-- Invite a friend modal -->
+<div class="c2-overlay" id="inviteOverlay" aria-hidden="true">
+  <div class="c2-modal narrow">
+    <button class="c2-modal-close" type="button" id="inviteClose" aria-label="Close">×</button>
+    <div class="c2-modal-body left">
+      <h2>Invite a friend, get 7 days</h2>
+      <p>Share your personal link. When a friend joins, your trial extends by another 7 days.</p>
+      <div class="c2-copyrow">
+        <input id="inviteLinkInput" readonly>
+        <button id="inviteCopy" type="button">Copy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Trial-ended forced modal (payment lock) -->
+<div class="c2-overlay" id="trialEndedOverlay" aria-hidden="true">
+  <div class="c2-modal">
+    <div class="c2-modal-body">
+      <h2>Your free trial has ended</h2>
+      <p>Continue with Connexion Two by upgrading — or extend free for 7 more days by inviting a friend.</p>
+      <button id="endedPay" class="c2-pay" type="button">Upgrade for €15/month</button>
+      <div class="c2-or">— or invite a friend for +7 days —</div>
+      <div class="c2-copyrow">
+        <input id="endedLinkInput" readonly>
+        <button id="endedCopy" type="button">Copy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Trial countdown + referral + payment-lock — reads the SAME trials table as the
+   welcome page (xbw project, via sbAuth). Identical behavior. */
+(function(){
+  const PAY_LINK   = 'https://buy.stripe.com/cNi00ieLedtedDL24vafS02';
+  const SHARE_BASE = 'https://www.connexiontwo.com/?ref=';
+  let myShareCode = null;
+
+  function daysLeft(t){ if(t?.paid) return 999; return Math.ceil((new Date(t.trial_ends_at).getTime()-Date.now())/86400000); }
+
+  async function ensureTrial(u){
+    let { data } = await sbAuth.from('trials').select('*').eq('user_id',u.id).maybeSingle();
+    if(!data){
+      const created=u.created_at?new Date(u.created_at):new Date();
+      const ends=new Date(created.getTime()+7*86400000).toISOString();
+      const ins=await sbAuth.from('trials').insert({ user_id:u.id, email:u.email, full_name:u.user_metadata?.full_name||'', trial_started_at:created.toISOString(), trial_ends_at:ends }).select().single();
+      data=ins.data;
+    }
+    return data;
+  }
+
+  function applyTrialUI(t){
+    myShareCode=t.share_code;
+    const d=daysLeft(t);
+    const tl=document.getElementById('trialLeft'); if(tl) tl.textContent=t.paid?'Active':(d>0?d+' Day'+(d===1?'':'s')+' Left':'Trial ended');
+    if(!t.paid && d<=0) openTrialEnded();
+  }
+
+  async function maybeCredit(){
+    const url=new URLSearchParams(location.search);
+    let ref=url.get('ref'); if(ref) localStorage.setItem('c2_pending_ref',ref);
+    ref=ref||localStorage.getItem('c2_pending_ref');
+    if(!ref) return;
+    if(ref===myShareCode){ localStorage.removeItem('c2_pending_ref'); return; }
+    if(localStorage.getItem('c2_credited_'+ref)) return;
+    try{ await sbAuth.rpc('credit_referral',{ code: ref }); localStorage.setItem('c2_credited_'+ref,'1'); localStorage.removeItem('c2_pending_ref'); }catch(_){}
+  }
+
+  function shareLink(){ return SHARE_BASE+(myShareCode||''); }
+  function openInvite(){ const i=document.getElementById('inviteLinkInput'); if(i) i.value=shareLink(); document.getElementById('inviteOverlay').classList.add('open'); document.body.style.overflow='hidden'; }
+  function closeInvite(){ document.getElementById('inviteOverlay').classList.remove('open'); document.body.style.overflow=''; }
+  function openTrialEnded(){ const i=document.getElementById('endedLinkInput'); if(i) i.value=shareLink(); document.getElementById('trialEndedOverlay').classList.add('open'); document.body.style.overflow='hidden'; }
+  function copyVal(id,btn){ const el=document.getElementById(id); el.select(); el.setSelectionRange(0,99999); const done=()=>{ const o=btn.textContent; btn.textContent='Copied!'; setTimeout(()=>btn.textContent=o,1500); }; if(navigator.clipboard){ navigator.clipboard.writeText(el.value).then(done).catch(()=>{document.execCommand('copy');done();}); } else { document.execCommand('copy'); done(); } }
+
+  document.getElementById('buyNowBtn')?.addEventListener('click',()=>{ window.location.href=PAY_LINK; });
+  document.getElementById('inviteFriendBtn')?.addEventListener('click',openInvite);
+  document.getElementById('inviteClose')?.addEventListener('click',closeInvite);
+  document.getElementById('inviteOverlay')?.addEventListener('click',e=>{ if(e.target.id==='inviteOverlay') closeInvite(); });
+  document.getElementById('inviteCopy')?.addEventListener('click',e=>copyVal('inviteLinkInput',e.target));
+  document.getElementById('endedCopy')?.addEventListener('click',e=>copyVal('endedLinkInput',e.target));
+  document.getElementById('endedPay')?.addEventListener('click',()=>{ window.location.href=PAY_LINK; });
+
+  (async ()=>{
+    const { data:{ session } } = await sbAuth.auth.getSession();
+    if(!session) return;
+    let t=await ensureTrial(session.user);
+    if(t){ applyTrialUI(t); await maybeCredit();
+      const { data:t2 } = await sbAuth.from('trials').select('*').eq('user_id',session.user.id).maybeSingle();
+      if(t2) applyTrialUI(t2);
+    }
+  })();
+})();
 </script>
 </body>
 </html>
