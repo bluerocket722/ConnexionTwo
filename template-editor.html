@@ -271,12 +271,22 @@ async function fetchPdfBytes(filePath){
   throw new Error('Could not fetch the template file');
 }
 
+// pdf.js font/CMap data — WITHOUT these, PDFs that use embedded (CID) fonts
+// parse fine but render as blank white pages. This is the usual "pages show but
+// nothing paints" cause.
+const PDFJS_CDN='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174';
+
 async function renderPdf(filePath){
   const stage=document.getElementById('stage');
   stage.innerHTML='';
   pages=[];
   const bytes=await fetchPdfBytes(filePath);
-  const pdf=await pdfjsLib.getDocument({data:bytes}).promise;
+  const pdf=await pdfjsLib.getDocument({
+    data:bytes,
+    cMapUrl:PDFJS_CDN+'/cmaps/',
+    cMapPacked:true,
+    standardFontDataUrl:PDFJS_CDN+'/standard_fonts/'
+  }).promise;
   const avail=Math.max(360,(stage.clientWidth||900)-52);
   const base=(await pdf.getPage(1)).getViewport({scale:1});
   const scale=Math.min(1.5, avail/base.width);
@@ -292,7 +302,9 @@ async function renderPdf(filePath){
     canvas.style.display='block';
     wrap.appendChild(canvas);
     stage.appendChild(wrap);
-    await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height); // opaque base
+    await page.render({canvasContext:ctx,viewport:vp,background:'#ffffff'}).promise;
     wrap.addEventListener('pointerdown',e=>onPageClick(e,wrap,p));
     pages.push({wrap,wPx:vp.width,hPx:vp.height,pageNum:p});
   }
