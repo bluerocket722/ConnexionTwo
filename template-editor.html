@@ -30,6 +30,13 @@ button,select,input{font:inherit}
 .saved-tag{color:#0f9f6e;font-weight:700;font-size:.84rem;opacity:0;transition:.2s}
 .saved-tag.show{opacity:1}
 
+/* trial countdown + upgrade / invite (matches document-creation) */
+.trial-left{color:var(--navy);font-weight:800;font-size:.84rem;white-space:nowrap}
+.topbar-invite{height:38px;padding:0 12px;border:1px solid var(--blue-700);border-radius:8px;background:#fff;color:var(--blue-700);font-weight:700;font-size:.82rem;cursor:pointer;white-space:nowrap}
+.topbar-invite:hover{background:var(--blue-050)}
+.topbar-upgrade{height:38px;padding:0 14px;border:none;border-radius:8px;background:var(--blue-700);color:#fff;font-weight:700;font-size:.82rem;cursor:pointer;white-space:nowrap}
+.topbar-upgrade:hover{background:var(--navy)}
+
 .main{flex:1;display:grid;grid-template-columns:248px 1fr;min-height:0}
 .tools{background:#fff;border-right:1px solid var(--line);padding:18px 14px;overflow:auto}
 .tool-label{color:var(--faint);font-size:.68rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin:6px 6px 8px}
@@ -57,15 +64,68 @@ button,select,input{font:inherit}
   .main{grid-template-columns:1fr}
   .tools{position:fixed;bottom:0;left:0;right:0;top:auto;height:auto;max-height:46vh;border-right:0;border-top:1px solid var(--line);z-index:40}
   .stage{padding:14px 8px 48vh}
+  .trial-left,.topbar-invite{display:none}
 }
+
+/* login overlay (Google + email, pointed at xbw) */
+#login-overlay{position:fixed;inset:0;background:linear-gradient(135deg,#061a3a,#082b61);display:flex;align-items:center;justify-content:center;z-index:500;padding:22px}
+#login-overlay .login-card{background:#fff;border-radius:22px;padding:40px 34px;width:100%;max-width:420px;box-shadow:0 30px 90px rgba(0,0,0,.25)}
+#login-overlay h1{color:var(--navy);font-size:26px;font-weight:900;letter-spacing:-.05em;margin:0 0 6px}
+#login-overlay .login-sub{color:var(--muted);font-size:14px;margin-bottom:22px}
+#login-overlay .lo-label{color:var(--muted);font-size:11px;font-weight:800;margin:12px 0 6px;display:block;text-transform:uppercase;letter-spacing:.07em}
+#login-overlay .lo-input{background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:12px 13px;font-size:14px;width:100%;outline:none;transition:.15s}
+#login-overlay .lo-input:focus{border-color:var(--blue-600);box-shadow:0 0 0 3px rgba(0,104,255,.12)}
+#login-overlay .login-btn{width:100%;background:var(--blue-700);color:#fff;border:none;border-radius:999px;padding:13px;font-size:15px;font-weight:800;cursor:pointer;margin-top:16px}
+#login-overlay .login-btn:hover{background:var(--navy)}
+#login-overlay .login-err{color:#d93025;font-size:13px;margin-top:10px;text-align:center;min-height:18px}
+
+/* trial / upgrade / invite modals */
+.c2-overlay{position:fixed;inset:0;z-index:600;background:rgba(6,26,58,.5);display:none;align-items:center;justify-content:center;padding:20px}
+.c2-overlay.open{display:flex}
+.c2-modal{width:100%;max-width:520px;background:var(--surface);border-radius:18px;box-shadow:0 30px 80px rgba(6,26,58,.35);position:relative;overflow:hidden}
+.c2-modal.narrow{max-width:480px}
+.c2-modal-body{padding:44px 36px;text-align:center}
+.c2-modal-body.left{text-align:left}
+.c2-modal h2{font-size:1.6rem;margin-bottom:10px;letter-spacing:-.03em;color:var(--navy)}
+.c2-modal p{color:var(--muted);margin-bottom:22px;line-height:1.55}
+.c2-pay{width:100%;min-height:52px;border:none;border-radius:11px;cursor:pointer;background:var(--blue-700);color:#fff;font-weight:800;font-size:.98rem;margin-bottom:16px}
+.c2-pay:hover{background:var(--navy)}
+.c2-or{color:var(--muted);font-size:.85rem;margin-bottom:10px}
+.c2-copyrow{display:flex;gap:8px}
+.c2-copyrow input{flex:1;height:46px;border:1px solid var(--line);border-radius:10px;padding:0 12px;font-size:.9rem;background:var(--blue-050);color:var(--navy)}
+.c2-copyrow button{min-height:46px;padding:0 18px;border-radius:10px;cursor:pointer;border:1px solid var(--blue-700);background:var(--blue-700);color:#fff;font-weight:800}
+.c2-modal-close{position:absolute;top:14px;right:14px;width:36px;height:36px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--navy);font-size:1.3rem;line-height:1;cursor:pointer}
 </style>
 </head>
 <body>
+<div id="login-overlay">
+  <div class="login-card">
+    <h1>Welcome Back</h1>
+    <p class="login-sub">Please sign in to your account.</p>
+    <label class="lo-label">Email</label>
+    <input class="lo-input" id="lo-email" type="email" placeholder="you@example.com" onkeydown="if(event.key==='Enter')doLogin()">
+    <label class="lo-label">Password</label>
+    <input class="lo-input" id="lo-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div style="display:flex;align-items:center;gap:10px;margin:16px 0 6px;color:var(--faint);font-size:12px;font-weight:800;letter-spacing:.06em;">
+      <span style="flex:1;height:1px;background:var(--line);"></span>OR<span style="flex:1;height:1px;background:var(--line);"></span>
+    </div>
+    <button type="button" onclick="signInWithGoogle()" style="width:100%;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:12px;font-size:14px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+      Continue with Google
+    </button>
+    <div class="login-err" id="lo-err"></div>
+  </div>
+</div>
+
 <div class="app">
   <div class="header">
     <div class="brand"><div class="c2">C2</div><b>Connexion Two</b></div>
     <span class="doc-name" id="docName">Loading…</span>
     <div class="header-right">
+      <span class="trial-left" id="trialLeft">—</span>
+      <button class="topbar-invite" id="inviteFriendBtn" type="button">Invite +7d</button>
+      <button class="topbar-upgrade" id="buyNowBtn" type="button">Upgrade</button>
       <span class="saved-tag" id="savedTag">Saved ✓</span>
       <a class="btn" href="/templates">Back</a>
       <button class="btn btn-primary" id="saveBtn" type="button">Save Fields</button>
@@ -88,12 +148,66 @@ button,select,input{font:inherit}
   </div>
 </div>
 
+<!-- Invite a friend modal -->
+<div class="c2-overlay" id="inviteOverlay" aria-hidden="true">
+  <div class="c2-modal narrow">
+    <button class="c2-modal-close" type="button" id="inviteClose" aria-label="Close">×</button>
+    <div class="c2-modal-body left">
+      <h2>Invite a friend, get 7 days</h2>
+      <p>Share your personal link. When a friend joins, your trial extends by another 7 days.</p>
+      <div class="c2-copyrow">
+        <input id="inviteLinkInput" readonly>
+        <button id="inviteCopy" type="button">Copy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Trial-ended forced modal (payment lock) -->
+<div class="c2-overlay" id="trialEndedOverlay" aria-hidden="true">
+  <div class="c2-modal">
+    <div class="c2-modal-body">
+      <h2>Your free trial has ended</h2>
+      <p>Continue with Connexion Two by upgrading — or extend free for 7 more days by inviting a friend.</p>
+      <button id="endedPay" class="c2-pay" type="button">Upgrade for €15/month</button>
+      <div class="c2-or">— or invite a friend for +7 days —</div>
+      <div class="c2-copyrow">
+        <input id="endedLinkInput" readonly>
+        <button id="endedCopy" type="button">Copy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
+// ── DATA project (rfd): templates + fields + storage ──
 const SB_URL='https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
 const TEMPLATE_BUCKET='template-files';
 const sb=supabase.createClient(SB_URL,SB_KEY);
+
+// ── AUTH project (xbw): SAME as home / welcome / document-creation ──
+const AUTH_URL='https://xbwuvaxtnylqvagdvpxp.supabase.co';
+const AUTH_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc';
+const sbAuth=supabase.createClient(AUTH_URL,AUTH_KEY);
+
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── Login (email + Google), pointed at xbw ──
+async function doLogin(){
+  const email=document.getElementById('lo-email').value.trim();
+  const pass=document.getElementById('lo-pass').value;
+  document.getElementById('lo-err').textContent='';
+  const { error }=await sbAuth.auth.signInWithPassword({ email, password: pass });
+  if(error){ document.getElementById('lo-err').textContent=error.message; return; }
+  document.getElementById('login-overlay').style.display='none';
+}
+async function signInWithGoogle(){
+  document.getElementById('lo-err').textContent='';
+  const { error }=await sbAuth.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: window.location.origin + window.location.pathname + window.location.search } });
+  if(error) document.getElementById('lo-err').textContent=error.message;
+}
+sbAuth.auth.onAuthStateChange((_e,session)=>{ if(session) document.getElementById('login-overlay').style.display='none'; });
 
 const params=new URLSearchParams(location.search);
 const templateId=params.get('id');
@@ -139,11 +253,30 @@ document.getElementById('addSigner').addEventListener('click',()=>{
 });
 document.getElementById('signerSelect').addEventListener('change',e=>{ currentSigner=Number(e.target.value); });
 
-// ---------- render PDF ----------
-async function renderPdf(url){
+// ---------- render PDF (fetch actual bytes → render; robust for private buckets) ----------
+async function fetchPdfBytes(filePath){
+  // 1) try an authenticated download (works even if the bucket is private)
+  try{
+    const dl=await sb.storage.from(TEMPLATE_BUCKET).download(filePath);
+    if(dl && dl.data){ return await dl.data.arrayBuffer(); }
+  }catch(_){}
+  // 2) try a signed URL
+  try{
+    const s=await sb.storage.from(TEMPLATE_BUCKET).createSignedUrl(filePath,3600);
+    if(s && s.data && s.data.signedUrl){ const r=await fetch(s.data.signedUrl); if(r.ok) return await r.arrayBuffer(); }
+  }catch(_){}
+  // 3) fall back to the public URL
+  const pub=sb.storage.from(TEMPLATE_BUCKET).getPublicUrl(filePath).data.publicUrl;
+  const r=await fetch(pub); if(r.ok) return await r.arrayBuffer();
+  throw new Error('Could not fetch the template file');
+}
+
+async function renderPdf(filePath){
   const stage=document.getElementById('stage');
   stage.innerHTML='';
-  const pdf=await pdfjsLib.getDocument(url).promise;
+  pages=[];
+  const bytes=await fetchPdfBytes(filePath);
+  const pdf=await pdfjsLib.getDocument({data:bytes}).promise;
   const avail=Math.max(360,(stage.clientWidth||900)-52);
   const base=(await pdf.getPage(1)).getViewport({scale:1});
   const scale=Math.min(1.5, avail/base.width);
@@ -157,10 +290,10 @@ async function renderPdf(url){
     const canvas=document.createElement('canvas');
     canvas.width=vp.width; canvas.height=vp.height;
     canvas.style.display='block';
-    await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
     wrap.appendChild(canvas);
-    wrap.addEventListener('pointerdown',e=>onPageClick(e,wrap,p));
     stage.appendChild(wrap);
+    await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+    wrap.addEventListener('pointerdown',e=>onPageClick(e,wrap,p));
     pages.push({wrap,wPx:vp.width,hPx:vp.height,pageNum:p});
   }
 }
@@ -268,17 +401,82 @@ document.getElementById('saveBtn').addEventListener('click',saveFields);
 
 // ---------- boot ----------
 (async()=>{
-  try{ const { data:{ session } } = await sb.auth.getSession(); currentUserId = session?.user?.id || null; }catch(_){}
+  // hide the login wall the moment an xbw session exists; grab the user id for ownership
+  try{ const { data:{ session } } = await sbAuth.auth.getSession(); if(session){ currentUserId=session.user.id; document.getElementById('login-overlay').style.display='none'; } }catch(_){}
+
   if(!templateId){ document.getElementById('stage').innerHTML='<div class="loading">Missing template id (open from the Templates page).</div>'; return; }
   const { data, error }=await sb.from('document_templates').select('name,file_path').eq('id',templateId).single();
   if(error||!data){ document.getElementById('stage').innerHTML='<div class="loading">Template not found.</div>'; return; }
   document.getElementById('docName').textContent=data.name||'Template';
   refreshSigners();
   buildPalette();
-  const url=sb.storage.from(TEMPLATE_BUCKET).getPublicUrl(data.file_path).data.publicUrl;
-  try{ await renderPdf(url); }
-  catch(e){ document.getElementById('stage').innerHTML='<div class="loading">Could not load the template PDF.</div>'; return; }
+  try{ await renderPdf(data.file_path); }
+  catch(e){ console.error('render failed',e); document.getElementById('stage').innerHTML='<div class="loading">Could not load the template PDF ('+(e&&e.message?e.message:'unknown error')+'). Make sure the template file is a PDF.</div>'; return; }
   await loadExisting();
+})();
+</script>
+
+<script>
+/* Trial countdown + referral + payment-lock — reads the SAME trials table as the
+   welcome + document-creation pages (xbw project, via sbAuth). Identical behavior. */
+(function(){
+  const PAY_LINK   = 'https://buy.stripe.com/cNi00ieLedtedDL24vafS02';
+  const SHARE_BASE = 'https://www.connexiontwo.com/?ref=';
+  let myShareCode = null;
+
+  function daysLeft(t){ if(t?.paid) return 999; return Math.ceil((new Date(t.trial_ends_at).getTime()-Date.now())/86400000); }
+
+  async function ensureTrial(u){
+    let { data } = await sbAuth.from('trials').select('*').eq('user_id',u.id).maybeSingle();
+    if(!data){
+      const created=u.created_at?new Date(u.created_at):new Date();
+      const ends=new Date(created.getTime()+7*86400000).toISOString();
+      const ins=await sbAuth.from('trials').insert({ user_id:u.id, email:u.email, full_name:u.user_metadata?.full_name||'', trial_started_at:created.toISOString(), trial_ends_at:ends }).select().single();
+      data=ins.data;
+    }
+    return data;
+  }
+
+  function applyTrialUI(t){
+    myShareCode=t.share_code;
+    const d=daysLeft(t);
+    const tl=document.getElementById('trialLeft'); if(tl) tl.textContent=t.paid?'Active':(d>0?d+' Day'+(d===1?'':'s')+' Left':'Trial ended');
+    if(!t.paid && d<=0) openTrialEnded();
+  }
+
+  async function maybeCredit(){
+    const url=new URLSearchParams(location.search);
+    let ref=url.get('ref'); if(ref) localStorage.setItem('c2_pending_ref',ref);
+    ref=ref||localStorage.getItem('c2_pending_ref');
+    if(!ref) return;
+    if(ref===myShareCode){ localStorage.removeItem('c2_pending_ref'); return; }
+    if(localStorage.getItem('c2_credited_'+ref)) return;
+    try{ await sbAuth.rpc('credit_referral',{ code: ref }); localStorage.setItem('c2_credited_'+ref,'1'); localStorage.removeItem('c2_pending_ref'); }catch(_){}
+  }
+
+  function shareLink(){ return SHARE_BASE+(myShareCode||''); }
+  function openInvite(){ const i=document.getElementById('inviteLinkInput'); if(i) i.value=shareLink(); document.getElementById('inviteOverlay').classList.add('open'); document.body.style.overflow='hidden'; }
+  function closeInvite(){ document.getElementById('inviteOverlay').classList.remove('open'); document.body.style.overflow=''; }
+  function openTrialEnded(){ const i=document.getElementById('endedLinkInput'); if(i) i.value=shareLink(); document.getElementById('trialEndedOverlay').classList.add('open'); document.body.style.overflow='hidden'; }
+  function copyVal(id,btn){ const el=document.getElementById(id); el.select(); el.setSelectionRange(0,99999); const done=()=>{ const o=btn.textContent; btn.textContent='Copied!'; setTimeout(()=>btn.textContent=o,1500); }; if(navigator.clipboard){ navigator.clipboard.writeText(el.value).then(done).catch(()=>{document.execCommand('copy');done();}); } else { document.execCommand('copy'); done(); } }
+
+  document.getElementById('buyNowBtn')?.addEventListener('click',()=>{ window.location.href=PAY_LINK; });
+  document.getElementById('inviteFriendBtn')?.addEventListener('click',openInvite);
+  document.getElementById('inviteClose')?.addEventListener('click',closeInvite);
+  document.getElementById('inviteOverlay')?.addEventListener('click',e=>{ if(e.target.id==='inviteOverlay') closeInvite(); });
+  document.getElementById('inviteCopy')?.addEventListener('click',e=>copyVal('inviteLinkInput',e.target));
+  document.getElementById('endedCopy')?.addEventListener('click',e=>copyVal('endedLinkInput',e.target));
+  document.getElementById('endedPay')?.addEventListener('click',()=>{ window.location.href=PAY_LINK; });
+
+  (async ()=>{
+    const { data:{ session } } = await sbAuth.auth.getSession();
+    if(!session) return;
+    let t=await ensureTrial(session.user);
+    if(t){ applyTrialUI(t); await maybeCredit();
+      const { data:t2 } = await sbAuth.from('trials').select('*').eq('user_id',session.user.id).maybeSingle();
+      if(t2) applyTrialUI(t2);
+    }
+  })();
 })();
 </script>
 </body>
