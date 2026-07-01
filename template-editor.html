@@ -314,13 +314,16 @@ async function renderPdfBytes(bytes){
   for(let p=1;p<=pdf.numPages;p++){
     const page=await pdf.getPage(p);
     const vp=page.getViewport({scale});
+    const cw=Math.floor(vp.width), ch=Math.floor(vp.height);
     const wrap=document.createElement('div');
     wrap.className='page-wrap'+(armedType?' armed':'');
-    wrap.style.width=vp.width+'px'; wrap.style.height=vp.height+'px';
+    wrap.style.width=cw+'px'; wrap.style.height=ch+'px';
     wrap.dataset.page=p;
     const canvas=document.createElement('canvas');
-    canvas.width=Math.floor(vp.width); canvas.height=Math.floor(vp.height);
-    canvas.style.width='100%'; canvas.style.height='100%'; canvas.style.display='block';
+    // backing store AND displayed size use the same pixel dimensions so the
+    // page keeps its true aspect ratio (no vertical squish)
+    canvas.width=cw; canvas.height=ch;
+    canvas.style.width=cw+'px'; canvas.style.height=ch+'px'; canvas.style.display='block';
     wrap.appendChild(canvas);
     stage.appendChild(wrap);
     const ctx=canvas.getContext('2d');
@@ -359,7 +362,7 @@ async function renderImageBytes(bytes){
   wrap.style.width=wPx+'px'; wrap.style.height=hPx+'px';
   wrap.dataset.page=1;
   const el=document.createElement('img');
-  el.src=url; el.style.width='100%'; el.style.height='100%'; el.style.display='block';
+  el.src=url; el.style.width=wPx+'px'; el.style.height=hPx+'px'; el.style.display='block';
   wrap.appendChild(el);
   wrap.addEventListener('pointerdown',e=>onPageClick(e,wrap,1));
   stage.appendChild(wrap);
