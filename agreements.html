@@ -68,7 +68,9 @@ button, input, select { font: inherit; }
 .nav-tabs a:hover { color: var(--ink); background: var(--indigo-050); }
 .nav-tabs a.active { color: var(--indigo-700); background: var(--indigo-050); }
 .top-actions { margin-left: auto; display: flex; align-items: center; gap: 14px; }
-.trial-left { color: var(--muted); font-weight: 600; font-size: .85rem; }
+.trial-left { color: var(--violet); font-weight: 700; font-size: .85rem; white-space: nowrap; }
+.topbar-invite { height: 36px; padding: 0 12px; border: 1px solid var(--indigo-700); border-radius: 8px; background: #fff; color: var(--indigo-700); font-weight: 700; font-size: .82rem; cursor: pointer; white-space: nowrap; }
+.topbar-invite:hover { background: var(--indigo-050); }
 .buy-btn {
   height: 36px; padding: 0 16px; border-radius: 8px;
   background: var(--indigo-700); border: none; color: #fff;
@@ -80,7 +82,7 @@ button, input, select { font: inherit; }
   width: 34px; height: 34px; border-radius: 50%;
   display: grid; place-items: center;
   background: var(--indigo-050); color: var(--indigo-700);
-  font-weight: 800; font-size: .8rem;
+  font-weight: 800; font-size: .8rem; cursor: pointer;
 }
 
 /* ── LAYOUT ── */
@@ -375,7 +377,8 @@ button, input, select { font: inherit; }
     margin-left: 0;
   }
 
-  .trial-left {
+  .trial-left,
+  .topbar-invite {
     display: none;
   }
 
@@ -584,9 +587,42 @@ button, input, select { font: inherit; }
   width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 9px;
   background: var(--surface); color: var(--violet); font-size: 1.3rem; line-height: 1; cursor: pointer;
 }
+
+/* ── LOGIN WALL (Google + email, pointed at xbw) ── */
+#login-overlay{position:fixed;inset:0;background:linear-gradient(135deg,#061a3a,#082b61);display:flex;align-items:center;justify-content:center;z-index:500;padding:22px}
+#login-overlay .login-card{background:#fff;border-radius:22px;padding:40px 34px;width:100%;max-width:420px;box-shadow:0 30px 90px rgba(0,0,0,.25)}
+#login-overlay h1{color:var(--violet);font-size:26px;font-weight:900;letter-spacing:-.05em;margin:0 0 6px}
+#login-overlay .login-sub{color:var(--muted);font-size:14px;margin-bottom:22px}
+#login-overlay .lo-label{color:var(--muted);font-size:11px;font-weight:800;margin:12px 0 6px;display:block;text-transform:uppercase;letter-spacing:.07em}
+#login-overlay .lo-input{background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:12px 13px;font-size:14px;width:100%;outline:none;transition:.15s}
+#login-overlay .lo-input:focus{border-color:var(--indigo-600);box-shadow:0 0 0 3px rgba(0,104,255,.12)}
+#login-overlay .login-btn{width:100%;background:var(--indigo-700);color:#fff;border:none;border-radius:999px;padding:13px;font-size:15px;font-weight:800;cursor:pointer;margin-top:16px}
+#login-overlay .login-btn:hover{background:var(--violet)}
+#login-overlay .login-err{color:#d93025;font-size:13px;margin-top:10px;text-align:center;min-height:18px}
 </style>
 </head>
 <body>
+  <!-- LOGIN WALL (email + Google), pointed at xbw -->
+  <div id="login-overlay">
+    <div class="login-card">
+      <h1>Welcome Back</h1>
+      <p class="login-sub">Please sign in to view your agreements.</p>
+      <label class="lo-label">Email</label>
+      <input class="lo-input" id="lo-email" type="email" placeholder="you@example.com" onkeydown="if(event.key==='Enter')doLogin()">
+      <label class="lo-label">Password</label>
+      <input class="lo-input" id="lo-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="login-btn" onclick="doLogin()">Sign In</button>
+      <div style="display:flex;align-items:center;gap:10px;margin:16px 0 6px;color:var(--faint);font-size:12px;font-weight:800;letter-spacing:.06em;">
+        <span style="flex:1;height:1px;background:var(--line);"></span>OR<span style="flex:1;height:1px;background:var(--line);"></span>
+      </div>
+      <button type="button" onclick="signInWithGoogle()" style="width:100%;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:12px;font-size:14px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+        Continue with Google
+      </button>
+      <div class="login-err" id="lo-err"></div>
+    </div>
+  </div>
+
   <header class="top-nav">
     <a href="/welcome" class="brand" aria-label="Connexion Two home">
       <div class="c2-logo">C2</div>
@@ -603,8 +639,9 @@ button, input, select { font: inherit; }
     </nav>
     <div class="top-actions">
       <span class="trial-left" id="trialLeft">—</span>
+      <button class="topbar-invite" id="inviteFriendBtn" type="button">Invite +7d</button>
       <button class="buy-btn" type="button" id="buyBtn">Upgrade</button>
-      <div class="avatar">AP</div>
+      <div class="avatar" id="avatar" title="Sign out">C2</div>
     </div>
   </header>
 
@@ -632,6 +669,7 @@ button, input, select { font: inherit; }
     <div class="mobile-drawer-section">
       <button class="mobile-action primary" type="button" onclick="window.location.href='/document-creation'">New Agreement</button>
       <button class="mobile-action" type="button" id="mobileInvite">Invite a Friend (+7 days)</button>
+      <button class="mobile-action" type="button" id="mobileSignOut">Sign Out</button>
     </div>
   </aside>
 
@@ -747,9 +785,33 @@ let rangeDays = 30;      // default: last 30 days
 let sortAsc = false;     // default: newest first
 let currentEmail = null; // this account's email — used to scope agreements
 let myShareCode = null;
+let booted = false;
 
 function fmtDate(value) { if(!value) return ''; return new Date(value).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }); }
 function escapeHtml(value) { return String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ── Login (email + Google), pointed at xbw ──
+async function doLogin(){
+  const email=document.getElementById('lo-email').value.trim();
+  const pass=document.getElementById('lo-pass').value;
+  document.getElementById('lo-err').textContent='';
+  const { error }=await sbAuth.auth.signInWithPassword({ email, password: pass });
+  if(error){ document.getElementById('lo-err').textContent=error.message; return; }
+  // onAuthStateChange will fire and boot the page
+}
+async function signInWithGoogle(){
+  document.getElementById('lo-err').textContent='';
+  const { error }=await sbAuth.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: window.location.origin + window.location.pathname + window.location.search } });
+  if(error) document.getElementById('lo-err').textContent=error.message;
+}
+async function signOut(){ try{ await sbAuth.auth.signOut(); }catch(_){}; location.reload(); }
+function showLogin(){ document.getElementById('login-overlay').style.display='flex'; }
+function hideLogin(){ document.getElementById('login-overlay').style.display='none'; }
+function setAvatar(user){
+  const em=(user && user.email)||'';
+  const initials=(em.slice(0,2)||'C2').toUpperCase();
+  const a=document.getElementById('avatar'); if(a) a.textContent=initials;
+}
 
 // Read the signing-progress view; fall back to the raw table if the view is missing.
 async function loadAgreements() {
@@ -768,10 +830,11 @@ async function loadAgreements() {
     return;
   }
   allAgreements = (result.data || []).map(normalize);
-  // Scope to this account: keep rows owned by this email (legacy rows with no
-  // owner stay visible so nothing already created disappears).
+  // Scope strictly to the signed-in account: only show agreements this user owns.
   if(currentEmail) {
-    allAgreements = allAgreements.filter(a => !a.owner_email || a.owner_email === currentEmail);
+    allAgreements = allAgreements.filter(a => a.owner_email === currentEmail);
+  } else {
+    allAgreements = [];
   }
   renderAgreements();
 }
@@ -890,6 +953,8 @@ document.getElementById('sortUpdated').addEventListener('click', () => {
 document.querySelectorAll('[data-folder]').forEach(btn => {
   btn.addEventListener('click', () => { currentFolder = btn.dataset.folder; document.getElementById('searchInput').value=''; renderAgreements(); });
 });
+document.getElementById('avatar')?.addEventListener('click', signOut);
+document.getElementById('mobileSignOut')?.addEventListener('click', signOut);
 
 
 const mobileMenuBtn = document.getElementById('mobileMenuBtn');
@@ -920,8 +985,9 @@ mobileMenuBtn?.addEventListener('click', () => {
 mobileClose?.addEventListener('click', closeMobileMenu);
 mobileBackdrop?.addEventListener('click', closeMobileMenu);
 mobileDrawer?.querySelectorAll('a, [data-folder], .mobile-action').forEach(item => {
-  // the invite button opens a modal — don't let it also bubble to nav handlers
-  if(item.id === 'mobileInvite') return;
+  // the invite / sign-out buttons handle their own action — don't let them
+  // also bubble to nav handlers, but still close the drawer on plain nav.
+  if(item.id === 'mobileInvite' || item.id === 'mobileSignOut') return;
   item.addEventListener('click', closeMobileMenu);
 });
 document.addEventListener('keydown', event => {
@@ -976,31 +1042,36 @@ function copyVal(id, btn) {
 
 document.getElementById('buyBtn')?.addEventListener('click', () => { window.location.href = PAY_LINK; });
 document.getElementById('endedPay')?.addEventListener('click', () => { window.location.href = PAY_LINK; });
+document.getElementById('inviteFriendBtn')?.addEventListener('click', openInvite);
 document.getElementById('inviteClose')?.addEventListener('click', closeInvite);
 document.getElementById('inviteOverlay')?.addEventListener('click', e => { if(e.target.id === 'inviteOverlay') closeInvite(); });
 document.getElementById('inviteCopy')?.addEventListener('click', e => copyVal('inviteLinkInput', e.target));
 document.getElementById('endedCopy')?.addEventListener('click', e => copyVal('endedLinkInput', e.target));
 document.getElementById('mobileInvite')?.addEventListener('click', () => { closeMobileMenu(); openInvite(); });
 
-// ── Boot: figure out who's signed in (scopes the list), load agreements, run trial ──
-(async () => {
-  let user = null;
-  try { const { data:{ session } } = await sbAuth.auth.getSession(); user = session?.user || null; } catch(_) {}
-  if(user) currentEmail = (user.email || '').toLowerCase() || null;
+// ── Boot / auth gate: require login, scope the list to this user, run trial ──
+async function onSession(session) {
+  if(!session) { showLogin(); return; }
+  const user = session.user;
+  currentEmail = (user.email || '').toLowerCase() || null;
+  hideLogin();
+  setAvatar(user);
+  if(booted) return; booted = true;
 
   await loadAgreements();
 
-  if(user) {
-    try {
-      const t = await ensureTrial(user);
-      if(t) { applyTrialUI(t); await maybeCredit();
-        const { data: t2 } = await sbAuth.from('trials').select('*').eq('user_id', user.id).maybeSingle();
-        if(t2) applyTrialUI(t2);
-      }
-    } catch(_) {}
-  } else {
-    const tl = document.getElementById('trialLeft'); if(tl) tl.textContent = '';
-  }
+  try {
+    const t = await ensureTrial(user);
+    if(t) { applyTrialUI(t); await maybeCredit();
+      const { data: t2 } = await sbAuth.from('trials').select('*').eq('user_id', user.id).maybeSingle();
+      if(t2) applyTrialUI(t2);
+    }
+  } catch(_) {}
+}
+sbAuth.auth.onAuthStateChange((_e, session) => { onSession(session); });
+(async () => {
+  const { data:{ session } } = await sbAuth.auth.getSession();
+  onSession(session);
 })();
 </script>
 </body>
