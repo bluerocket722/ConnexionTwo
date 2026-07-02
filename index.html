@@ -395,6 +395,14 @@
     .addons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
     .addon { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 18px; font-weight: 900; color: var(--blue-950); }
 
+    /* PRODUCT SCREENSHOTS — "See What You Get" gallery */
+    .shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .shot { border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: #fff; box-shadow: 0 12px 38px rgba(6, 26, 58, 0.06); display: flex; flex-direction: column; }
+    .shot img { width: 100%; height: auto; display: block; border-bottom: 1px solid var(--line); background: var(--blue-050); }
+    .shot .cap { padding: 16px 18px; font-weight: 900; color: var(--blue-950); }
+    .shot .cap span { display: block; font-weight: 600; color: var(--muted); font-size: 0.86rem; margin-top: 3px; }
+    @media (max-width: 900px) { .shots { grid-template-columns: 1fr; max-width: 520px; margin: 0 auto; } }
+
     .why-now { background: linear-gradient(180deg, var(--blue-950), #071d40); color: #fff; }
     .why-now .section-header h2, .why-now h3 { color: #fff; }
     .why-now p, .why-now li { color: rgba(255,255,255,0.76); }
@@ -1155,6 +1163,30 @@
 
 
     <main>
+      <section class="content-section" id="see-it">
+        <div class="container">
+          <div class="section-header">
+            <div class="section-eyebrow">See What You Get</div>
+            <h2>A Real Office Suite, Built In</h2>
+            <p>Create documents, spreadsheets, and presentations right inside your own portal — no Microsoft 365 required. Here's what your team actually works in.</p>
+          </div>
+          <div class="shots">
+            <div class="shot">
+              <img src="https://rfdvogakvyodixgpvqvz.supabase.co/storage/v1/object/public/ConnexiontwoWebsite/Word%20example.png" alt="Word-style document editor with headers, styles, and formatting">
+              <div class="cap">Documents<span>Word-style editing — headings, styles, bullets, page layout</span></div>
+            </div>
+            <div class="shot">
+              <img src="https://rfdvogakvyodixgpvqvz.supabase.co/storage/v1/object/public/ConnexiontwoWebsite/XLSX%20example.png" alt="Excel-style spreadsheet with formulas, formatting, and multiple sheets">
+              <div class="cap">Spreadsheets<span>Excel-style — formulas, formatting, multiple sheets</span></div>
+            </div>
+            <div class="shot">
+              <img src="https://rfdvogakvyodixgpvqvz.supabase.co/storage/v1/object/public/ConnexiontwoWebsite/PPTX%20example.png" alt="PowerPoint-style presentation editor with slides and layouts">
+              <div class="cap">Presentations<span>PowerPoint-style — slides, layouts, animations</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="hero">
         <div class="container hero-grid">
           <div>
