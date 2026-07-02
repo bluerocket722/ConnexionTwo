@@ -564,43 +564,63 @@
       z-index: 2;
       right: 6%;
       bottom: 9%;
-      width: min(380px, 38vw);
+      width: min(420px, 34vw);
       pointer-events: none;
       opacity: 0;
-      animation: sigFadeIn 0.9s ease 0.4s forwards, sigSettle 1.4s ease 3.6s forwards;
+      animation: sigCycle 6s ease-in-out 0.4s infinite;   /* sign · hold · fade · repeat */
     }
-    .hero-signature svg { width: 100%; height: auto; display: block; overflow: visible; filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.45)); }
-    .hero-signature path {
+    .hero-signature svg { width: 100%; height: auto; display: block; overflow: visible; filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.4)); }
+    .hero-signature .sig-line {
       fill: none;
       stroke: #ffffff;
-      stroke-width: 3.4;
+      stroke-width: 1.6;                 /* thin, modern */
       stroke-linecap: round;
       stroke-linejoin: round;
       stroke-dasharray: 1;
       stroke-dashoffset: 1;
+      animation: sigLineCycle 6s ease 0.4s infinite;
     }
     .hero-signature .sig-text {
       fill: #ffffff;
-      font-family: "Segoe Script", "Bradley Hand", "Brush Script MT", "Snell Roundhand", cursive;
+      font-family: "Snell Roundhand", "Segoe Script", "Gabriola", "Brush Script MT", cursive;
       font-style: italic;
-      font-size: 104px;
-      clip-path: inset(0 100% 0 0);          /* hidden, revealed left-to-right */
-      animation: sigWrite 1.9s ease 0.5s forwards;
+      font-weight: 300;                  /* thinner, classy */
+      font-size: 92px;
+      letter-spacing: 1px;
+      clip-path: inset(0 100% 0 0);
+      animation: sigTextCycle 6s ease 0.4s infinite;
     }
-    .hero-signature .sig-line { animation: sigDraw 0.9s ease 2.2s forwards; }
 
-    @keyframes sigFadeIn { to { opacity: 1; } }
-    @keyframes sigDraw   { to { stroke-dashoffset: 0; } }
-    @keyframes sigWrite  { to { clip-path: inset(0 0 0 0); } }   /* writes the word on */
-    /* settle: eases opacity down so the ink "fades into" the photo */
-    @keyframes sigSettle { to { opacity: 0.8; } }
+    /* container: fade in as it signs, hold, fade out, then loop */
+    @keyframes sigCycle {
+      0%   { opacity: 0; }
+      10%  { opacity: 1; }
+      70%  { opacity: 1; }
+      88%  { opacity: 0; }
+      100% { opacity: 0; }
+    }
+    /* text writes on left-to-right (resets while invisible) */
+    @keyframes sigTextCycle {
+      0%   { clip-path: inset(0 100% 0 0); }
+      42%  { clip-path: inset(0 0 0 0); }
+      100% { clip-path: inset(0 0 0 0); }
+    }
+    /* underline flourish draws just after the name */
+    @keyframes sigLineCycle {
+      0%, 18% { stroke-dashoffset: 1; }
+      50%     { stroke-dashoffset: 0; }
+      100%    { stroke-dashoffset: 0; }
+    }
 
     @media (prefers-reduced-motion: reduce) {
-      .hero-signature { animation: none; opacity: 0.8; }
+      .hero-signature { animation: none; opacity: 0.85; }
       .hero-signature .sig-text { clip-path: none; animation: none; }
-      .hero-signature path { stroke-dashoffset: 0; animation: none; }
+      .hero-signature .sig-line { stroke-dashoffset: 0; animation: none; }
     }
-    @media (max-width: 760px) { .hero-signature { display: none; } }
+    /* keep it visible on mobile — repositioned and a touch larger */
+    @media (max-width: 760px) {
+      .hero-signature { width: 48vw; right: 5%; bottom: 6%; }
+    }
 
     @media (max-width: 760px) {
       .full-photo-hero img { min-height: 420px; object-fit: cover; object-position: center; }
@@ -1224,9 +1244,9 @@
       </div>
 
       <div class="hero-signature" aria-hidden="true">
-        <svg viewBox="0 0 420 150" xmlns="http://www.w3.org/2000/svg">
-          <text class="sig-text" x="14" y="104">sign</text>
-          <path class="sig-line" pathLength="1" d="M22 124 C 140 140, 300 140, 402 118"/>
+        <svg viewBox="0 0 520 150" xmlns="http://www.w3.org/2000/svg">
+          <text class="sig-text" x="16" y="104">Signature</text>
+          <path class="sig-line" pathLength="1" d="M24 126 C 180 142, 380 142, 500 118"/>
         </svg>
       </div>
     </div>
