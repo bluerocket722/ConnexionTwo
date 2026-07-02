@@ -558,6 +558,50 @@
       display: block;
     }
 
+    /* SIGNATURE ANIMATION — draws itself, then fades into the hero image */
+    .hero-signature {
+      position: absolute;
+      z-index: 2;
+      right: 6%;
+      bottom: 9%;
+      width: min(380px, 38vw);
+      pointer-events: none;
+      opacity: 0;
+      animation: sigFadeIn 0.9s ease 0.4s forwards, sigSettle 1.4s ease 3.6s forwards;
+    }
+    .hero-signature svg { width: 100%; height: auto; display: block; overflow: visible; filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.45)); }
+    .hero-signature path {
+      fill: none;
+      stroke: #ffffff;
+      stroke-width: 3.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+    }
+    .hero-signature .sig-text {
+      fill: #ffffff;
+      font-family: "Segoe Script", "Bradley Hand", "Brush Script MT", "Snell Roundhand", cursive;
+      font-style: italic;
+      font-size: 104px;
+      clip-path: inset(0 100% 0 0);          /* hidden, revealed left-to-right */
+      animation: sigWrite 1.9s ease 0.5s forwards;
+    }
+    .hero-signature .sig-line { animation: sigDraw 0.9s ease 2.2s forwards; }
+
+    @keyframes sigFadeIn { to { opacity: 1; } }
+    @keyframes sigDraw   { to { stroke-dashoffset: 0; } }
+    @keyframes sigWrite  { to { clip-path: inset(0 0 0 0); } }   /* writes the word on */
+    /* settle: eases opacity down so the ink "fades into" the photo */
+    @keyframes sigSettle { to { opacity: 0.8; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hero-signature { animation: none; opacity: 0.8; }
+      .hero-signature .sig-text { clip-path: none; animation: none; }
+      .hero-signature path { stroke-dashoffset: 0; animation: none; }
+    }
+    @media (max-width: 760px) { .hero-signature { display: none; } }
+
     @media (max-width: 760px) {
       .full-photo-hero img { min-height: 420px; object-fit: cover; object-position: center; }
       .hero-content { width: 86vw; left: 6%; }
@@ -1157,6 +1201,13 @@
         <div class="hero-buttons">
           <a href="/calendar" class="btn-primary">BOOK YOUR FREE STRATEGY CALL!</a>
         </div>
+      </div>
+
+      <div class="hero-signature" aria-hidden="true">
+        <svg viewBox="0 0 420 150" xmlns="http://www.w3.org/2000/svg">
+          <text class="sig-text" x="14" y="104">sign</text>
+          <path class="sig-line" pathLength="1" d="M22 124 C 140 140, 300 140, 402 118"/>
+        </svg>
       </div>
     </div>
 
