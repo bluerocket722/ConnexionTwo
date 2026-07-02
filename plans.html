@@ -248,5 +248,35 @@
 
     <footer><div class="container"><p>© Connexion Two. Sovereign Document Workflow System.</p></div></footer>
   </div>
+
+  <script>
+    /* Currency: show $ for visitors in the United States, € for everyone else.
+       Symbol-only swap inside the pricing section (numbers unchanged). No network
+       call — uses the browser's own locale + timezone. Defaults to € when unsure. */
+    (function () {
+      function isUS() {
+        try {
+          const langs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language];
+          for (const l of langs) {
+            const m = /[-_]([A-Za-z]{2})$/.exec(l || '');
+            if (m && m[1].toUpperCase() === 'US') return true;
+          }
+          try { const r = new Intl.Locale(navigator.language).region; if (r === 'US') return true; } catch (e) {}
+          const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || '');
+          const US_TZ = ['America/New_York','America/Detroit','America/Chicago','America/Denver','America/Phoenix','America/Los_Angeles','America/Anchorage','America/Adak','America/Boise','America/Juneau','America/Sitka','America/Menominee','America/Indiana/Indianapolis','America/Indiana/Knox','America/Kentucky/Louisville','Pacific/Honolulu'];
+          if (US_TZ.indexOf(tz) !== -1) return true;
+        } catch (e) {}
+        return false;
+      }
+      if (!isUS()) return; // outside the US → keep € (default)
+      const scope = document.getElementById('offer');
+      if (!scope) return;
+      const walk = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, null);
+      let n;
+      while ((n = walk.nextNode())) {
+        if (n.nodeValue.indexOf('€') !== -1) n.nodeValue = n.nodeValue.replace(/€/g, '$');
+      }
+    })();
+  </script>
 </body>
 </html>
