@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Connexion Two | Sovereign Document Workflow System</title>
+  <title>Connexion Two Signature | Sovereign Document Workflow System</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <style>
@@ -1673,6 +1673,36 @@
         });
       });
     }
+  </script>
+
+  <script>
+    /* Currency: show $ for visitors in the United States, € for everyone else.
+       Symbol-only swap inside the pricing section (numbers unchanged). No network
+       call — uses the browser's own locale + timezone. Defaults to € when unsure. */
+    (function () {
+      function isUS() {
+        try {
+          const langs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language];
+          for (const l of langs) {
+            const m = /[-_]([A-Za-z]{2})$/.exec(l || '');
+            if (m && m[1].toUpperCase() === 'US') return true;
+          }
+          try { const r = new Intl.Locale(navigator.language).region; if (r === 'US') return true; } catch (e) {}
+          const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || '');
+          const US_TZ = ['America/New_York','America/Detroit','America/Chicago','America/Denver','America/Phoenix','America/Los_Angeles','America/Anchorage','America/Adak','America/Boise','America/Juneau','America/Sitka','America/Menominee','America/Indiana/Indianapolis','America/Indiana/Knox','America/Kentucky/Louisville','Pacific/Honolulu'];
+          if (US_TZ.indexOf(tz) !== -1) return true;
+        } catch (e) {}
+        return false;
+      }
+      if (!isUS()) return; // outside the US → keep € (default)
+      const scope = document.getElementById('offer');
+      if (!scope) return;
+      const walk = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, null);
+      let n;
+      while ((n = walk.nextNode())) {
+        if (n.nodeValue.indexOf('€') !== -1) n.nodeValue = n.nodeValue.replace(/€/g, '$');
+      }
+    })();
   </script>
 
   <script>
