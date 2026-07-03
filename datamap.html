@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connexion Two | Data Map & Records of Processing</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+  <style>
+    body{font-family:Inter,Arial,sans-serif;background:#f7f9fc;color:#0f1b2d;margin:0;padding:40px 20px;line-height:1.6}
+    .wrap{max-width:820px;margin:0 auto;background:#fff;border:1px solid #d9e2ef;border-radius:16px;padding:28px;box-shadow:0 22px 70px rgba(6,26,58,.08)}
+    h1{font-size:1.6rem;letter-spacing:-.03em;color:#041124;margin:0 0 6px}
+    p{color:#5f6b7a;margin:0 0 18px}
+    label{display:block;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#5f6b7a;margin:12px 0 6px}
+    select,input{border:1px solid #d9e2ef;border-radius:8px;padding:7px 9px;font:inherit;outline:none;background:#fff;color:#0f1b2d;width:100%}
+    select:focus,input:focus{border-color:#0068ff;box-shadow:0 0 0 3px rgba(0,104,255,.12)}
+    .btn{margin-top:18px;background:#0054d1;color:#fff;border:none;border-radius:10px;padding:13px 18px;font-weight:800;cursor:pointer}
+    .btn:hover{background:#082b61}.btn:disabled{background:#9db4d6;cursor:not-allowed}
+    .note{font-size:.82rem;color:#5f6b7a;margin-top:14px}.err{color:#c0362c}
+    table{width:100%;border-collapse:collapse;margin-top:10px;font-size:.85rem}
+    th{text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:#5f6b7a;padding:8px 8px;border-bottom:1px solid #e6edf7}
+    td{padding:8px 8px;border-bottom:1px solid #eef3fb;vertical-align:top}
+    .tw{max-width:220px}.doc-t{font-weight:700}.doc-s{color:#9aa6b5;font-size:.72rem}
+    .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:700}
+    .b-none{background:#eef1f5;color:#5f6b7a}.b-personal{background:#e3f0ff;color:#0054d1}.b-confidential{background:#fff2df;color:#a45b00}.b-special{background:#ffe3e3;color:#c0362c}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+    .who{font-size:.78rem;color:#5f6b7a}.link{background:none;border:none;color:#0054d1;font-weight:700;cursor:pointer;font-size:.82rem;padding:0}
+    .row-actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
+    .scroll{overflow-x:auto}
+    .overlay{position:fixed;inset:0;background:rgba(4,17,36,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50}
+    .card{background:#fff;border-radius:16px;padding:26px;max-width:380px;width:100%;box-shadow:0 30px 90px rgba(6,26,58,.25)}
+    .card h2{margin:0 0 4px;font-size:1.3rem;color:#041124}.card p{font-size:.85rem;margin:0 0 16px}
+    .gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:1px solid #d9e2ef;background:#fff;border-radius:10px;padding:11px;font-weight:700;cursor:pointer;margin-bottom:14px}
+    .gbtn:hover{background:#f7f9fc}.divider{text-align:center;font-size:.72rem;color:#9aa6b5;margin:6px 0 12px}
+    .card input{margin-bottom:2px}
+  </style>
+</head>
+<body>
+  <div class="overlay" id="login-overlay">
+    <div class="card">
+      <h2>Sign in</h2>
+      <p>Sign in to map your documents and generate a Records of Processing report.</p>
+      <button class="gbtn" onclick="signInWithGoogle()">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Continue with Google
+      </button>
+      <div class="divider">or with email</div>
+      <label>Email</label><input id="lo-email" type="email" placeholder="you@company.com">
+      <label>Password</label><input id="lo-pass" type="password" placeholder="••••••••">
+      <button class="btn" style="width:100%" onclick="doLogin()">Sign in</button>
+      <div class="note err" id="lo-err"></div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="topbar">
+      <h1>Data Map &amp; Records of Processing</h1>
+      <span class="who"><span id="who-email"></span> · <button class="link" onclick="signOut()">Sign out</button></span>
+    </div>
+    <p>Tag each document so you know exactly where your regulated and personal data lives. Then export a <strong>Records of Processing</strong> report — the map an auditor or Data Protection Officer asks for. Everything here stays in your EU-hosted workspace.</p>
+
+    <div class="scroll">
+      <table id="tbl">
+        <thead><tr>
+          <th class="tw">Document</th><th>Classification</th><th>Data categories</th><th>Legal basis</th><th>Retention</th>
+        </tr></thead>
+        <tbody id="rows"><tr><td colspan="5" class="doc-s">Loading your documents…</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="row-actions">
+      <button class="btn" id="save">Save tags</button>
+      <button class="btn" id="report" style="background:#0a7d3f">Export Records of Processing (PDF)</button>
+    </div>
+    <div class="note" id="status"></div>
+  </div>
+
+  <script>
+    const SB_URL='https://rfdvogakvyodixgpvqvz.supabase.co';
+    const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
+    const sb=supabase.createClient(SB_URL,SB_KEY);
+    const AUTH_URL='https://xbwuvaxtnylqvagdvpxp.supabase.co';
+    const AUTH_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc';
+    const sbAuth=supabase.createClient(AUTH_URL,AUTH_KEY);
+    const REGION='EU (Supabase eu · Brevo FR)';   // where documents are hosted
+
+    let currentEmail=null, rows=[], tags={}, booted=false;
+    const $=(id)=>document.getElementById(id);
+    const esc=(v)=>String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const CLASS=[['none','Not sensitive'],['personal','Personal data'],['confidential','Confidential / business'],['special','Special category']];
+
+    async function doLogin(){const{error}=await sbAuth.auth.signInWithPassword({email:$('lo-email').value.trim(),password:$('lo-pass').value});if(error)$('lo-err').textContent=error.message;}
+    async function signInWithGoogle(){const{error}=await sbAuth.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+window.location.pathname}});if(error)$('lo-err').textContent=error.message;}
+    async function signOut(){try{await sbAuth.auth.signOut();}catch(_){}location.reload();}
+    async function logAccess(action){try{await sb.from('access_log').insert({owner_email:currentEmail,actor_email:currentEmail,action,user_agent:navigator.userAgent});}catch(_){}}
+
+    async function load(){
+      let res=await sb.from('v_agreement_progress').select('*').order('updated_at',{ascending:false});
+      if(res.error)res=await sb.from('signer_documents').select('*').order('created_at',{ascending:false});
+      if(res.error){$('rows').innerHTML='<tr><td colspan="5" class="err">Could not load: '+esc(res.error.message)+'</td></tr>';return;}
+      const seen=new Set();
+      rows=(res.data||[]).filter(a=>{const owner=(a.owner_email||'').toLowerCase();return!(currentEmail&&owner!==currentEmail);})
+        .filter(r=>{if(seen.has(r.doc_id))return false;seen.add(r.doc_id);return true;})
+        .map(r=>({doc_id:r.doc_id,title:r.title||'Untitled document',completed_at:r.completed_at||r.updated_at||r.created_at,status:r.status||''}));
+      // existing tags
+      const{data:tg}=await sb.from('document_tags').select('*');
+      (tg||[]).forEach(t=>{tags[t.doc_id]=t;});
+      render();
+    }
+    function render(){
+      if(!rows.length){$('rows').innerHTML='<tr><td colspan="5" class="doc-s">No documents yet.</td></tr>';return;}
+      $('rows').innerHTML=rows.map(r=>{
+        const t=tags[r.doc_id]||{};
+        const opts=CLASS.map(([v,l])=>`<option value="${v}" ${(t.classification||'none')===v?'selected':''}>${l}</option>`).join('');
+        return `<tr data-id="${esc(r.doc_id)}">
+          <td class="tw"><div class="doc-t">${esc(r.title)}</div><div class="doc-s">${esc(r.doc_id).slice(0,8)} · ${esc(String(r.status||'').toLowerCase())}</div></td>
+          <td><select class="f-class">${opts}</select></td>
+          <td><input class="f-cat" placeholder="e.g. Contact details, contract terms" value="${esc(t.categories||'')}"></td>
+          <td><input class="f-basis" placeholder="e.g. Contract (Art.6(1)(b))" value="${esc(t.legal_basis||'')}"></td>
+          <td><input class="f-ret" placeholder="e.g. 6 years" value="${esc(t.retention||'')}"></td>
+        </tr>`;
+      }).join('');
+    }
+    function collect(){
+      return [...document.querySelectorAll('#rows tr[data-id]')].map(tr=>({
+        doc_id:tr.dataset.id, owner_email:currentEmail,
+        classification:tr.querySelector('.f-class').value,
+        categories:tr.querySelector('.f-cat').value.trim(),
+        legal_basis:tr.querySelector('.f-basis').value.trim(),
+        retention:tr.querySelector('.f-ret').value.trim(),
+        updated_at:new Date().toISOString()
+      }));
+    }
+    async function save(){
+      $('status').textContent='Saving…';
+      const payload=collect();
+      const{error}=await sb.from('document_tags').upsert(payload,{onConflict:'doc_id'});
+      if(error){$('status').innerHTML='<span class="err">Save failed: '+esc(error.message)+'</span>';return;}
+      payload.forEach(p=>{tags[p.doc_id]=p;});
+      $('status').textContent='✓ Tags saved.';
+    }
+
+    async function report(){
+      $('status').textContent='Building report…';
+      try{
+        const data=collect();
+        const{PDFDocument,StandardFonts,rgb}=PDFLib;
+        const out=await PDFDocument.create();
+        const font=await out.embedFont(StandardFonts.Helvetica);
+        const bold=await out.embedFont(StandardFonts.HelveticaBold);
+        const W=595.28,H=841.89,M=42;
+        const blue=rgb(0,0.33,0.82),navy=rgb(0.024,0.102,0.227),ink=rgb(0.07,0.11,0.18),muted=rgb(0.37,0.42,0.48),line=rgb(0.85,0.89,0.94);
+        let page=out.addPage([W,H]),y=H-50;
+        const CLABEL={none:'Not sensitive',personal:'Personal data',confidential:'Confidential / business',special:'Special category'};
+        const nl=(f,s,t,x,c)=>{page.drawText(t,{x,y,size:s,font:f,color:c});};
+        const nb=()=>{page=out.addPage([W,H]);y=H-50;};
+        nl(bold,12,'Connexion Two',M,blue);y-=24;
+        nl(bold,20,'Records of Processing',M,navy);y-=14;
+        page.drawLine({start:{x:M,y},end:{x:W-M,y},thickness:1,color:line});y-=22;
+        nl(font,9,'Generated (UTC): '+new Date().toUTCString(),M,muted);y-=13;
+        nl(font,9,'Controller / account: '+(currentEmail||''),M,muted);y-=13;
+        nl(font,9,'Storage location: '+REGION,M,muted);y-=13;
+        const tagged=data.filter(d=>d.classification&&d.classification!=='none');
+        nl(font,9,'Documents mapped: '+data.length+'   ·   carrying regulated/personal data: '+tagged.length,M,muted);y-=22;
+
+        data.forEach((d,i)=>{
+          if(y<120)nb();
+          const r=rows.find(x=>x.doc_id===d.doc_id)||{};
+          nl(bold,11,(i+1)+'.  '+(r.title||'Untitled document'),M,navy);y-=14;
+          nl(font,8.5,'Document ID '+d.doc_id,M,muted);y-=13;
+          nl(bold,9,'Classification: ',M,ink);nl(font,9,CLABEL[d.classification]||'Not sensitive',M+82,ink);y-=13;
+          if(d.categories){nl(bold,9,'Data categories: ',M,ink);nl(font,9,d.categories,M+92,ink);y-=13;}
+          if(d.legal_basis){nl(bold,9,'Legal basis: ',M,ink);nl(font,9,d.legal_basis,M+70,ink);y-=13;}
+          if(d.retention){nl(bold,9,'Retention: ',M,ink);nl(font,9,d.retention,M+62,ink);y-=13;}
+          nl(font,9,'Location: '+REGION,M,muted);y-=13;
+          y-=6;page.drawLine({start:{x:M,y},end:{x:W-M,y},thickness:.4,color:line});y-=14;
+        });
+        if(y<90)nb();
+        y-=4;page.drawLine({start:{x:M,y},end:{x:W-M,y},thickness:.5,color:line});y-=14;
+        nl(font,8,'This report lists where regulated and personal data is held in your Connexion Two workspace. It is evidence to support your record-keeping; it is not a certification of compliance.',M,muted);
+
+        const bytes=await out.save();
+        const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+        const a=document.createElement('a');a.href=url;a.download='records-of-processing.pdf';a.click();
+        setTimeout(()=>URL.revokeObjectURL(url),4000);
+        logAccess('data_map');
+        $('status').textContent='✓ Report downloaded.';
+      }catch(e){console.error(e);$('status').innerHTML='<span class="err">Error: '+esc(e.message)+'</span>';}
+    }
+
+    $('save').addEventListener('click',save);
+    $('report').addEventListener('click',report);
+    async function onSession(session){
+      const user=session&&session.user;if(!user){$('login-overlay').style.display='flex';return;}
+      currentEmail=(user.email||'').toLowerCase()||null;$('who-email').textContent=user.email||'';
+      $('login-overlay').style.display='none';if(booted)return;booted=true;await load();
+    }
+    sbAuth.auth.onAuthStateChange((_e,s)=>onSession(s));
+    (async()=>{const{data:{session}}=await sbAuth.auth.getSession();onSession(session);})();
+  </script>
+</body>
+</html>

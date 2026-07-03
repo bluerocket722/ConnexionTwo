@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connexion Two | Access Log</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body{font-family:Inter,Arial,sans-serif;background:#f7f9fc;color:#0f1b2d;margin:0;padding:40px 20px;line-height:1.6}
+    .wrap{max-width:860px;margin:0 auto;background:#fff;border:1px solid #d9e2ef;border-radius:16px;padding:28px;box-shadow:0 22px 70px rgba(6,26,58,.08)}
+    h1{font-size:1.6rem;letter-spacing:-.03em;color:#041124;margin:0 0 6px}
+    p{color:#5f6b7a;margin:0 0 18px}
+    .btn{background:#0054d1;color:#fff;border:none;border-radius:10px;padding:11px 16px;font-weight:800;cursor:pointer}
+    .btn:hover{background:#082b61}.link{background:none;border:none;color:#0054d1;font-weight:700;cursor:pointer;font-size:.82rem;padding:0}
+    .note{font-size:.82rem;color:#5f6b7a;margin-top:14px}.err{color:#c0362c}
+    table{width:100%;border-collapse:collapse;margin-top:12px;font-size:.85rem}
+    th{text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:#5f6b7a;padding:8px;border-bottom:1px solid #e6edf7}
+    td{padding:8px;border-bottom:1px solid #eef3fb;vertical-align:top}
+    .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:700;background:#eef1f5;color:#5f6b7a}
+    .b-evidence_pack{background:#e3f0ff;color:#0054d1}.b-data_map{background:#e4f6ec;color:#0a7d3f}.b-download{background:#fff2df;color:#a45b00}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+    .who{font-size:.78rem;color:#5f6b7a}.scroll{overflow-x:auto}.mono{font-family:ui-monospace,Menlo,monospace;font-size:.78rem}
+    .overlay{position:fixed;inset:0;background:rgba(4,17,36,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50}
+    .card{background:#fff;border-radius:16px;padding:26px;max-width:380px;width:100%;box-shadow:0 30px 90px rgba(6,26,58,.25)}
+    .card h2{margin:0 0 4px;font-size:1.3rem;color:#041124}.card p{font-size:.85rem;margin:0 0 16px}
+    .card input{width:100%;border:1px solid #d9e2ef;border-radius:10px;padding:11px 12px;font:inherit;margin-bottom:2px}
+    .card label{display:block;font-size:.72rem;font-weight:800;text-transform:uppercase;color:#5f6b7a;margin:12px 0 6px}
+    .gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:1px solid #d9e2ef;background:#fff;border-radius:10px;padding:11px;font-weight:700;cursor:pointer;margin-bottom:14px}
+    .gbtn:hover{background:#f7f9fc}.divider{text-align:center;font-size:.72rem;color:#9aa6b5;margin:6px 0 12px}
+  </style>
+</head>
+<body>
+  <div class="overlay" id="login-overlay">
+    <div class="card">
+      <h2>Sign in</h2>
+      <p>Sign in to view your document access log.</p>
+      <button class="gbtn" onclick="signInWithGoogle()">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Continue with Google
+      </button>
+      <div class="divider">or with email</div>
+      <label>Email</label><input id="lo-email" type="email" placeholder="you@company.com">
+      <label>Password</label><input id="lo-pass" type="password" placeholder="••••••••">
+      <button class="btn" style="width:100%" onclick="doLogin()">Sign in</button>
+      <div class="note err" id="lo-err"></div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="topbar">
+      <h1>Access Log</h1>
+      <span class="who"><span id="who-email"></span> · <button class="link" onclick="signOut()">Sign out</button></span>
+    </div>
+    <p>A running record of who opened, packed, or exported your documents — a clean audit trail you can show a Data Protection Officer or auditor. <button class="link" onclick="exportCsv()">Export CSV</button></p>
+
+    <div class="scroll">
+      <table id="tbl">
+        <thead><tr><th>When (UTC)</th><th>Who</th><th>Action</th><th>Document</th><th>IP</th><th>Device</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="6" class="note">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="note" id="status"></div>
+  </div>
+
+  <script>
+    const SB_URL='https://rfdvogakvyodixgpvqvz.supabase.co';
+    const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
+    const sb=supabase.createClient(SB_URL,SB_KEY);
+    const AUTH_URL='https://xbwuvaxtnylqvagdvpxp.supabase.co';
+    const AUTH_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc';
+    const sbAuth=supabase.createClient(AUTH_URL,AUTH_KEY);
+
+    let currentEmail=null, entries=[], booted=false;
+    const $=(id)=>document.getElementById(id);
+    const esc=(v)=>String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const fmtUtc=(iso)=>{if(!iso)return'—';const d=new Date(iso);return isNaN(d.getTime())?String(iso):d.toUTCString();};
+    const ACT={view:'Viewed',evidence_pack:'Evidence Pack',data_map:'Records report',download:'Download'};
+
+    async function doLogin(){const{error}=await sbAuth.auth.signInWithPassword({email:$('lo-email').value.trim(),password:$('lo-pass').value});if(error)$('lo-err').textContent=error.message;}
+    async function signInWithGoogle(){const{error}=await sbAuth.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+window.location.pathname}});if(error)$('lo-err').textContent=error.message;}
+    async function signOut(){try{await sbAuth.auth.signOut();}catch(_){}location.reload();}
+
+    async function load(){
+      const{data,error}=await sb.from('access_log').select('*').eq('owner_email',currentEmail).order('created_at',{ascending:false}).limit(500);
+      if(error){$('rows').innerHTML='<tr><td colspan="6" class="err">Could not load log: '+esc(error.message)+'</td></tr>';return;}
+      entries=data||[];
+      if(!entries.length){$('rows').innerHTML='<tr><td colspan="6" class="note">No activity yet. Actions (Evidence Pack, Records report, downloads) will appear here.</td></tr>';return;}
+      $('rows').innerHTML=entries.map(e=>`<tr>
+        <td class="mono">${fmtUtc(e.created_at)}</td>
+        <td>${esc(e.actor_email||'—')}</td>
+        <td><span class="badge b-${esc(e.action||'')}">${esc(ACT[e.action]||e.action||'—')}</span></td>
+        <td class="mono">${e.doc_id?esc(String(e.doc_id).slice(0,8)):'—'}</td>
+        <td class="mono">${esc(e.ip||'—')}</td>
+        <td style="max-width:240px;font-size:.72rem;color:#9aa6b5">${esc((e.user_agent||'').slice(0,120))}</td>
+      </tr>`).join('');
+    }
+    function exportCsv(){
+      if(!entries.length){return;}
+      const head=['created_at','actor_email','action','doc_id','ip','user_agent'];
+      const csv=[head.join(',')].concat(entries.map(e=>head.map(k=>'"'+String(e[k]==null?'':e[k]).replace(/"/g,'""')+'"').join(','))).join('\n');
+      const url=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+      const a=document.createElement('a');a.href=url;a.download='access-log.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),4000);
+    }
+    window.exportCsv=exportCsv;
+
+    async function onSession(session){
+      const user=session&&session.user;if(!user){$('login-overlay').style.display='flex';return;}
+      currentEmail=(user.email||'').toLowerCase()||null;$('who-email').textContent=user.email||'';
+      $('login-overlay').style.display='none';if(booted)return;booted=true;await load();
+    }
+    sbAuth.auth.onAuthStateChange((_e,s)=>onSession(s));
+    (async()=>{const{data:{session}}=await sbAuth.auth.getSession();onSession(session);})();
+  </script>
+</body>
+</html>
