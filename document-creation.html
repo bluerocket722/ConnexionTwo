@@ -813,6 +813,7 @@ async function submitData() {
     const { data:{ user } } = await sbAuth.auth.getUser();
 const { data:doc, error:docError } = await sb.from("signer_documents").insert({
   owner_id:    user?.id || null,
+  owner_email: (user?.email || "").toLowerCase() || null,
   jira_code:   document.getElementById("jira_code")?.value || "",
   title:       titleInput?.value || name,
   template_name: "",
@@ -1018,7 +1019,10 @@ async function submitData() {
   try {
     const titleInput = document.getElementById('document_title');
 
+    const { data:{ user } } = await sbAuth.auth.getUser();
     const { data:doc, error:docError } = await sb.from('signer_documents').insert({
+      owner_id:    user?.id || null,
+      owner_email: (user?.email || '').toLowerCase() || null,
       jira_code:   document.getElementById('jira_code')?.value || '',
       title:       titleInput?.value || first.name,
       template_name: '',
