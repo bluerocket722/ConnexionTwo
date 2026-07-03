@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Connexion Two | Certificate of Completion — Demo</title>
+  <title>Connexion Two | Certificate of Completion</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
   <script src="c2-certificate.js"></script>
   <style>
@@ -12,64 +13,231 @@
     h1{font-size:1.6rem;letter-spacing:-.03em;color:#041124;margin:0 0 6px}
     p{color:#5f6b7a;margin:0 0 18px}
     label{display:block;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#5f6b7a;margin:12px 0 6px}
-    input,textarea{width:100%;border:1px solid #d9e2ef;border-radius:10px;padding:11px 12px;font:inherit;outline:none}
-    input:focus,textarea:focus{border-color:#0068ff;box-shadow:0 0 0 4px rgba(0,104,255,.12)}
-    .btn{margin-top:18px;background:#0054d1;color:#fff;border:none;border-radius:10px;padding:13px 18px;font-weight:800;cursor:pointer}
+    input,textarea,select{width:100%;border:1px solid #d9e2ef;border-radius:10px;padding:11px 12px;font:inherit;outline:none;background:#fff;color:#0f1b2d}
+    input:focus,textarea:focus,select:focus{border-color:#0068ff;box-shadow:0 0 0 4px rgba(0,104,255,.12)}
+    .btn{margin-top:18px;background:#0054d1;color:#fff;border:none;border-radius:10px;padding:13px 18px;font-weight:800;cursor:pointer;width:100%}
     .btn:hover{background:#082b61}
+    .btn:disabled{background:#9db4d6;cursor:not-allowed}
     .note{font-size:.82rem;color:#5f6b7a;margin-top:14px}
     code{background:#eef3fb;padding:1px 5px;border-radius:5px}
+    .hidden{display:none!important}
+    .signers{margin-top:14px;border:1px solid #e6edf7;border-radius:12px;overflow:hidden}
+    .signers .srow{display:flex;justify-content:space-between;gap:12px;padding:10px 14px;border-top:1px solid #eef3fb;font-size:.9rem}
+    .signers .srow:first-child{border-top:none}
+    .signers .snm{font-weight:700;color:#0f1b2d}
+    .signers .sem{color:#5f6b7a;font-size:.82rem}
+    .signers .sdt{color:#5f6b7a;font-size:.8rem;text-align:right;white-space:nowrap}
+    .meta-card{margin-top:14px;background:#f7faff;border:1px solid #e6edf7;border-radius:12px;padding:14px}
+    .meta-card .mrow{display:flex;justify-content:space-between;gap:12px;font-size:.85rem;margin:4px 0}
+    .meta-card .mk{color:#5f6b7a}
+    .meta-card .mv{color:#0f1b2d;font-weight:600;text-align:right;word-break:break-all}
+    .fp{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.72rem}
+    .err{color:#c0362c}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+    .who{font-size:.78rem;color:#5f6b7a}
+    .link{background:none;border:none;color:#0054d1;font-weight:700;cursor:pointer;font-size:.78rem;padding:0}
+    /* login overlay */
+    .overlay{position:fixed;inset:0;background:rgba(4,17,36,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50}
+    .card{background:#fff;border-radius:16px;padding:26px;max-width:380px;width:100%;box-shadow:0 30px 90px rgba(6,26,58,.25)}
+    .card h2{margin:0 0 4px;font-size:1.3rem;color:#041124}
+    .card p{font-size:.85rem;margin:0 0 16px}
+    .gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:1px solid #d9e2ef;background:#fff;border-radius:10px;padding:11px;font-weight:700;cursor:pointer;margin-bottom:14px}
+    .gbtn:hover{background:#f7f9fc}
+    .divider{text-align:center;font-size:.72rem;color:#9aa6b5;margin:6px 0 12px}
   </style>
 </head>
 <body>
+  <!-- ── Login overlay (xbw auth, same accounts as the rest of the app) ── -->
+  <div class="overlay" id="login-overlay">
+    <div class="card">
+      <h2>Sign in</h2>
+      <p>Sign in to pick one of your completed documents and generate its Certificate of Completion.</p>
+      <button class="gbtn" onclick="signInWithGoogle()">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Continue with Google
+      </button>
+      <div class="divider">or with email</div>
+      <label>Email</label>
+      <input id="lo-email" type="email" placeholder="you@company.com">
+      <label>Password</label>
+      <input id="lo-pass" type="password" placeholder="••••••••">
+      <button class="btn" onclick="doLogin()">Sign in</button>
+      <div class="note err" id="lo-err"></div>
+    </div>
+  </div>
+
   <div class="wrap">
-    <h1>Certificate of Completion — demo</h1>
-    <p>Fill in sample details and download a real proof receipt. This runs entirely in your browser (pdf-lib + <code>c2-certificate.js</code>) — no server.</p>
+    <div class="topbar">
+      <h1>Certificate of Completion</h1>
+      <span class="who"><span id="who-email"></span> · <button class="link" onclick="signOut()">Sign out</button></span>
+    </div>
+    <p>Pick one of your <strong>completed</strong> documents. The certificate is built from the real signing record — signers, timestamps, devices, and the document's SHA-256 fingerprint. Generated in your browser (pdf-lib + <code>c2-certificate.js</code>).</p>
 
-    <label>Document title</label>
-    <input id="title" value="Flow-Down Clause Acknowledgment — Acme Subcontractor">
-    <label>Document ID</label>
-    <input id="docId" value="doc_4f2c9a71-8e10-4a3b-9d02-b6c1e2f0a5d9">
-    <label>Signer name</label>
-    <input id="name" value="Jane Smith">
-    <label>Signer email</label>
-    <input id="email" value="jane@acme-sub.com">
+    <label for="docSelect">Completed document</label>
+    <select id="docSelect" disabled><option>Loading your completed documents…</option></select>
 
-    <button class="btn" id="gen">Generate &amp; download certificate</button>
+    <div id="detail" class="hidden">
+      <div class="meta-card">
+        <div class="mrow"><span class="mk">Document ID</span><span class="mv" id="d-id">—</span></div>
+        <div class="mrow"><span class="mk">Completed (UTC)</span><span class="mv" id="d-completed">—</span></div>
+        <div class="mrow"><span class="mk">Content SHA-256</span><span class="mv fp" id="d-sha">—</span></div>
+      </div>
+      <label>Signers &amp; audit trail</label>
+      <div class="signers" id="d-signers"></div>
+      <button class="btn" id="gen" disabled>Generate &amp; download certificate</button>
+    </div>
+
     <div class="note" id="status"></div>
   </div>
 
   <script>
-    async function sha256Hex(str){
-      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-      return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    // ── Signing data lives in the rfd project ──
+    const SB_URL = 'https://rfdvogakvyodixgpvqvz.supabase.co';
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
+    const sb = supabase.createClient(SB_URL, SB_KEY);
+
+    // ── Auth lives in the xbw project (same accounts as templates/agreements) ──
+    const AUTH_URL = 'https://xbwuvaxtnylqvagdvpxp.supabase.co';
+    const AUTH_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc';
+    const sbAuth = supabase.createClient(AUTH_URL, AUTH_KEY);
+
+    let currentEmail = null;
+    let completedDocs = [];   // [{doc_id, title, completed_at}]
+    let selectedMeta = null;  // built cert meta for the chosen doc
+    let booted = false;
+
+    const $ = (id) => document.getElementById(id);
+    function fmtUtc(iso){ if(!iso) return '—'; const d=new Date(iso); return isNaN(d.getTime())?String(iso):d.toUTCString(); }
+    function esc(v){ return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    // ── Login (email + Google), pointed at xbw ──
+    async function doLogin(){
+      const email=$('lo-email').value.trim(), pass=$('lo-pass').value;
+      $('lo-err').textContent='';
+      const { error }=await sbAuth.auth.signInWithPassword({ email, password: pass });
+      if(error){ $('lo-err').textContent=error.message; }
     }
-    document.getElementById('gen').addEventListener('click', async ()=>{
-      const s = document.getElementById('status'); s.textContent='Generating…';
+    async function signInWithGoogle(){
+      $('lo-err').textContent='';
+      const { error }=await sbAuth.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: window.location.origin + window.location.pathname } });
+      if(error) $('lo-err').textContent=error.message;
+    }
+    async function signOut(){ try{ await sbAuth.auth.signOut(); }catch(_){}; location.reload(); }
+    function showLogin(){ $('login-overlay').style.display='flex'; }
+    function hideLogin(){ $('login-overlay').style.display='none'; }
+
+    // ── Load this user's COMPLETED documents ──
+    async function loadCompletedDocs(){
+      const sel = $('docSelect');
+      // Prefer the progress view; fall back to the raw table.
+      let res = await sb.from('v_agreement_progress').select('*').order('updated_at',{ascending:false});
+      if(res.error) res = await sb.from('signer_documents').select('*').order('created_at',{ascending:false});
+      if(res.error){
+        sel.innerHTML='<option>Could not load documents</option>';
+        $('status').innerHTML='<span class="err">Could not load documents: '+esc(res.error.message)+'</span>';
+        return;
+      }
+      const rows = (res.data||[]).filter(a=>{
+        const owner=(a.owner_email||'').toLowerCase();
+        if(currentEmail && owner!==currentEmail) return false;   // only this user's docs
+        const st=String(a.status||'').toLowerCase();
+        const total=Number(a.total_signers||0), signed=Number(a.signed_count||0);
+        return st.includes('complete') || !!a.completed_at || (total>0 && signed>=total);
+      });
+      // de-dupe by doc_id, newest first
+      const seen=new Set();
+      completedDocs = rows.filter(r=>{ if(seen.has(r.doc_id))return false; seen.add(r.doc_id); return true; })
+        .map(r=>({ doc_id:r.doc_id, title:r.title||'Untitled document', completed_at:r.completed_at||r.updated_at||r.created_at }));
+
+      if(!completedDocs.length){
+        sel.innerHTML='<option value="">No completed documents yet</option>';
+        sel.disabled=true;
+        $('status').textContent='Once a document is fully signed, it will appear here.';
+        return;
+      }
+      sel.innerHTML='<option value="">Select a completed document…</option>' +
+        completedDocs.map(d=>`<option value="${esc(d.doc_id)}">${esc(d.title)}${d.completed_at?' · '+new Date(d.completed_at).toLocaleDateString():''}</option>`).join('');
+      sel.disabled=false;
+      $('status').textContent='';
+    }
+
+    // ── When a document is picked, pull its real signer/audit record ──
+    async function onPickDoc(){
+      const docId = $('docSelect').value;
+      $('gen').disabled=true; selectedMeta=null;
+      if(!docId){ $('detail').classList.add('hidden'); return; }
+      $('status').textContent='Loading signing record…';
+
+      const chosen = completedDocs.find(d=>d.doc_id===docId) || {};
+      const { data:signers, error } = await sb.from('signers')
+        .select('signer_order,name,email,signed_at,user_agent,pdf_sha256,status')
+        .eq('doc_id', docId).order('signer_order',{ascending:true});
+      if(error){ $('status').innerHTML='<span class="err">Could not load signers: '+esc(error.message)+'</span>'; return; }
+
+      const list = signers||[];
+      // The completed document's fingerprint is the hash captured from the LAST signer.
+      const withHash = list.filter(s=>s.pdf_sha256);
+      const documentSha256 = withHash.length ? withHash[withHash.length-1].pdf_sha256 : '';
+
+      selectedMeta = {
+        brand: 'Connexion Two',
+        title: chosen.title || 'Document',
+        docId,
+        completedAt: chosen.completed_at || new Date().toISOString(),
+        documentSha256,
+        signers: list.map((s,i)=>({
+          order: Number(s.signer_order || i+1),
+          name: s.name || '',
+          email: s.email || '',
+          signedAt: s.signed_at || null,
+          userAgent: s.user_agent || null
+        }))
+      };
+
+      // render preview
+      $('d-id').textContent = docId;
+      $('d-completed').textContent = fmtUtc(selectedMeta.completedAt);
+      $('d-sha').textContent = documentSha256 || '— (no fingerprint stored for this document)';
+      $('d-signers').innerHTML = list.length ? list.map((s,i)=>`
+        <div class="srow">
+          <div><div class="snm">${esc(s.name || 'Signer '+(s.signer_order||i+1))}</div><div class="sem">${esc(s.email||'')}</div></div>
+          <div class="sdt">${s.signed_at?fmtUtc(s.signed_at):'—'}</div>
+        </div>`).join('') : '<div class="srow"><span class="sem">No signer rows found for this document.</span></div>';
+
+      $('detail').classList.remove('hidden');
+      $('gen').disabled = false;
+      $('status').textContent='';
+    }
+
+    // ── Generate the certificate PDF from the real record ──
+    async function generateCert(){
+      if(!selectedMeta){ return; }
+      $('status').textContent='Generating…';
       try{
-        // a sample document fingerprint (in the real flow this is the hash of the signed PDF)
-        const documentSha256 = await sha256Hex('sample-signed-document-bytes-' + Date.now());
-        const now = new Date().toISOString();
-        const meta = {
-          title: document.getElementById('title').value,
-          docId: document.getElementById('docId').value,
-          completedAt: now,
-          documentSha256,
-          signers: [{
-            order: 1,
-            name: document.getElementById('name').value,
-            email: document.getElementById('email').value,
-            signedAt: now,
-            ip: '203.0.113.42',
-            userAgent: navigator.userAgent
-          }]
-        };
-        const bytes = await C2Certificate.buildPage(meta);
+        const bytes = await C2Certificate.buildPage(selectedMeta);
         const url = URL.createObjectURL(new Blob([bytes], { type:'application/pdf' }));
-        const a = document.createElement('a'); a.href=url; a.download='certificate-of-completion.pdf'; a.click();
+        const a=document.createElement('a'); a.href=url;
+        a.download='certificate-of-completion-'+String(selectedMeta.docId).slice(0,8)+'.pdf'; a.click();
         setTimeout(()=>URL.revokeObjectURL(url), 4000);
-        s.textContent='✓ Downloaded. Open the PDF to see the receipt.';
-      }catch(e){ console.error(e); s.textContent='Error: '+e.message; }
-    });
+        $('status').textContent='✓ Downloaded. Open the PDF to see the receipt.';
+      }catch(e){ console.error(e); $('status').innerHTML='<span class="err">Error: '+esc(e.message)+'</span>'; }
+    }
+
+    $('docSelect').addEventListener('change', onPickDoc);
+    $('gen').addEventListener('click', generateCert);
+
+    // ── Auth boot ──
+    async function onSession(session){
+      const user = session && session.user;
+      if(!user){ showLogin(); return; }
+      currentEmail = (user.email||'').toLowerCase() || null;
+      $('who-email').textContent = user.email || '';
+      hideLogin();
+      if(booted) return; booted=true;
+      await loadCompletedDocs();
+    }
+    sbAuth.auth.onAuthStateChange((_e, session)=>{ onSession(session); });
+    (async ()=>{ const { data:{ session } } = await sbAuth.auth.getSession(); onSession(session); })();
   </script>
 </body>
 </html>
