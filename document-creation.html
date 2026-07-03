@@ -259,14 +259,22 @@ hr { border: 0; border-top: 1px solid var(--border2); margin: 18px 0; }
     <div class="dashboard-grid">
       <div class="main-col">
 
-        <!-- TEMPLATES -->
+        <!-- TEMPLATES / DOCUMENT LIBRARY -->
         <div class="card">
-          <div class="section-title">Start From a Template</div>
+          <div class="section-title">Start From a Template or Document</div>
+          <div class="form-group">
+            <label>Source</label>
+            <select class="boxed" id="source-picker" onchange="onSourceChange(this.value)">
+              <option value="template">Template</option>
+              <option value="library">Document Library (PDFs)</option>
+            </select>
+          </div>
           <div class="form-group" style="margin:0;">
-            <label>Templates</label>
-            <select class="boxed" id="template-picker" onchange="onTemplatePick(this.value)">
+            <label id="picker-label">Templates</label>
+            <select class="boxed" id="item-picker" onchange="onItemPick(this.value)">
               <option value="">— Select a saved template —</option>
             </select>
+            <div id="picker-hint" style="font-size:12px;color:var(--text-dim);margin-top:8px;display:none;">Only PDF files from your Document Library can be used for signatures.</div>
           </div>
         </div>
 
@@ -1057,16 +1065,91 @@ async function submitData() {
 </script>
 
 <script>
-/* Template picker — pull saved templates, load the PDF + auto-place saved fields */
+/* Source picker — choose Templates OR your Document Library (PDFs only), then a
+   dropdown lists the items for that source. Templates load the PDF + auto-place
+   saved fields; library PDFs load ready for you to place fields. */
+let TEMPLATES = [];
+let LIBRARY = [];
+let CURRENT_SOURCE = 'template';
+
+function escOpt(s){ return String(s||'').replace(/[<>&"]/g,''); }
+
 async function loadTemplateOptions(){
   try{
     const { data, error } = await sb.from('document_templates').select('id,name').eq('status','active').order('updated_at',{ascending:false});
-    if(error) return;
-    const sel=document.getElementById('template-picker'); if(!sel) return;
-    (data||[]).forEach(t=>{ const o=document.createElement('option'); o.value=t.id; o.textContent=t.name||'Untitled template'; sel.appendChild(o); });
+    if(!error) TEMPLATES = data||[];
   }catch(_){}
+  if(CURRENT_SOURCE==='template') renderItemPicker();
 }
-function onTemplatePick(id){ if(id) loadTemplateIntoDoc(id); }
+
+// Document Library = the PDFs on your Documents page (xbw project, per-user).
+async function loadLibraryOptions(){
+  try{
+    const { data:{ session } } = await sbAuth.auth.getSession();
+    if(!session){ LIBRARY=[]; }
+    else{
+      const uid = session.user.id;
+      const { data, error } = await sbAuth.storage.from('documents').list(uid, { sortBy:{ column:'updated_at', order:'desc' } });
+      if(!error) LIBRARY = (data||[]).filter(f=>f.id && /\.pdf$/i.test(f.name)).map(f=>({ path: uid+'/'+f.name, name: f.name }));
+    }
+  }catch(_){ LIBRARY=[]; }
+  if(CURRENT_SOURCE==='library') renderItemPicker();
+}
+
+function renderItemPicker(){
+  const sel=document.getElementById('item-picker'); if(!sel) return;
+  if(CURRENT_SOURCE==='template'){
+    sel.innerHTML='<option value="">— Select a saved template —</option>'+
+      TEMPLATES.map(t=>'<option value="'+escOpt(t.id)+'">'+escOpt(t.name||'Untitled template')+'</option>').join('');
+  } else {
+    sel.innerHTML = LIBRARY.length
+      ? '<option value="">— Select a document (PDF) —</option>'+LIBRARY.map(f=>'<option value="'+escOpt(f.path)+'">'+escOpt(f.name)+'</option>').join('')
+      : '<option value="">— No PDFs in your library —</option>';
+  }
+}
+
+function onSourceChange(src){
+  CURRENT_SOURCE = src;
+  const label=document.getElementById('picker-label');
+  const hint=document.getElementById('picker-hint');
+  if(src==='library'){
+    if(label) label.textContent='Document Library';
+    if(hint) hint.style.display='block';
+    if(LIBRARY.length) renderItemPicker(); else loadLibraryOptions();
+  } else {
+    if(label) label.textContent='Templates';
+    if(hint) hint.style.display='none';
+    renderItemPicker();
+  }
+}
+
+function onItemPick(val){
+  if(!val) return;
+  if(CURRENT_SOURCE==='template'){ loadTemplateIntoDoc(val); }
+  else { const item = LIBRARY.find(f=>f.path===val); loadLibraryPdfIntoDoc(val, item ? item.name : 'Document.pdf'); }
+}
+
+// Load a PDF from the Document Library: fetch its bytes, re-upload to the signing
+// store to get a real URL, render it, and reveal the field-placement step.
+async function loadLibraryPdfIntoDoc(path, name){
+  try{
+    const dl = await sbAuth.storage.from('documents').download(path);
+    if(dl.error || !dl.data) throw dl.error || new Error('download failed');
+    const file = new File([dl.data], name, { type:'application/pdf' });
+    if(typeof resetDocumentState==='function') resetDocumentState();
+    const url = await uploadPdfToSupabase(file);
+    window.UPLOADED_PDF_URL = url;
+    document.getElementById('upload-text').innerHTML='✓ '+name;
+    const ti=document.getElementById('document_title'); if(ti && !ti.value) ti.value=name.replace(/\.pdf$/i,'');
+    document.getElementById('step-document-card').style.display='';
+    document.getElementById('annotation-zone').style.display='';
+    refreshStepChips('fields');
+    await renderPDF(url);
+    try{ detectUploadedDoc(file); }catch(_){}
+    updateSendButton();
+    document.getElementById('annotation-zone').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(err){ console.error('library load failed',err); alert('Could not load that document from your library.'); }
+}
 async function loadTemplateIntoDoc(templateId){
   try{
     const { data:tpl } = await sb.from('document_templates').select('name,file_path').eq('id',templateId).single();
@@ -1198,6 +1281,38 @@ loadTemplateOptions();
     }
   })();
 })();
+</script>
+
+<script>
+  /* Currency: show $ for visitors in the United States, € for everyone else.
+     Symbol-only swap (numbers unchanged). No network call — uses the browser's
+     own locale + timezone. Defaults to € when it can't confirm US. */
+  (function () {
+    function isUS() {
+      try {
+        const langs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language];
+        for (const l of langs) {
+          const m = /[-_]([A-Za-z]{2})$/.exec(l || '');
+          if (m && m[1].toUpperCase() === 'US') return true;
+        }
+        try { const r = new Intl.Locale(navigator.language).region; if (r === 'US') return true; } catch (e) {}
+        const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || '');
+        const US_TZ = ['America/New_York','America/Detroit','America/Chicago','America/Denver','America/Phoenix','America/Los_Angeles','America/Anchorage','America/Adak','America/Boise','America/Juneau','America/Sitka','America/Menominee','America/Indiana/Indianapolis','America/Indiana/Knox','America/Kentucky/Louisville','Pacific/Honolulu'];
+        if (US_TZ.indexOf(tz) !== -1) return true;
+      } catch (e) {}
+      return false;
+    }
+    function swap() {
+      const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+      let n;
+      while ((n = walk.nextNode())) {
+        if (n.nodeValue.indexOf('€') !== -1) n.nodeValue = n.nodeValue.replace(/€/g, '$');
+      }
+    }
+    if (!isUS()) return; // outside the US → keep € (default)
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', swap);
+    else swap();
+  })();
 </script>
 </body>
 </html>
