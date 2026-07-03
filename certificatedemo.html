@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connexion Two | Certificate of Completion — Demo</title>
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+  <script src="c2-certificate.js"></script>
+  <style>
+    body{font-family:Inter,Arial,sans-serif;background:#f7f9fc;color:#0f1b2d;margin:0;padding:40px 20px;line-height:1.6}
+    .wrap{max-width:640px;margin:0 auto;background:#fff;border:1px solid #d9e2ef;border-radius:16px;padding:28px;box-shadow:0 22px 70px rgba(6,26,58,.08)}
+    h1{font-size:1.6rem;letter-spacing:-.03em;color:#041124;margin:0 0 6px}
+    p{color:#5f6b7a;margin:0 0 18px}
+    label{display:block;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#5f6b7a;margin:12px 0 6px}
+    input,textarea{width:100%;border:1px solid #d9e2ef;border-radius:10px;padding:11px 12px;font:inherit;outline:none}
+    input:focus,textarea:focus{border-color:#0068ff;box-shadow:0 0 0 4px rgba(0,104,255,.12)}
+    .btn{margin-top:18px;background:#0054d1;color:#fff;border:none;border-radius:10px;padding:13px 18px;font-weight:800;cursor:pointer}
+    .btn:hover{background:#082b61}
+    .note{font-size:.82rem;color:#5f6b7a;margin-top:14px}
+    code{background:#eef3fb;padding:1px 5px;border-radius:5px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Certificate of Completion — demo</h1>
+    <p>Fill in sample details and download a real proof receipt. This runs entirely in your browser (pdf-lib + <code>c2-certificate.js</code>) — no server.</p>
+
+    <label>Document title</label>
+    <input id="title" value="Flow-Down Clause Acknowledgment — Acme Subcontractor">
+    <label>Document ID</label>
+    <input id="docId" value="doc_4f2c9a71-8e10-4a3b-9d02-b6c1e2f0a5d9">
+    <label>Signer name</label>
+    <input id="name" value="Jane Smith">
+    <label>Signer email</label>
+    <input id="email" value="jane@acme-sub.com">
+
+    <button class="btn" id="gen">Generate &amp; download certificate</button>
+    <div class="note" id="status"></div>
+  </div>
+
+  <script>
+    async function sha256Hex(str){
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+    document.getElementById('gen').addEventListener('click', async ()=>{
+      const s = document.getElementById('status'); s.textContent='Generating…';
+      try{
+        // a sample document fingerprint (in the real flow this is the hash of the signed PDF)
+        const documentSha256 = await sha256Hex('sample-signed-document-bytes-' + Date.now());
+        const now = new Date().toISOString();
+        const meta = {
+          title: document.getElementById('title').value,
+          docId: document.getElementById('docId').value,
+          completedAt: now,
+          documentSha256,
+          signers: [{
+            order: 1,
+            name: document.getElementById('name').value,
+            email: document.getElementById('email').value,
+            signedAt: now,
+            ip: '203.0.113.42',
+            userAgent: navigator.userAgent
+          }]
+        };
+        const bytes = await C2Certificate.buildPage(meta);
+        const url = URL.createObjectURL(new Blob([bytes], { type:'application/pdf' }));
+        const a = document.createElement('a'); a.href=url; a.download='certificate-of-completion.pdf'; a.click();
+        setTimeout(()=>URL.revokeObjectURL(url), 4000);
+        s.textContent='✓ Downloaded. Open the PDF to see the receipt.';
+      }catch(e){ console.error(e); s.textContent='Error: '+e.message; }
+    });
+  </script>
+</body>
+</html>
