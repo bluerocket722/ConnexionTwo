@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Connexion Two | In-Person Signing</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{--blue:#0054d1;--navy:#041124;--muted:#5f6b7a;--line:#e6edf7;--bg:#f7f9fc;}
+    *{box-sizing:border-box}
+    body{font-family:Inter,-apple-system,Arial,sans-serif;background:var(--bg);color:#0f1b2d;margin:0;line-height:1.5;-webkit-text-size-adjust:100%}
+    .wrap{max-width:640px;margin:0 auto;padding:20px 16px 60px}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}
+    h1{font-size:1.5rem;letter-spacing:-.02em;color:var(--navy);margin:0}
+    .sub{color:var(--muted);font-size:.9rem;margin:2px 0 18px}
+    .who{font-size:.78rem;color:var(--muted)}
+    .link{background:none;border:none;color:var(--blue);font-weight:700;cursor:pointer;font-size:.82rem;padding:0}
+    .doc{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 12px 40px rgba(6,26,58,.06)}
+    .doc h2{font-size:1.05rem;margin:0 0 2px;color:var(--navy)}
+    .doc .meta{color:var(--muted);font-size:.78rem;margin-bottom:12px}
+    .signer{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid #eef3fb}
+    .signer:first-of-type{border-top:none}
+    .savatar{width:40px;height:40px;border-radius:50%;background:#e3f0ff;color:var(--blue);display:flex;align-items:center;justify-content:center;font-weight:800;flex:0 0 auto}
+    .sinfo{flex:1;min-width:0}
+    .sinfo .n{font-weight:700}
+    .sinfo .e{color:var(--muted);font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .pill{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:20px}
+    .p-signed{background:#e4f6ec;color:#0a7d3f}
+    .p-wait{background:#fff2df;color:#a45b00}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--blue);color:#fff;border:none;border-radius:12px;padding:14px 16px;font-weight:800;font-size:1rem;cursor:pointer;text-decoration:none;width:100%;min-height:52px}
+    .btn:active{background:#082b61}
+    .btn.ghost{background:#eef3fb;color:var(--blue)}
+    .signer .btn{width:auto;padding:12px 18px;min-height:48px;flex:0 0 auto}
+    .empty{text-align:center;color:var(--muted);padding:40px 10px}
+    .note{font-size:.82rem;color:var(--muted);margin-top:8px}.err{color:#c0362c}
+    /* login overlay */
+    .overlay{position:fixed;inset:0;background:rgba(4,17,36,.55);display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}
+    .card{background:#fff;border-radius:18px;padding:24px;max-width:400px;width:100%;box-shadow:0 30px 90px rgba(6,26,58,.25)}
+    .card h2{margin:0 0 4px;font-size:1.3rem;color:var(--navy)}.card p{font-size:.85rem;color:var(--muted);margin:0 0 16px}
+    .card label{display:block;font-size:.72rem;font-weight:800;text-transform:uppercase;color:var(--muted);margin:12px 0 6px}
+    .card input{width:100%;border:1px solid #d9e2ef;border-radius:12px;padding:14px 12px;font:inherit;outline:none}
+    .card input:focus{border-color:var(--blue);box-shadow:0 0 0 4px rgba(0,104,255,.12)}
+    .gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:1px solid #d9e2ef;background:#fff;border-radius:12px;padding:13px;font-weight:700;cursor:pointer;margin-bottom:14px;min-height:50px}
+    .divider{text-align:center;font-size:.72rem;color:#9aa6b5;margin:6px 0 12px}
+    @media(max-width:480px){ .signer{flex-wrap:wrap} .signer .btn{width:100%} }
+  </style>
+</head>
+<body>
+  <div class="overlay" id="login-overlay">
+    <div class="card">
+      <h2>In-Person Signing</h2>
+      <p>Sign in to hand this device to someone standing with you and collect their signature on the spot.</p>
+      <button class="gbtn" onclick="signInWithGoogle()">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Continue with Google
+      </button>
+      <div class="divider">or with email</div>
+      <label>Email</label><input id="lo-email" type="email" autocomplete="email" placeholder="you@company.com">
+      <label>Password</label><input id="lo-pass" type="password" autocomplete="current-password" placeholder="••••••••">
+      <button class="btn" style="margin-top:16px" onclick="doLogin()">Sign in</button>
+      <div class="note err" id="lo-err"></div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="top">
+      <h1>In-Person Signing</h1>
+      <span class="who"><span id="who-email"></span> · <button class="link" onclick="signOut()">Sign out</button></span>
+    </div>
+    <div class="sub">Pick the person standing with you and tap <strong>Sign on this device</strong>. Hand them the screen — no email needed. When they finish, tap “Back to list” for the next signer.</div>
+
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="btn ghost" style="flex:1" onclick="location.reload()">↻ Refresh</button>
+      <a class="btn ghost" style="flex:1" href="/document-creation">+ New document</a>
+    </div>
+
+    <div id="list"><div class="empty">Loading your documents…</div></div>
+  </div>
+
+  <script>
+    const SB_URL='https://rfdvogakvyodixgpvqvz.supabase.co';
+    const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
+    const sb=supabase.createClient(SB_URL,SB_KEY);
+    const AUTH_URL='https://xbwuvaxtnylqvagdvpxp.supabase.co';
+    const AUTH_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc';
+    const sbAuth=supabase.createClient(AUTH_URL,AUTH_KEY);
+    const SIGN_URL='/sign-2';   // route to the signing page (matches finalize-document)
+
+    let currentEmail=null, booted=false;
+    const $=(id)=>document.getElementById(id);
+    const esc=(v)=>String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const initials=(n,e)=>((n||e||'?').trim().slice(0,2)||'?').toUpperCase();
+
+    async function doLogin(){const{error}=await sbAuth.auth.signInWithPassword({email:$('lo-email').value.trim(),password:$('lo-pass').value});if(error)$('lo-err').textContent=error.message;}
+    async function signInWithGoogle(){const{error}=await sbAuth.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+window.location.pathname}});if(error)$('lo-err').textContent=error.message;}
+    async function signOut(){try{await sbAuth.auth.signOut();}catch(_){}location.reload();}
+    window.doLogin=doLogin;window.signInWithGoogle=signInWithGoogle;window.signOut=signOut;
+
+    async function load(){
+      // this user's documents that still need signatures
+      let res=await sb.from('signer_documents').select('*').order('created_at',{ascending:false});
+      if(res.error){$('list').innerHTML='<div class="empty err">Could not load: '+esc(res.error.message)+'</div>';return;}
+      const docs=(res.data||[]).filter(d=>{
+        const owner=(d.owner_email||'').toLowerCase();
+        if(currentEmail&&owner!==currentEmail)return false;
+        const st=String(d.status||'').toLowerCase();
+        return !(st.includes('complete'))&&!d.completed_at;   // still open
+      });
+      if(!docs.length){$('list').innerHTML='<div class="empty">No documents awaiting signature.<br>Create one, then come back to sign in person.</div>';return;}
+
+      // pull signers for these docs
+      const ids=docs.map(d=>d.doc_id);
+      const{data:signers}=await sb.from('signers').select('doc_id,signer_order,name,email,token,status').in('doc_id',ids).order('signer_order',{ascending:true});
+      const byDoc={};(signers||[]).forEach(s=>{(byDoc[s.doc_id]=byDoc[s.doc_id]||[]).push(s);});
+
+      $('list').innerHTML=docs.map(d=>{
+        const ss=byDoc[d.doc_id]||[];
+        const rows=ss.map(s=>{
+          const signed=String(s.status||'').toLowerCase()==='signed';
+          return `<div class="signer">
+            <div class="savatar">${esc(initials(s.name,s.email))}</div>
+            <div class="sinfo"><div class="n">${esc(s.name||'Signer '+s.signer_order)}</div><div class="e">${esc(s.email||'')}</div></div>
+            ${signed
+              ? '<span class="pill p-signed">✓ Signed</span>'
+              : `<a class="btn" href="${SIGN_URL}?token=${encodeURIComponent(s.token)}">Sign on this device</a>`}
+          </div>`;
+        }).join('');
+        return `<div class="doc"><h2>${esc(d.title||'Untitled document')}</h2>
+          <div class="meta">${esc(String(d.status||'').toLowerCase())} · ${d.created_at?new Date(d.created_at).toLocaleDateString():''}</div>
+          ${rows||'<div class="note">No signers on this document.</div>'}</div>`;
+      }).join('');
+    }
+
+    async function onSession(session){
+      const user=session&&session.user;if(!user){$('login-overlay').style.display='flex';return;}
+      currentEmail=(user.email||'').toLowerCase()||null;$('who-email').textContent=user.email||'';
+      $('login-overlay').style.display='none';if(booted)return;booted=true;await load();
+    }
+    sbAuth.auth.onAuthStateChange((_e,s)=>onSession(s));
+    (async()=>{const{data:{session}}=await sbAuth.auth.getSession();onSession(session);})();
+  </script>
+</body>
+</html>
