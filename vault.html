@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connexion Two | Encrypted Vault</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="c2-crypto.js"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+  <style>
+    :root{--blue-950:#041124;--blue-900:#061a3a;--blue-800:#082b61;--blue-700:#0054d1;--blue-600:#0068ff;--blue-500:#1683ff;--blue-100:#eaf3ff;--blue-050:#f5f9ff;--text:#111827;--muted:#5f6b7a;--line:#d9e2ef;--panel:#fff;--bg:#f7f9fc;--success:#0f9f6e;--danger:#dc2626;--shadow:0 22px 70px rgba(6,26,58,.10)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:Inter,Arial,sans-serif;-webkit-font-smoothing:antialiased;line-height:1.6}
+    a{color:inherit;text-decoration:none}
+    .page{min-height:100vh;background:radial-gradient(circle at 88% 5%,rgba(0,104,255,.10),transparent 26%),linear-gradient(180deg,#fff,#f7f9fc 42%,#fff)}
+    header{height:70px;display:flex;align-items:center;gap:14px;padding:0 24px;background:rgba(255,255,255,.9);border-bottom:1px solid var(--line);backdrop-filter:blur(12px);position:sticky;top:0;z-index:20}
+    .mark{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(135deg,var(--blue-600),var(--blue-900));color:#fff;font-weight:900;letter-spacing:-.05em}
+    .brand{font-weight:900;color:var(--blue-950);letter-spacing:-.03em}
+    .brand small{display:block;font-size:.7rem;color:var(--muted);font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+    .spacer{flex:1}
+    .lockchip{display:inline-flex;align-items:center;gap:7px;background:var(--blue-050);border:1px solid var(--line);color:var(--blue-800);border-radius:999px;padding:7px 12px;font-size:.8rem;font-weight:800}
+    .lockchip .material-icons-round{font-size:16px;color:var(--success)}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:10px;font-weight:850;border:1px solid transparent;cursor:pointer;transition:.15s}
+    .btn-primary{background:var(--blue-700);color:#fff}
+    .btn-primary:hover{background:var(--blue-800)}
+    .btn-ghost{background:#fff;border-color:var(--line);color:var(--blue-800)}
+    .btn-ghost:hover{border-color:var(--blue-500)}
+    .wrap{max-width:900px;margin:0 auto;padding:34px 22px 60px}
+    h1{font-size:clamp(1.8rem,4vw,2.6rem);letter-spacing:-.05em;color:var(--blue-950);margin-bottom:8px}
+    .sub{color:var(--muted);margin-bottom:26px;max-width:640px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:24px;margin-bottom:18px}
+    .drop{border:2px dashed #bdd7f8;border-radius:14px;padding:34px 20px;text-align:center;cursor:pointer;color:var(--muted);transition:.15s}
+    .drop:hover{border-color:var(--blue-600);color:var(--blue-700);background:var(--blue-050)}
+    .files{display:grid;gap:10px}
+    .file{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:#fff}
+    .fic{width:40px;height:40px;border-radius:10px;background:var(--blue-050);color:var(--blue-700);display:grid;place-items:center}
+    .fmeta{flex:1;min-width:0}
+    .fname{font-weight:800;color:var(--blue-950);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .fsub{font-size:.78rem;color:var(--muted)}
+    .file .act{border:1px solid var(--line);background:#fff;color:var(--blue-800);border-radius:8px;height:36px;padding:0 12px;font-weight:800;cursor:pointer;font-size:.82rem}
+    .file .act:hover{border-color:var(--blue-500)}
+    .file .del:hover{border-color:#ffb4b4;color:var(--danger);background:#fff5f5}
+    .empty{color:var(--muted);text-align:center;padding:34px;border:1px dashed var(--line);border-radius:12px;background:var(--blue-050)}
+    .note{font-size:.82rem;color:var(--muted);margin-top:12px;line-height:1.5}
+    /* overlays */
+    .overlay{position:fixed;inset:0;background:linear-gradient(135deg,#061a3a,#082b61);display:flex;align-items:center;justify-content:center;z-index:300;padding:22px}
+    .overlay.plain{background:rgba(6,26,58,.5)}
+    .modal{background:#fff;border-radius:20px;padding:34px 30px;width:100%;max-width:420px;box-shadow:0 30px 90px rgba(0,0,0,.25)}
+    .modal h2{color:var(--blue-950);font-size:1.5rem;letter-spacing:-.04em;margin-bottom:6px}
+    .modal p{color:var(--muted);font-size:.92rem;margin-bottom:18px}
+    .modal label{display:block;font-size:.72rem;font-weight:850;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:12px 0 6px}
+    .modal input{width:100%;height:48px;border:1px solid var(--line);border-radius:11px;padding:0 13px;font-size:.95rem;outline:none}
+    .modal input:focus{border-color:var(--blue-600);box-shadow:0 0 0 4px rgba(0,104,255,.12)}
+    .modal .btn{width:100%;margin-top:16px}
+    .err{color:var(--danger);font-size:.85rem;margin-top:10px;min-height:18px;text-align:center}
+    .hidden{display:none!important}
+  </style>
+</head>
+<body>
+  <!-- LOGIN (xbw, same session as the rest of the site) -->
+  <div class="overlay" id="loginOverlay">
+    <div class="modal">
+      <h2>Welcome Back</h2>
+      <p>Sign in to open your encrypted vault.</p>
+      <label>Email</label>
+      <input id="lo-email" type="email" placeholder="you@example.com" onkeydown="if(event.key==='Enter')doLogin()">
+      <label>Password</label>
+      <input id="lo-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="btn btn-primary" onclick="doLogin()">Sign In</button>
+      <div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px;color:#93a0b3;font-size:12px;font-weight:800">
+        <span style="flex:1;height:1px;background:var(--line)"></span>OR<span style="flex:1;height:1px;background:var(--line)"></span>
+      </div>
+      <button class="btn btn-ghost" style="width:100%" onclick="signInWithGoogle()">Continue with Google</button>
+      <div class="err" id="lo-err"></div>
+    </div>
+  </div>
+
+  <!-- PASSPHRASE gate (the encryption key never leaves this device) -->
+  <div class="overlay plain hidden" id="passOverlay">
+    <div class="modal">
+      <h2 id="pass-title">Unlock your vault</h2>
+      <p id="pass-note">Enter your vault passphrase. It never leaves this device — we use it to encrypt and decrypt your files locally.</p>
+      <label>Passphrase</label>
+      <input id="pass-input" type="password" placeholder="Your vault passphrase" onkeydown="if(event.key==='Enter')submitPass()">
+      <div id="pass-confirm-wrap" class="hidden">
+        <label>Confirm passphrase</label>
+        <input id="pass-confirm" type="password" placeholder="Re-enter passphrase" onkeydown="if(event.key==='Enter')submitPass()">
+      </div>
+      <button class="btn btn-primary" onclick="submitPass()" id="pass-btn">Unlock</button>
+      <div class="err" id="pass-err"></div>
+      <div class="note" style="margin-top:14px">⚠️ There is no recovery. If you forget this passphrase, the files cannot be decrypted — by us or anyone.</div>
+    </div>
+  </div>
+
+  <div class="page">
+    <header>
+      <a href="/welcome" style="display:flex;align-items:center;gap:11px">
+        <div class="mark">C2</div>
+        <div class="brand">Connexion Two<small>Encrypted Vault</small></div>
+      </a>
+      <div class="spacer"></div>
+      <span class="lockchip"><span class="material-icons-round">lock</span>End-to-end encrypted</span>
+      <button class="btn btn-ghost" id="signout" style="margin-left:10px">Sign out</button>
+    </header>
+
+    <div class="wrap">
+      <h1>Your Encrypted Vault</h1>
+      <p class="sub">Files are encrypted in your browser with AES-256-GCM before they're uploaded. Connexion Two only ever stores ciphertext — your passphrase and key never leave this device.</p>
+
+      <div class="card">
+        <div class="drop" id="drop">
+          <div style="font-size:30px;margin-bottom:8px">🔐</div>
+          <div style="font-weight:850;color:var(--blue-950)">Click to upload &amp; encrypt a file</div>
+          <div style="font-size:12px;margin-top:4px;color:var(--muted)">Any file type · encrypted locally before upload</div>
+          <input type="file" id="fileInput" class="hidden">
+        </div>
+        <div class="note">Encrypted files download and decrypt in your browser. They are <b>not</b> openable in the online editor (that would require the server to read them).</div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <strong style="color:var(--blue-950)">Files</strong>
+          <button class="btn btn-ghost" id="refresh" style="height:38px">Refresh</button>
+        </div>
+        <div class="files" id="fileList"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── AUTH + private storage live in the xbw project (shared session) ──
+    const AUTH_URL = 'https://xbwuvaxtnylqvagdvpxp.supabase.co';
+    const AUTH_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc';
+    const sb = supabase.createClient(AUTH_URL, AUTH_KEY);
+    const BUCKET = 'encrypted-docs';          // PRIVATE bucket (see supabase/encrypted_vault.sql)
+    const LOGIN_URL = 'https://www.connexiontwo.com/';
+
+    let userId = null;
+    let passphrase = null;                     // held in memory only, never uploaded
+    let files = [];
+
+    // ── login ──
+    async function doLogin(){
+      document.getElementById('lo-err').textContent='';
+      const email=document.getElementById('lo-email').value.trim();
+      const pass=document.getElementById('lo-pass').value;
+      const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+      if(error){ document.getElementById('lo-err').textContent=error.message; }
+    }
+    async function signInWithGoogle(){
+      const { error } = await sb.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: location.origin + location.pathname } });
+      if(error) document.getElementById('lo-err').textContent=error.message;
+    }
+    document.getElementById('signout').addEventListener('click', async ()=>{ await sb.auth.signOut(); location.reload(); });
+
+    // ── passphrase gate ──
+    function askPassphrase(isNew){
+      document.getElementById('passOverlay').classList.remove('hidden');
+      document.getElementById('pass-confirm-wrap').classList.toggle('hidden', !isNew);
+      document.getElementById('pass-title').textContent = isNew ? 'Create your vault passphrase' : 'Unlock your vault';
+      document.getElementById('pass-btn').textContent = isNew ? 'Create Vault' : 'Unlock';
+      document.getElementById('pass-note').textContent = isNew
+        ? 'Set a passphrase to protect this vault. It never leaves this device — it is used to encrypt and decrypt your files locally.'
+        : 'Enter your vault passphrase. It never leaves this device.';
+      setTimeout(()=>document.getElementById('pass-input').focus(), 50);
+    }
+    async function submitPass(){
+      const err=document.getElementById('pass-err'); err.textContent='';
+      const p=document.getElementById('pass-input').value;
+      const isNew=!document.getElementById('pass-confirm-wrap').classList.contains('hidden');
+      if(!p || p.length<8){ err.textContent='Use at least 8 characters.'; return; }
+      if(isNew && p!==document.getElementById('pass-confirm').value){ err.textContent='Passphrases do not match.'; return; }
+      passphrase = p;
+      document.getElementById('passOverlay').classList.add('hidden');
+      document.getElementById('pass-input').value=''; document.getElementById('pass-confirm').value='';
+    }
+
+    // ── files ──
+    function userPath(name){ return userId + '/' + name; }
+    function fmtSize(b){ if(b==null)return''; if(b<1024)return b+' B'; if(b<1048576)return (b/1024).toFixed(0)+' KB'; return (b/1048576).toFixed(1)+' MB'; }
+    function origName(n){ return n.replace(/\.c2enc$/,''); }
+
+    async function loadFiles(){
+      const list=document.getElementById('fileList');
+      const { data, error } = await sb.storage.from(BUCKET).list(userId, { sortBy:{ column:'updated_at', order:'desc' } });
+      if(error){ list.innerHTML='<div class="empty">Could not load files. Make sure the private '+BUCKET+' bucket + RLS exist (see supabase/encrypted_vault.sql).</div>'; return; }
+      files=(data||[]).filter(f=>f.id && !f.name.startsWith('.'));
+      render();
+    }
+    function render(){
+      const list=document.getElementById('fileList');
+      if(!files.length){ list.innerHTML='<div class="empty">No files yet. Upload one above — it encrypts before it leaves your device.</div>'; return; }
+      list.innerHTML='';
+      files.forEach(f=>{
+        const row=document.createElement('div'); row.className='file';
+        row.innerHTML='<div class="fic"><span class="material-icons-round">lock</span></div>'+
+          '<div class="fmeta"><div class="fname"></div><div class="fsub">Encrypted · '+fmtSize(f.metadata&&f.metadata.size)+'</div></div>'+
+          '<button class="act dl">Download</button><button class="act del">Delete</button>';
+        row.querySelector('.fname').textContent=origName(f.name);
+        row.querySelector('.dl').addEventListener('click',()=>downloadFile(f.name));
+        row.querySelector('.del').addEventListener('click',()=>deleteFile(f.name));
+        list.appendChild(row);
+      });
+    }
+
+    const fileInput=document.getElementById('fileInput');
+    document.getElementById('drop').addEventListener('click',()=>{ if(!passphrase){ askPassphrase(false); return; } fileInput.click(); });
+    document.getElementById('refresh').addEventListener('click',loadFiles);
+
+    fileInput.addEventListener('change', async ()=>{
+      const file=fileInput.files[0]; fileInput.value='';
+      if(!file) return;
+      if(!passphrase){ askPassphrase(false); return; }
+      try{
+        const bytes=new Uint8Array(await file.arrayBuffer());
+        const packed=await C2Crypto.encryptBytes(passphrase, bytes);           // ← encrypt in-browser
+        const blob=new Blob([packed], { type:'application/octet-stream' });
+        const { error }=await sb.storage.from(BUCKET).upload(userPath(file.name+'.c2enc'), blob, { upsert:false, contentType:'application/octet-stream' });
+        if(error){ alert('Upload failed: '+error.message); return; }
+        loadFiles();
+      }catch(e){ console.error(e); alert('Encryption/upload failed: '+e.message); }
+    });
+
+    async function downloadFile(name){
+      if(!passphrase){ askPassphrase(false); return; }
+      try{
+        const { data, error }=await sb.storage.from(BUCKET).download(userPath(name)); // authenticated (private)
+        if(error||!data){ alert('Download failed.'); return; }
+        const packed=new Uint8Array(await data.arrayBuffer());
+        const plain=await C2Crypto.decryptBytes(passphrase, packed);            // ← decrypt in-browser
+        const url=URL.createObjectURL(new Blob([plain]));
+        const a=document.createElement('a'); a.href=url; a.download=origName(name); a.click();
+        setTimeout(()=>URL.revokeObjectURL(url), 4000);
+      }catch(e){ alert(e.message || 'Could not decrypt this file.'); }
+    }
+
+    async function deleteFile(name){
+      if(!confirm('Delete "'+origName(name)+'"? This cannot be undone.')) return;
+      const { error }=await sb.storage.from(BUCKET).remove([userPath(name)]);
+      if(error){ alert('Delete failed: '+error.message); return; }
+      files=files.filter(f=>f.name!==name); render();
+    }
+
+    // ── boot ──
+    async function boot(session){
+      if(!session){ document.getElementById('loginOverlay').classList.remove('hidden'); return; }
+      document.getElementById('loginOverlay').classList.add('hidden');
+      userId=session.user.id;
+      await loadFiles();
+      // first-time vs returning: if they already have files, ask to unlock; else offer to create
+      askPassphrase(files.length === 0);
+    }
+    sb.auth.onAuthStateChange((_e, session)=>{ if(session) boot(session); });
+    (async()=>{ const { data:{ session } } = await sb.auth.getSession(); boot(session); })();
+  </script>
+</body>
+</html>
