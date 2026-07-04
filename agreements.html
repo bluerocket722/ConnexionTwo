@@ -936,7 +936,7 @@ function renderAgreements() {
   rows.querySelectorAll('[data-open]').forEach(btn => btn.addEventListener('click', () => openAgreement(btn.dataset.open)));
 }
 
-function openAgreement(id) { window.location.href = '/document-creation?id=' + encodeURIComponent(id); }
+function openAgreement(id) { window.location.href = '/agreement-view?id=' + encodeURIComponent(id); }
 
 document.getElementById('searchInput').addEventListener('input', renderAgreements);
 document.getElementById('clearSearch').addEventListener('click', () => {
