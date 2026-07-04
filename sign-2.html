@@ -726,15 +726,20 @@ async function boot() {
 const tokenParam = new URLSearchParams(window.location.search).get("token");
 const errorPage=(title,msg)=>`<div style="position:fixed;inset:0;background:#202124;color:#e8eaed;display:flex;align-items:center;justify-content:center;text-align:center;font-family:'Roboto',system-ui;padding:40px;"><div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:48px 40px;max-width:420px;"><div style="width:48px;height:48px;background:rgba(217,48,37,0.12);border:1px solid rgba(217,48,37,0.25);border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:20px;">✕</div><h2 style="font-size:20px;font-weight:500;margin-bottom:10px;letter-spacing:-.3px;">${title}</h2><p style="opacity:.55;font-size:13px;line-height:1.65;">${msg}</p></div></div>`;
 
+// When a link is missing, unknown, expired, or already used, send the visitor to
+// a dedicated "no longer valid" page — never render the document.
+const EXPIRED_URL = "/link-expired";
 if (!tokenParam) {
-  document.body.innerHTML = errorPage("Invalid Document Link","Please contact Connexion Two for a valid signing link.");
+  window.location.replace(EXPIRED_URL);
 } else {
   fetch(`${SUPABASE_URL}/rest/v1/signers?token=eq.${tokenParam}&select=created_at,status`,{headers:{apikey:SUPABASE_ANON,Authorization:`Bearer ${SUPABASE_ANON}`}})
   .then(r=>r.json())
   .then(data=>{
-    if(!data||(Array.isArray(data)&&data.length===0)){document.body.innerHTML=errorPage("Document Not Found","This link is no longer valid.");return;}
+    if(!data||(Array.isArray(data)&&data.length===0)){ window.location.replace(EXPIRED_URL); return; }
     const signer=data[0];
-    if((Date.now()-new Date(signer.created_at).getTime())>48*60*60*1000||signer.status==="completed"){document.body.innerHTML=errorPage("Link Expired","This signing session is no longer available. Please contact Connexion Two for a new link.");return;}
+    const expired = (Date.now()-new Date(signer.created_at).getTime())>48*60*60*1000;
+    const alreadyUsed = signer.status==="completed" || signer.status==="signed";
+    if(expired || alreadyUsed){ window.location.replace(EXPIRED_URL); return; }
     document.getElementById("zoomInBtn")?.addEventListener("click",async()=>{if(!pdfDoc||!currentPdfUrl)return;currentScale*=1.15;await renderAllPages(currentPdfUrl);});
     document.getElementById("zoomOutBtn")?.addEventListener("click",async()=>{if(!pdfDoc||!currentPdfUrl)return;currentScale/=1.15;await renderAllPages(currentPdfUrl);});
     boot();
