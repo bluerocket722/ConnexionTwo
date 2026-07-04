@@ -449,7 +449,20 @@
         <a href="/welcome" class="active">Home</a>
         <a href="agreements">Agreements</a>
         <a href="/templates">Templates</a>
-        <a href="/proofpacket">Completion Packet</a>
+        <div class="menu-anchor">
+          <a href="#" id="toolsTrigger" aria-haspopup="true" aria-expanded="false">Tools &#9662;</a>
+          <div class="menu" id="toolsMenu" style="min-width:280px;">
+            <a class="menu-item" href="/submission-checklist"><div>Submission Checklist<small>Never miss a required document</small></div></a>
+            <a class="menu-item" href="/kiosk"><div>In-Person Signing<small>Sign on this device, no email</small></div></a>
+            <a class="menu-item" href="/proof-packet"><div>Signature Evidence Pack<small>Bundle signed docs for audits</small></div></a>
+            <a class="menu-item" href="/certificate-demo"><div>Certificate of Completion<small>Proof a document is unaltered</small></div></a>
+            <a class="menu-item" href="/#verify"><div>Verify a Document<small>Confirm a file is genuine</small></div></a>
+            <a class="menu-item" href="/data-map"><div>Data Map &amp; Records<small>See where sensitive data lives</small></div></a>
+            <a class="menu-item" href="/access-log"><div>Access Log<small>Who opened or exported what</small></div></a>
+            <a class="menu-item" href="/vault"><div>Encrypted Vault<small>Files only you can open</small></div></a>
+            <a class="menu-item" href="/webhooks"><div>Webhooks<small>Connect your CRM / Zapier</small></div></a>
+          </div>
+        </div>
       </nav>
 
       <div class="top-actions">
@@ -478,6 +491,15 @@
         <a href="/welcome">Home <span>›</span></a>
         <a href="agreements">Agreements <span>›</span></a>
         <a href="/templates">Templates <span>›</span></a>
+        <a href="/submission-checklist">Submission Checklist <span>›</span></a>
+        <a href="/kiosk">In-Person Signing <span>›</span></a>
+        <a href="/proof-packet">Signature Evidence Pack <span>›</span></a>
+        <a href="/certificate-demo">Certificate of Completion <span>›</span></a>
+        <a href="/#verify">Verify a Document <span>›</span></a>
+        <a href="/data-map">Data Map &amp; Records <span>›</span></a>
+        <a href="/access-log">Access Log <span>›</span></a>
+        <a href="/vault">Encrypted Vault <span>›</span></a>
+        <a href="/webhooks">Webhooks <span>›</span></a>
         <a href="/plans">Plans <span>›</span></a>
         <a href="https://buy.stripe.com/cNi00ieLedtedDL24vafS02" class="mobile-pay-link">Upgrade for €15/month</a>
         <button type="button" id="mobileSignout">Sign out <span>›</span></button>
@@ -910,6 +932,23 @@
       </div>
     </div>
   </div>
+
+  <script>
+    // Tools dropdown in the top nav
+    (function(){
+      var trigger=document.getElementById('toolsTrigger');
+      var menu=document.getElementById('toolsMenu');
+      if(!trigger||!menu) return;
+      trigger.addEventListener('click',function(e){
+        e.preventDefault();
+        var open=menu.classList.toggle('open');
+        trigger.setAttribute('aria-expanded', open?'true':'false');
+      });
+      document.addEventListener('click',function(e){
+        if(!menu.contains(e.target)&&e.target!==trigger){ menu.classList.remove('open'); trigger.setAttribute('aria-expanded','false'); }
+      });
+    })();
+  </script>
 
 </body>
 <script>
