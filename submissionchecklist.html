@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connexion Two | Submission Checklist</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:Inter,-apple-system,Arial,sans-serif;background:#f7f9fc;color:#0f1b2d;margin:0;line-height:1.5}
+    .bar{background:#fff;border-bottom:1px solid #e6edf7;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .bar .back{color:#0054d1;font-weight:800;text-decoration:none;font-size:.9rem}
+    .who{font-size:.78rem;color:#5f6b7a}.link{background:none;border:none;color:#0054d1;font-weight:700;cursor:pointer;font-size:.8rem;padding:0}
+    .wrap{max-width:900px;margin:0 auto;padding:22px 16px 60px}
+    h1{font-size:1.55rem;letter-spacing:-.02em;color:#041124;margin:0 0 4px}
+    .sub{color:#5f6b7a;font-size:.9rem;margin:0 0 18px}
+    .grid{display:grid;grid-template-columns:1fr;gap:18px}
+    @media(min-width:800px){.grid{grid-template-columns:260px 1fr}}
+    .panel{background:#fff;border:1px solid #e6edf7;border-radius:14px;padding:16px}
+    .panel h3{margin:0 0 10px;font-size:.74rem;text-transform:uppercase;letter-spacing:.05em;color:#5f6b7a}
+    input,select,textarea{width:100%;border:1px solid #d9e2ef;border-radius:9px;padding:10px 11px;font:inherit;outline:none;background:#fff;color:#0f1b2d}
+    input:focus,select:focus{border-color:#0068ff;box-shadow:0 0 0 3px rgba(0,104,255,.12)}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:#0054d1;color:#fff;border:none;border-radius:10px;padding:11px 14px;font-weight:800;font-size:.9rem;cursor:pointer}
+    .btn:hover{background:#082b61}.btn:disabled{background:#9db4d6;cursor:not-allowed}
+    .btn.ghost{background:#eef3fb;color:#0054d1}.btn.sm{padding:7px 11px;font-size:.82rem}
+    .btn.green{background:#0a7d3f}.btn.block{width:100%}
+    .sublist .s{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px;border-radius:9px;cursor:pointer;border:1px solid transparent}
+    .sublist .s:hover{background:#f4f7fb}
+    .sublist .s.active{background:#eef3fb;border-color:#cfe0fb}
+    .sublist .nm{font-weight:700;font-size:.9rem}
+    .sublist .rf{font-size:.75rem;color:#5f6b7a}
+    .ready-bar{height:8px;background:#eef1f5;border-radius:20px;overflow:hidden;margin:8px 0 4px}
+    .ready-bar > div{height:100%;background:#0a7d3f;width:0%}
+    .pill{display:inline-block;font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:3px 10px;border-radius:20px}
+    .p-open{background:#fff2df;color:#a45b00}.p-ready{background:#e4f6ec;color:#0a7d3f}.p-submitted{background:#e3f0ff;color:#0054d1}
+    .item{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-top:1px solid #eef3fb}
+    .item:first-child{border-top:none}
+    .chk{width:22px;height:22px;border-radius:6px;border:2px solid #cdd8e8;flex:0 0 auto;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;margin-top:1px}
+    .chk.done{background:#0a7d3f;border-color:#0a7d3f}
+    .ibody{flex:1;min-width:0}
+    .ilabel{font-weight:700}
+    .ireq{font-size:.72rem;color:#a45b00;font-weight:800;text-transform:uppercase;margin-left:6px}
+    .ilink{font-size:.78rem;color:#0a7d3f;margin-top:2px}
+    .irow2{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center}
+    .irm{background:none;border:none;color:#c0362c;cursor:pointer;font-size:.78rem;font-weight:700}
+    .note{color:#5f6b7a;font-size:.85rem;margin-top:10px}.err{color:#c0362c}
+    .addrow{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+    .addrow input{flex:1;min-width:160px}
+    .overlay{position:fixed;inset:0;background:rgba(4,17,36,.55);display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}
+    .card{background:#fff;border-radius:16px;padding:26px;max-width:380px;width:100%;box-shadow:0 30px 90px rgba(6,26,58,.25)}
+    .card h2{margin:0 0 4px;font-size:1.3rem;color:#041124}.card p{font-size:.85rem;color:#5f6b7a;margin:0 0 16px}
+    .card label{display:block;font-size:.72rem;font-weight:800;text-transform:uppercase;color:#5f6b7a;margin:12px 0 6px}
+    .gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:1px solid #d9e2ef;background:#fff;border-radius:10px;padding:11px;font-weight:700;cursor:pointer;margin-bottom:14px}
+    .divider{text-align:center;font-size:.72rem;color:#9aa6b5;margin:6px 0 12px}
+  </style>
+</head>
+<body>
+  <div class="overlay" id="login-overlay">
+    <div class="card">
+      <h2>Sign in</h2>
+      <p>Sign in to build a pre-submission checklist so no required document is ever missed.</p>
+      <button class="gbtn" onclick="signInWithGoogle()">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Continue with Google
+      </button>
+      <div class="divider">or with email</div>
+      <label>Email</label><input id="lo-email" type="email" placeholder="you@company.com">
+      <label>Password</label><input id="lo-pass" type="password" placeholder="••••••••">
+      <button class="btn block" style="margin-top:14px" onclick="doLogin()">Sign in</button>
+      <div class="note err" id="lo-err"></div>
+    </div>
+  </div>
+
+  <div class="bar">
+    <a class="back" href="/agreements">← Agreements</a>
+    <span class="who"><span id="who-email"></span> · <button class="link" onclick="signOut()">Sign out</button></span>
+  </div>
+
+  <div class="wrap">
+    <h1>Submission Checklist</h1>
+    <div class="sub">Define every document a package requires, then check each off before you submit. The package stays <strong>Not ready</strong> until every required item is done — so a single missing attestation can't slip through.</div>
+
+    <div class="grid">
+      <div class="panel">
+        <h3>Packages</h3>
+        <div class="sublist" id="subList"><div class="note">Loading…</div></div>
+        <div style="margin-top:12px">
+          <input id="newName" placeholder="New package name (e.g. SEWP VI bid)">
+          <input id="newRef" placeholder="Reference (solicitation #, client)" style="margin-top:8px">
+          <button class="btn block" style="margin-top:8px" id="newSub">+ Create package</button>
+        </div>
+      </div>
+
+      <div class="panel" id="detail"><div class="note">Select or create a package to build its checklist.</div></div>
+    </div>
+    <div class="note" id="status"></div>
+  </div>
+
+  <script>
+    const SB_URL='https://rfdvogakvyodixgpvqvz.supabase.co';
+    const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
+    const sb=supabase.createClient(SB_URL,SB_KEY);
+    const AUTH_URL='https://xbwuvaxtnylqvagdvpxp.supabase.co';
+    const AUTH_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc';
+    const sbAuth=supabase.createClient(AUTH_URL,AUTH_KEY);
+
+    // Common starter items — fully editable per package.
+    const TEMPLATE=[
+      'Representations & Certifications (Reps & Certs)',
+      'Supply-Chain / C-SCRM Attestation',
+      'Technical Proposal',
+      'Price / Cost Proposal',
+      'Past Performance',
+      'SAM.gov registration active',
+      'Subcontractor flow-down acknowledgments',
+    ];
+
+    let currentEmail=null, subs=[], activeId=null, items=[], completedDocs=[], booted=false;
+    const $=(id)=>document.getElementById(id);
+    const esc=(v)=>String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    async function doLogin(){const{error}=await sbAuth.auth.signInWithPassword({email:$('lo-email').value.trim(),password:$('lo-pass').value});if(error)$('lo-err').textContent=error.message;}
+    async function signInWithGoogle(){const{error}=await sbAuth.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+window.location.pathname}});if(error)$('lo-err').textContent=error.message;}
+    async function signOut(){try{await sbAuth.auth.signOut();}catch(_){}location.reload();}
+    window.doLogin=doLogin;window.signInWithGoogle=signInWithGoogle;window.signOut=signOut;
+
+    async function loadSubs(){
+      const{data,error}=await sb.from('submissions').select('*').eq('owner_email',currentEmail).order('created_at',{ascending:false});
+      if(error){$('subList').innerHTML='<div class="note err">'+esc(error.message)+'</div>';return;}
+      subs=data||[];
+      $('subList').innerHTML=subs.length?subs.map(s=>`<div class="s ${s.id===activeId?'active':''}" onclick="openSub(${s.id})">
+        <div><div class="nm">${esc(s.name)}</div><div class="rf">${esc(s.reference||'')}</div></div>
+        <span class="pill p-${esc(s.status)}">${esc(s.status)}</span></div>`).join('')
+        :'<div class="note">No packages yet.</div>';
+    }
+
+    async function createSub(){
+      const name=$('newName').value.trim();if(!name){return;}
+      const ref=$('newRef').value.trim();
+      const{data,error}=await sb.from('submissions').insert({owner_email:currentEmail,name,reference:ref,status:'open'}).select().single();
+      if(error){$('status').innerHTML='<span class="err">'+esc(error.message)+'</span>';return;}
+      // seed with the template items
+      const seed=TEMPLATE.map((label,i)=>({submission_id:data.id,owner_email:currentEmail,label,required:true,status:'pending',sort_order:i}));
+      await sb.from('submission_items').insert(seed);
+      $('newName').value='';$('newRef').value='';
+      activeId=data.id;await loadSubs();await openSub(data.id);
+    }
+
+    async function openSub(id){
+      activeId=id;await loadSubs();
+      const sub=subs.find(s=>s.id===id);if(!sub){return;}
+      const{data}=await sb.from('submission_items').select('*').eq('submission_id',id).order('sort_order',{ascending:true});
+      items=data||[];
+      // completed docs for linking as proof
+      if(!completedDocs.length){
+        let r=await sb.from('signer_documents').select('doc_id,title,owner_email,status,completed_at,total_signers,signed_count');
+        completedDocs=((r.data)||[]).filter(a=>{
+          if((a.owner_email||'').toLowerCase()!==currentEmail)return false;
+          const st=String(a.status||'').toLowerCase();return st.includes('complete')||!!a.completed_at||(Number(a.total_signers||0)>0&&Number(a.signed_count||0)>=Number(a.total_signers||0));
+        }).map(a=>({doc_id:a.doc_id,title:a.title||'Untitled'}));
+      }
+      renderDetail(sub);
+    }
+
+    function readiness(){
+      const req=items.filter(i=>i.required);
+      const done=req.filter(i=>i.status==='done').length;
+      return {req:req.length,done,ready:req.length>0&&done===req.length};
+    }
+
+    function renderDetail(sub){
+      const r=readiness();
+      const pct=r.req?Math.round(r.done/r.req*100):0;
+      const docOpts=(id)=>'<option value="">Link a signed agreement (optional)…</option>'+completedDocs.map(d=>`<option value="${esc(d.doc_id)}" ${id===d.doc_id?'selected':''}>${esc(d.title)}</option>`).join('');
+      $('detail').innerHTML=`
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+          <div><div style="font-weight:800;font-size:1.1rem">${esc(sub.name)}</div><div class="rf" style="color:#5f6b7a;font-size:.82rem">${esc(sub.reference||'')}</div></div>
+          <span class="pill ${r.ready?'p-ready':'p-open'}">${r.ready?'Ready to submit':'Not ready'}</span>
+        </div>
+        <div class="ready-bar"><div style="width:${pct}%"></div></div>
+        <div class="note" style="margin-top:0">${r.done} of ${r.req} required items complete${r.ready?' — every required document is in.':''}</div>
+
+        <div style="margin-top:14px">${items.map(it=>`
+          <div class="item">
+            <div class="chk ${it.status==='done'?'done':''}" onclick="toggleItem(${it.id})">${it.status==='done'?'✓':''}</div>
+            <div class="ibody">
+              <div><span class="ilabel">${esc(it.label)}</span>${it.required?'<span class="ireq">required</span>':'<span class="rf" style="color:#9aa6b5;font-size:.72rem;margin-left:6px">optional</span>'}</div>
+              ${it.doc_id?`<div class="ilink">✓ Linked to a signed agreement (proof attached)</div>`:''}
+              <div class="irow2">
+                <select onchange="linkDoc(${it.id},this.value)" style="max-width:320px">${docOpts(it.doc_id)}</select>
+                <button class="irm" onclick="toggleReq(${it.id})">${it.required?'make optional':'make required'}</button>
+                <button class="irm" onclick="removeItem(${it.id})">remove</button>
+              </div>
+            </div>
+          </div>`).join('')}
+        </div>
+
+        <div class="addrow">
+          <input id="addLabel" placeholder="Add a required document…">
+          <button class="btn sm" onclick="addItem()">+ Add</button>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+          <button class="btn green" onclick="markSubmitted()" ${r.ready?'':'disabled'}>Mark submitted</button>
+          <button class="btn ghost" onclick="exportReport()">Export readiness report (PDF)</button>
+        </div>`;
+    }
+
+    async function toggleItem(id){
+      const it=items.find(i=>i.id===id);if(!it)return;
+      const ns=it.status==='done'?'pending':'done';
+      await sb.from('submission_items').update({status:ns,updated_at:new Date().toISOString()}).eq('id',id);
+      it.status=ns;await refreshStatus();renderDetail(subs.find(s=>s.id===activeId));
+    }
+    async function toggleReq(id){
+      const it=items.find(i=>i.id===id);if(!it)return;
+      await sb.from('submission_items').update({required:!it.required}).eq('id',id);
+      it.required=!it.required;await refreshStatus();renderDetail(subs.find(s=>s.id===activeId));
+    }
+    async function linkDoc(id,docId){
+      const it=items.find(i=>i.id===id);if(!it)return;
+      const patch={doc_id:docId||null};
+      if(docId) patch.status='done';        // linking proof marks it complete
+      await sb.from('submission_items').update(patch).eq('id',id);
+      it.doc_id=docId||null; if(docId) it.status='done';
+      await refreshStatus();renderDetail(subs.find(s=>s.id===activeId));
+    }
+    async function addItem(){
+      const label=$('addLabel').value.trim();if(!label)return;
+      const{data}=await sb.from('submission_items').insert({submission_id:activeId,owner_email:currentEmail,label,required:true,status:'pending',sort_order:items.length}).select().single();
+      if(data)items.push(data);renderDetail(subs.find(s=>s.id===activeId));
+    }
+    async function removeItem(id){
+      await sb.from('submission_items').delete().eq('id',id);
+      items=items.filter(i=>i.id!==id);await refreshStatus();renderDetail(subs.find(s=>s.id===activeId));
+    }
+    async function refreshStatus(){
+      const r=readiness();const sub=subs.find(s=>s.id===activeId);if(!sub)return;
+      const ns=sub.status==='submitted'?'submitted':(r.ready?'ready':'open');
+      if(ns!==sub.status){await sb.from('submissions').update({status:ns}).eq('id',activeId);sub.status=ns;await loadSubs();}
+    }
+    async function markSubmitted(){
+      await sb.from('submissions').update({status:'submitted'}).eq('id',activeId);
+      const sub=subs.find(s=>s.id===activeId);if(sub)sub.status='submitted';await loadSubs();renderDetail(sub);
+    }
+    window.openSub=openSub;window.toggleItem=toggleItem;window.toggleReq=toggleReq;window.linkDoc=linkDoc;window.addItem=addItem;window.removeItem=removeItem;window.markSubmitted=markSubmitted;
+
+    async function exportReport(){
+      const sub=subs.find(s=>s.id===activeId);if(!sub)return;
+      $('status').textContent='Building report…';
+      try{
+        const{PDFDocument,StandardFonts,rgb}=PDFLib;
+        const out=await PDFDocument.create();
+        const font=await out.embedFont(StandardFonts.Helvetica);
+        const bold=await out.embedFont(StandardFonts.HelveticaBold);
+        const W=595.28,H=841.89,M=46;
+        const blue=rgb(0,0.33,0.82),navy=rgb(0.024,0.102,0.227),ink=rgb(0.07,0.11,0.18),muted=rgb(0.37,0.42,0.48),line=rgb(0.85,0.89,0.94),green=rgb(0.04,0.49,0.25),amber=rgb(0.64,0.36,0);
+        let page=out.addPage([W,H]),y=H-50;
+        const nb=()=>{page=out.addPage([W,H]);y=H-50;};
+        page.drawText('Connexion Two',{x:M,y,size:12,font:bold,color:blue});y-=24;
+        page.drawText('Submission Readiness Report',{x:M,y,size:20,font:bold,color:navy});y-=14;
+        page.drawLine({start:{x:M,y},end:{x:W-M,y},thickness:1,color:line});y-=22;
+        page.drawText('Package: '+(sub.name||''),{x:M,y,size:11,font:bold,color:ink});y-=15;
+        if(sub.reference){page.drawText('Reference: '+sub.reference,{x:M,y,size:9,font,color:muted});y-=13;}
+        page.drawText('Generated (UTC): '+new Date().toUTCString(),{x:M,y,size:9,font,color:muted});y-=13;
+        const r=readiness();
+        page.drawText('Status: '+(r.ready?'READY — all required documents complete':'NOT READY — required documents outstanding'),{x:M,y,size:10,font:bold,color:r.ready?green:amber});y-=13;
+        page.drawText(r.done+' of '+r.req+' required items complete',{x:M,y,size:9,font,color:muted});y-=22;
+        page.drawText('Checklist',{x:M,y,size:10,font:bold,color:blue});y-=6;page.drawLine({start:{x:M,y},end:{x:W-M,y},thickness:.5,color:line});y-=18;
+        items.forEach((it)=>{
+          if(y<70)nb();
+          const done=it.status==='done';
+          page.drawText(done?'[x]':'[ ]',{x:M,y,size:11,font:bold,color:done?green:amber});
+          page.drawText(it.label+(it.required?'':'  (optional)'),{x:M+28,y,size:10,font:bold,color:ink});y-=13;
+          const bits=[done?'Complete':'Outstanding', it.doc_id?'Proof: signed agreement linked':null].filter(Boolean).join('   ·   ');
+          page.drawText(bits,{x:M+28,y,size:8.5,font,color:muted});y-=16;
+        });
+        y-=6;page.drawLine({start:{x:M,y},end:{x:W-M,y},thickness:.5,color:line});y-=14;
+        page.drawText('This report reflects the checklist status at generation time. It is a record of your pre-submission review, not a guarantee of acceptance.',{x:M,y,size:8,font,color:muted});
+        const bytes=await out.save();
+        const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+        const a=document.createElement('a');a.href=url;a.download='submission-readiness-'+(sub.name||'package').replace(/[^a-z0-9]/gi,'-').slice(0,40)+'.pdf';a.click();
+        setTimeout(()=>URL.revokeObjectURL(url),4000);
+        $('status').textContent='✓ Report downloaded.';
+      }catch(e){console.error(e);$('status').innerHTML='<span class="err">Error: '+esc(e.message)+'</span>';}
+    }
+    window.exportReport=exportReport;
+    $('newSub').addEventListener('click',createSub);
+
+    async function onSession(session){
+      const user=session&&session.user;if(!user){$('login-overlay').style.display='flex';return;}
+      currentEmail=(user.email||'').toLowerCase()||null;$('who-email').textContent=user.email||'';
+      $('login-overlay').style.display='none';if(booted)return;booted=true;await loadSubs();
+    }
+    sbAuth.auth.onAuthStateChange((_e,s)=>onSession(s));
+    (async()=>{const{data:{session}}=await sbAuth.auth.getSession();onSession(session);})();
+  </script>
+</body>
+</html>
