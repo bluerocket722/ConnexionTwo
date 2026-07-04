@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connexion Two | Agreement</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:Inter,-apple-system,Arial,sans-serif;background:#f7f9fc;color:#0f1b2d;margin:0;line-height:1.5}
+    .bar{background:#fff;border-bottom:1px solid #e6edf7;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .bar .back{color:#0054d1;font-weight:800;text-decoration:none;font-size:.9rem}
+    .who{font-size:.78rem;color:#5f6b7a}.link{background:none;border:none;color:#0054d1;font-weight:700;cursor:pointer;font-size:.8rem;padding:0}
+    .wrap{max-width:1000px;margin:0 auto;padding:22px 16px 60px}
+    h1{font-size:1.5rem;letter-spacing:-.02em;color:#041124;margin:0 0 4px}
+    .meta{color:#5f6b7a;font-size:.85rem;margin-bottom:14px}
+    .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+    .b-completed{background:#e4f6ec;color:#0a7d3f}.b-progress{background:#fff2df;color:#a45b00}.b-draft{background:#eef1f5;color:#5f6b7a}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 18px}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#0054d1;color:#fff;border:none;border-radius:10px;padding:12px 18px;font-weight:800;font-size:.95rem;cursor:pointer;text-decoration:none}
+    .btn:hover{background:#082b61}.btn.ghost{background:#eef3fb;color:#0054d1}.btn:disabled{background:#9db4d6;cursor:not-allowed}
+    .grid{display:grid;grid-template-columns:1fr;gap:18px}
+    @media(min-width:820px){.grid{grid-template-columns:1fr 280px}}
+    .viewer{background:#fff;border:1px solid #e6edf7;border-radius:14px;overflow:hidden;min-height:520px}
+    .viewer iframe{width:100%;height:70vh;border:0;display:block}
+    .side{background:#fff;border:1px solid #e6edf7;border-radius:14px;padding:16px;height:fit-content}
+    .side h3{margin:0 0 10px;font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;color:#5f6b7a}
+    .signer{display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid #eef3fb}
+    .signer:first-of-type{border-top:none}
+    .sav{width:34px;height:34px;border-radius:50%;background:#e3f0ff;color:#0054d1;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.8rem;flex:0 0 auto}
+    .sn{font-weight:700;font-size:.9rem}.se{color:#5f6b7a;font-size:.76rem;overflow:hidden;text-overflow:ellipsis}
+    .dot{margin-left:auto;font-size:.7rem;font-weight:800}.dot.ok{color:#0a7d3f}.dot.wait{color:#a45b00}
+    .note{color:#5f6b7a;font-size:.85rem;margin-top:12px}.err{color:#c0362c}
+    .empty{background:#fff;border:1px dashed #cdd8e8;border-radius:14px;padding:40px;text-align:center;color:#5f6b7a}
+    .overlay{position:fixed;inset:0;background:rgba(4,17,36,.55);display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}
+    .card{background:#fff;border-radius:16px;padding:26px;max-width:380px;width:100%;box-shadow:0 30px 90px rgba(6,26,58,.25)}
+    .card h2{margin:0 0 4px;font-size:1.3rem;color:#041124}.card p{font-size:.85rem;color:#5f6b7a;margin:0 0 16px}
+    .card label{display:block;font-size:.72rem;font-weight:800;text-transform:uppercase;color:#5f6b7a;margin:12px 0 6px}
+    .card input{width:100%;border:1px solid #d9e2ef;border-radius:10px;padding:12px;font:inherit}
+    .gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:1px solid #d9e2ef;background:#fff;border-radius:10px;padding:11px;font-weight:700;cursor:pointer;margin-bottom:14px}
+    .divider{text-align:center;font-size:.72rem;color:#9aa6b5;margin:6px 0 12px}
+  </style>
+</head>
+<body>
+  <div class="overlay" id="login-overlay">
+    <div class="card">
+      <h2>Sign in</h2>
+      <p>Sign in to open your agreement.</p>
+      <button class="gbtn" onclick="signInWithGoogle()">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Continue with Google
+      </button>
+      <div class="divider">or with email</div>
+      <label>Email</label><input id="lo-email" type="email" placeholder="you@company.com">
+      <label>Password</label><input id="lo-pass" type="password" placeholder="••••••••">
+      <button class="btn" style="width:100%;margin-top:14px" onclick="doLogin()">Sign in</button>
+      <div class="note err" id="lo-err"></div>
+    </div>
+  </div>
+
+  <div class="bar">
+    <a class="back" href="/agreements">← All agreements</a>
+    <span class="who"><span id="who-email"></span> · <button class="link" onclick="signOut()">Sign out</button></span>
+  </div>
+
+  <div class="wrap">
+    <div id="content"><div class="empty">Loading…</div></div>
+  </div>
+
+  <script>
+    const SB_URL='https://rfdvogakvyodixgpvqvz.supabase.co';
+    const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
+    const sb=supabase.createClient(SB_URL,SB_KEY);
+    const AUTH_URL='https://xbwuvaxtnylqvagdvpxp.supabase.co';
+    const AUTH_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc';
+    const sbAuth=supabase.createClient(AUTH_URL,AUTH_KEY);
+
+    let currentEmail=null, booted=false;
+    const $=(id)=>document.getElementById(id);
+    const esc=(v)=>String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const docId=new URLSearchParams(location.search).get('id');
+    const initials=(n,e)=>((n||e||'?').trim().slice(0,2)||'?').toUpperCase();
+
+    async function doLogin(){const{error}=await sbAuth.auth.signInWithPassword({email:$('lo-email').value.trim(),password:$('lo-pass').value});if(error)$('lo-err').textContent=error.message;}
+    async function signInWithGoogle(){const{error}=await sbAuth.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+window.location.pathname+window.location.search}});if(error)$('lo-err').textContent=error.message;}
+    async function signOut(){try{await sbAuth.auth.signOut();}catch(_){}location.reload();}
+    window.doLogin=doLogin;window.signInWithGoogle=signInWithGoogle;window.signOut=signOut;
+
+    function phaseOf(a){
+      const st=String(a.status||'').toLowerCase();const total=Number(a.total_signers||0),signed=Number(a.signed_count||0);
+      if(st.includes('complete')||!!a.completed_at||(total>0&&signed>=total))return'completed';
+      if(st.includes('progress')||st.includes('pending')||signed>0||total>0)return'progress';
+      return'draft';
+    }
+
+    async function forceDownload(url,name){
+      try{
+        const r=await fetch(url);
+        if(!r.ok)throw new Error('fetch failed');
+        const blob=await r.blob();
+        const u=URL.createObjectURL(blob);
+        const a=document.createElement('a');a.href=u;a.download=name||'document.pdf';a.click();
+        setTimeout(()=>URL.revokeObjectURL(u),4000);
+      }catch(_){ window.open(url,'_blank'); }  // cross-origin fallback
+    }
+
+    async function load(){
+      if(!docId){$('content').innerHTML='<div class="empty">No document specified.</div>';return;}
+      const{data,error}=await sb.from('signer_documents').select('*').eq('doc_id',docId).limit(1);
+      if(error){$('content').innerHTML='<div class="empty err">Could not load: '+esc(error.message)+'</div>';return;}
+      const a=data&&data[0];
+      if(!a){$('content').innerHTML='<div class="empty">Agreement not found.</div>';return;}
+      if(currentEmail && (a.owner_email||'').toLowerCase()!==currentEmail){
+        $('content').innerHTML='<div class="empty">You don’t have access to this agreement.</div>';return;
+      }
+
+      const phase=phaseOf(a);
+      const badge={completed:['b-completed','Completed'],progress:['b-progress','Awaiting Signature'],draft:['b-draft','Draft']}[phase];
+      const viewUrl=a.final_pdf_url||a.current_pdf_url||a.pdf_url||'';
+      const isFinal=!!a.final_pdf_url;
+      const dlName=(a.title||'agreement').replace(/[^a-z0-9\-_ ]/gi,'').slice(0,60)+'.pdf';
+
+      // signers
+      const{data:signers}=await sb.from('signers').select('signer_order,name,email,status,signed_at').eq('doc_id',docId).order('signer_order');
+      const sList=(signers||[]).map(s=>{
+        const ok=String(s.status||'').toLowerCase()==='signed';
+        return `<div class="signer"><div class="sav">${esc(initials(s.name,s.email))}</div>
+          <div style="min-width:0"><div class="sn">${esc(s.name||'Signer '+s.signer_order)}</div><div class="se">${esc(s.email||'')}</div></div>
+          <div class="dot ${ok?'ok':'wait'}">${ok?'✓ Signed':'Waiting'}</div></div>`;
+      }).join('')||'<div class="note">No signers.</div>';
+
+      $('content').innerHTML=`
+        <h1>${esc(a.title||'Untitled Agreement')}</h1>
+        <div class="meta"><span class="badge ${badge[0]}">${badge[1]}</span> · ${esc(a.doc_id).slice(0,8)} · ${a.created_at?new Date(a.created_at).toLocaleDateString():''}</div>
+        <div class="actions">
+          ${viewUrl?`<a class="btn" href="${esc(viewUrl)}" target="_blank" rel="noopener">Open in new tab</a>
+          <button class="btn ghost" id="dl">Download PDF</button>`:'<span class="note">No document file is available yet for this agreement.</span>'}
+        </div>
+        <div class="grid">
+          <div class="viewer">${viewUrl?`<iframe src="${esc(viewUrl)}#toolbar=1" title="Agreement document"></iframe>`:'<div class="empty" style="border:0">Nothing to preview yet.</div>'}</div>
+          <div class="side">
+            <h3>Signers</h3>
+            ${sList}
+            ${isFinal?'<div class="note" style="margin-top:12px">This is the fully signed final copy.</div>':phase==='progress'?'<div class="note" style="margin-top:12px">Signing in progress — this shows the latest version.</div>':''}
+          </div>
+        </div>`;
+      if(viewUrl){ const b=$('dl'); if(b) b.addEventListener('click',()=>forceDownload(viewUrl,dlName)); }
+    }
+
+    async function onSession(session){
+      const user=session&&session.user;if(!user){$('login-overlay').style.display='flex';return;}
+      currentEmail=(user.email||'').toLowerCase()||null;$('who-email').textContent=user.email||'';
+      $('login-overlay').style.display='none';if(booted)return;booted=true;await load();
+    }
+    sbAuth.auth.onAuthStateChange((_e,s)=>onSession(s));
+    (async()=>{const{data:{session}}=await sbAuth.auth.getSession();onSession(session);})();
+  </script>
+</body>
+</html>
