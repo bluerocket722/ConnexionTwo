@@ -52,9 +52,8 @@ button,select,input{font:inherit}
 .hint{margin-top:14px;padding:11px 12px;border:1px dashed #bcd3ef;background:var(--blue-050);border-radius:10px;color:var(--muted);font-size:.78rem;line-height:1.5}
 
 .stage{overflow:auto;padding:26px;display:flex;flex-direction:column;align-items:center;gap:18px}
-.page-wrap{position:relative;flex:0 0 auto;background:#fff;box-shadow:0 1px 0 rgba(6,26,58,.08),0 16px 40px rgba(6,26,58,.14);border-radius:4px;overflow:hidden}
+.page-wrap{position:relative;background:#fff;box-shadow:0 1px 0 rgba(6,26,58,.08),0 16px 40px rgba(6,26,58,.14);border-radius:4px;overflow:hidden}
 .page-wrap.armed{cursor:crosshair}
-.page-err{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;color:#b42318;font-size:.8rem;font-weight:700;background:#fff}
 .fld{position:absolute;border:1.5px solid;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:800;cursor:move;user-select:none;overflow:visible}
 .fld .lbl{pointer-events:none;white-space:nowrap;opacity:.9;padding:0 4px;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .fld .del{position:absolute;top:-10px;right:-10px;width:20px;height:20px;border-radius:50%;background:#e11d48;color:#fff;border:2px solid #fff;font-size:.7rem;font-weight:900;cursor:pointer;display:grid;place-items:center;line-height:1}
@@ -254,8 +253,8 @@ document.getElementById('addSigner').addEventListener('click',()=>{
 });
 document.getElementById('signerSelect').addEventListener('change',e=>{ currentSigner=Number(e.target.value); });
 
-// ---------- fetch the template bytes (robust for private buckets) ----------
-async function fetchTemplateBytes(filePath){
+// ---------- render PDF (fetch actual bytes → render; robust for private buckets) ----------
+async function fetchPdfBytes(filePath){
   // 1) try an authenticated download (works even if the bucket is private)
   try{
     const dl=await sb.storage.from(TEMPLATE_BUCKET).download(filePath);
@@ -273,31 +272,15 @@ async function fetchTemplateBytes(filePath){
 }
 
 // pdf.js font/CMap data — WITHOUT these, PDFs that use embedded (CID) fonts
-// parse fine but render as blank white pages.
+// parse fine but render as blank white pages. This is the usual "pages show but
+// nothing paints" cause.
 const PDFJS_CDN='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174';
 
-// Some browsers (notably Safari/iOS) silently render a BLANK canvas once its
-// area exceeds a hard limit (~16.7M px on iOS). A scanned page at high scale can
-// blow past that and paint nothing. Cap the backing-store area to stay safe.
-const MAX_CANVAS_PX = 16*1024*1024;
-
-// ---------- decide PDF vs image, then render ----------
-async function renderTemplate(filePath){
+async function renderPdf(filePath){
   const stage=document.getElementById('stage');
   stage.innerHTML='';
   pages=[];
-  const bytes=await fetchTemplateBytes(filePath);
-  const head=new Uint8Array(bytes.slice(0,5));
-  // "%PDF" magic number → real PDF; anything else we treat as an image file.
-  const isPdf = head[0]===0x25 && head[1]===0x50 && head[2]===0x44 && head[3]===0x46;
-  if(isPdf){ await renderPdfBytes(bytes); }
-  else { await renderImageBytes(bytes); }
-  if(!pages.length){ throw new Error('The template produced no viewable pages.'); }
-}
-
-// ---------- render a PDF ----------
-async function renderPdfBytes(bytes){
-  const stage=document.getElementById('stage');
+  const bytes=await fetchPdfBytes(filePath);
   const pdf=await pdfjsLib.getDocument({
     data:bytes,
     cMapUrl:PDFJS_CDN+'/cmaps/',
@@ -306,75 +289,30 @@ async function renderPdfBytes(bytes){
   }).promise;
   const avail=Math.max(360,(stage.clientWidth||900)-52);
   const base=(await pdf.getPage(1)).getViewport({scale:1});
-  let scale=Math.min(1.5, avail/base.width);
-  // never let a single page's canvas exceed the browser's safe area
-  if(base.width*base.height*scale*scale > MAX_CANVAS_PX){
-    scale=Math.sqrt(MAX_CANVAS_PX/(base.width*base.height));
-  }
+  const scale=Math.min(1.5, avail/base.width);
   for(let p=1;p<=pdf.numPages;p++){
     const page=await pdf.getPage(p);
     const vp=page.getViewport({scale});
-    const cw=Math.floor(vp.width), ch=Math.floor(vp.height);
     const wrap=document.createElement('div');
     wrap.className='page-wrap'+(armedType?' armed':'');
-    wrap.style.width=cw+'px'; wrap.style.height=ch+'px';
+    wrap.style.width=vp.width+'px'; wrap.style.height=vp.height+'px';
     wrap.dataset.page=p;
     const canvas=document.createElement('canvas');
-    // backing store AND displayed size use the same pixel dimensions so the
-    // page keeps its true aspect ratio (no vertical squish)
-    canvas.width=cw; canvas.height=ch;
-    canvas.style.width=cw+'px'; canvas.style.height=ch+'px'; canvas.style.display='block';
+    canvas.width=vp.width; canvas.height=vp.height;
+    canvas.style.display='block';
     wrap.appendChild(canvas);
     stage.appendChild(wrap);
     const ctx=canvas.getContext('2d');
     ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height); // opaque base
-    try{
-      await page.render({canvasContext:ctx,viewport:vp,background:'#ffffff'}).promise;
-    }catch(err){
-      // surface the failure on the page instead of leaving a silent blank
-      console.error('page render failed',p,err);
-      const note=document.createElement('div');
-      note.className='page-err';
-      note.textContent='This page could not be rendered ('+(err&&err.message?err.message:'unknown error')+').';
-      wrap.appendChild(note);
-    }
+    await page.render({canvasContext:ctx,viewport:vp,background:'#ffffff'}).promise;
     wrap.addEventListener('pointerdown',e=>onPageClick(e,wrap,p));
     pages.push({wrap,wPx:vp.width,hPx:vp.height,pageNum:p});
   }
 }
 
-// ---------- render a plain image file (png / jpg / webp / gif …) ----------
-async function renderImageBytes(bytes){
-  const stage=document.getElementById('stage');
-  const url=URL.createObjectURL(new Blob([bytes]));
-  const img=await new Promise((res,rej)=>{
-    const im=new Image();
-    im.onload=()=>res(im);
-    im.onerror=()=>rej(new Error('Unsupported file — not a PDF or a readable image.'));
-    im.src=url;
-  });
-  const avail=Math.max(360,(stage.clientWidth||900)-52);
-  const scale=Math.min(1.5, avail/(img.naturalWidth||avail));
-  const wPx=(img.naturalWidth||avail)*scale;
-  const hPx=(img.naturalHeight||avail)*scale;
-  const wrap=document.createElement('div');
-  wrap.className='page-wrap'+(armedType?' armed':'');
-  wrap.style.width=wPx+'px'; wrap.style.height=hPx+'px';
-  wrap.dataset.page=1;
-  const el=document.createElement('img');
-  el.src=url; el.style.width=wPx+'px'; el.style.height=hPx+'px'; el.style.display='block';
-  wrap.appendChild(el);
-  wrap.addEventListener('pointerdown',e=>onPageClick(e,wrap,1));
-  stage.appendChild(wrap);
-  pages.push({wrap,wPx,hPx,pageNum:1});
-}
-
 function onPageClick(e,wrap,pageNum){
   if(!armedType) return;
-  // ignore clicks that land on an existing field; allow the page surface itself
-  // (the wrap, its canvas, or its background image)
-  const tag=e.target.tagName;
-  if(e.target!==wrap && tag!=='CANVAS' && tag!=='IMG') return;
+  if(e.target!==wrap && e.target.tagName!=='CANVAS') return; // ignore clicks on existing fields
   const rect=wrap.getBoundingClientRect();
   const d=defFor(armedType);
   const xPct=Math.max(0,Math.min(1-d.w,(e.clientX-rect.left)/rect.width - d.w/2));
@@ -484,8 +422,8 @@ document.getElementById('saveBtn').addEventListener('click',saveFields);
   document.getElementById('docName').textContent=data.name||'Template';
   refreshSigners();
   buildPalette();
-  try{ await renderTemplate(data.file_path); }
-  catch(e){ console.error('render failed',e); document.getElementById('stage').innerHTML='<div class="loading">Could not load the template ('+(e&&e.message?e.message:'unknown error')+'). Supported files: PDF, PNG, JPG, WEBP.</div>'; return; }
+  try{ await renderPdf(data.file_path); }
+  catch(e){ console.error('render failed',e); document.getElementById('stage').innerHTML='<div class="loading">Could not load the template PDF ('+(e&&e.message?e.message:'unknown error')+'). Make sure the template file is a PDF.</div>'; return; }
   await loadExisting();
 })();
 </script>
@@ -494,7 +432,17 @@ document.getElementById('saveBtn').addEventListener('click',saveFields);
 /* Trial countdown + referral + payment-lock — reads the SAME trials table as the
    welcome + document-creation pages (xbw project, via sbAuth). Identical behavior. */
 (function(){
-  const PAY_LINK   = 'https://buy.stripe.com/cNi00ieLedtedDL24vafS02';
+  const PAY_LINK = (function(){
+    const US='https://buy.stripe.com/cNi6oGeLebl6eHPdNdafS05', EU='https://buy.stripe.com/cNi00ieLedtedDL24vafS02';
+    try{ let us=false;
+      const langs=(navigator.languages&&navigator.languages.length)?navigator.languages:[navigator.language||''];
+      for(const l of langs){ if(/-US$/i.test(l||'')) us=true; }
+      try{ if(new Intl.Locale(navigator.language).region==='US') us=true; }catch(e){}
+      const US_TZ=['America/New_York','America/Detroit','America/Chicago','America/Denver','America/Phoenix','America/Los_Angeles','America/Anchorage','America/Adak','America/Boise','America/Juneau','America/Sitka','America/Menominee','America/Indiana/Indianapolis','America/Indiana/Knox','America/Kentucky/Louisville','Pacific/Honolulu'];
+      if(US_TZ.indexOf(Intl.DateTimeFormat().resolvedOptions().timeZone||'')>=0) us=true;
+      return us?US:EU;
+    }catch(e){ return EU; }
+  })();
   const SHARE_BASE = 'https://www.connexiontwo.com/?ref=';
   let myShareCode = null;
 
