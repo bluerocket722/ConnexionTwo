@@ -501,7 +501,7 @@
         <a href="/vault">Encrypted Vault <span>›</span></a>
         <a href="/webhooks">Webhooks <span>›</span></a>
         <a href="/plans">Plans <span>›</span></a>
-        <a href="https://buy.stripe.com/cNi00ieLedtedDL24vafS02" class="mobile-pay-link">Upgrade for €15/month</a>
+        <a href="https://buy.stripe.com/cNi00ieLedtedDL24vafS02" id="mobilePayLink" class="mobile-pay-link">Upgrade for €15/month</a>
         <button type="button" id="mobileSignout">Sign out <span>›</span></button>
       </div>
       <div class="mobile-nav-note">Document editing is locked on mobile so your files do not open in the browser editor by accident. Use desktop to create and edit DOCX, XLSX, and PPTX files.</div>
@@ -627,7 +627,17 @@
     const BUCKET = 'documents';
     const LOGIN_URL = 'https://www.connexiontwo.com/';
     const WELCOME_URL = 'https://www.connexiontwo.com/welcome';
-    const PAY_LINK = 'https://buy.stripe.com/cNi00ieLedtedDL24vafS02';
+    const PAY_LINK = (function(){
+      const US='https://buy.stripe.com/cNi6oGeLebl6eHPdNdafS05', EU='https://buy.stripe.com/cNi00ieLedtedDL24vafS02';
+      try{ let us=false;
+        const langs=(navigator.languages&&navigator.languages.length)?navigator.languages:[navigator.language||''];
+        for(const l of langs){ if(/-US$/i.test(l||'')) us=true; }
+        try{ if(new Intl.Locale(navigator.language).region==='US') us=true; }catch(e){}
+        const US_TZ=['America/New_York','America/Detroit','America/Chicago','America/Denver','America/Phoenix','America/Los_Angeles','America/Anchorage','America/Adak','America/Boise','America/Juneau','America/Sitka','America/Menominee','America/Indiana/Indianapolis','America/Indiana/Knox','America/Kentucky/Louisville','Pacific/Honolulu'];
+        if(US_TZ.indexOf(Intl.DateTimeFormat().resolvedOptions().timeZone||'')>=0) us=true;
+        return us?US:EU;
+      }catch(e){ return EU; }
+    })();
     const TEMPLATES = { docx: 'blank.docx', xlsx: 'blank.xlsx', pptx: 'blank.pptx' };
     const sb = supabase.createClient(SB_URL, SB_KEY);
     let editor = null;
@@ -657,6 +667,7 @@
     billingClose?.addEventListener('click', closeBillingModal);
     billingOverlay?.addEventListener('click', (event) => { if(event.target === billingOverlay) closeBillingModal(); });
     billingNextBtn?.addEventListener('click', () => { window.location.href = PAY_LINK; });
+    { const _mpl = document.getElementById('mobilePayLink'); if(_mpl) _mpl.href = PAY_LINK; }
     viewPlansBtn?.addEventListener('click', () => { window.location.href = '/plans'; });
     document.addEventListener('keydown', (event) => { if(event.key === 'Escape') { closeBillingModal(); if(typeof hideMobileNav === 'function') hideMobileNav(); } });
 
