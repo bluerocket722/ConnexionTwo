@@ -1227,7 +1227,17 @@ loadTemplateOptions();
 /* Trial countdown + referral + payment-lock — reads the SAME trials table as the
    welcome page (xbw project, via sbAuth). Identical behavior. */
 (function(){
-  const PAY_LINK   = 'https://buy.stripe.com/cNi00ieLedtedDL24vafS02';
+  const PAY_LINK = (function(){
+    const US='https://buy.stripe.com/cNi6oGeLebl6eHPdNdafS05', EU='https://buy.stripe.com/cNi00ieLedtedDL24vafS02';
+    try{ let us=false;
+      const langs=(navigator.languages&&navigator.languages.length)?navigator.languages:[navigator.language||''];
+      for(const l of langs){ if(/-US$/i.test(l||'')) us=true; }
+      try{ if(new Intl.Locale(navigator.language).region==='US') us=true; }catch(e){}
+      const US_TZ=['America/New_York','America/Detroit','America/Chicago','America/Denver','America/Phoenix','America/Los_Angeles','America/Anchorage','America/Adak','America/Boise','America/Juneau','America/Sitka','America/Menominee','America/Indiana/Indianapolis','America/Indiana/Knox','America/Kentucky/Louisville','Pacific/Honolulu'];
+      if(US_TZ.indexOf(Intl.DateTimeFormat().resolvedOptions().timeZone||'')>=0) us=true;
+      return us?US:EU;
+    }catch(e){ return EU; }
+  })();
   const SHARE_BASE = 'https://www.connexiontwo.com/?ref=';
   let myShareCode = null;
 
