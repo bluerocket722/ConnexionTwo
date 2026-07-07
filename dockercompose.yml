@@ -1,0 +1,39 @@
+# Connexion Two — self-hosted OnlyOffice Document Server (the "office" editor).
+# Runs OnlyOffice + Caddy (automatic HTTPS) on your Oracle Cloud VM so documents
+# open on YOUR server at https://docs.connexiontwo.com instead of a third party.
+#
+# Quick start on the VM:
+#   1) put this folder on the server
+#   2) create a .env file next to it with:  ONLYOFFICE_JWT_SECRET=<long-random-string>
+#   3) docker compose up -d
+#   4) visit https://docs.connexiontwo.com — you should see OnlyOffice's welcome page
+#
+# The SAME ONLYOFFICE_JWT_SECRET must be set as ONLYOFFICE_JWT_SECRET in Vercel.
+
+services:
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    restart: always
+    environment:
+      - JWT_ENABLED=true
+      - JWT_SECRET=${ONLYOFFICE_JWT_SECRET}
+      - JWT_HEADER=Authorization
+    volumes:
+      - ./data:/var/www/onlyoffice/Data
+      - ./logs:/var/log/onlyoffice
+      - ./lib:/var/lib/onlyoffice
+    expose:
+      - "80"
+
+  caddy:
+    image: caddy:2
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy_data:/data
+      - ./caddy_config:/config
+    depends_on:
+      - onlyoffice

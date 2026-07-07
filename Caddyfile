@@ -1,0 +1,7 @@
+# Automatic HTTPS for the OnlyOffice server. Caddy fetches a Let's Encrypt
+# certificate for this domain on first run — just make sure the DNS A record
+# for docs.connexiontwo.com points at this VM's public IP first.
+
+docs.connexiontwo.com {
+    reverse_proxy onlyoffice:80
+}
