@@ -57,9 +57,11 @@
 </div>
 
 <script>
-  // ── Configure ──
+  // ── Configure (same two values you put in intake.html) ──
   const SUPABASE_URL = window.SUPABASE_URL || "https://rfdvogakvyodixgpvqvz.supabase.co";
+  const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E";
   const API = `${SUPABASE_URL}/functions/v1/intake-admin`;
+  const HEADERS = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
 
   const STEP_CATALOG = [
     {key:'review',       label:'Review intake', always:true},
@@ -88,7 +90,7 @@
     el('err').textContent = '';
     el('load').disabled = true; el('load').textContent = 'Loading…';
     try{
-      const res = await fetch(API);
+      const res = await fetch(API, { headers: HEADERS });
       if(!res.ok){ throw new Error((await res.json().catch(()=>({}))).error || 'Load failed'); }
       CLIENTS = (await res.json()).submissions || [];
       render();
@@ -99,7 +101,7 @@
   async function patch(id, body){
     const res = await fetch(API, {
       method:'POST',
-      headers:{ 'Content-Type':'application/json' },
+      headers:{ ...HEADERS, 'Content-Type':'application/json' },
       body: JSON.stringify({ id, ...body }),
     });
     if(!res.ok){ el('err').textContent = 'Update failed — refresh and retry.'; }
