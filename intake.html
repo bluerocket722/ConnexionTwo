@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connexion Two — New Client Intake</title>
+<style>
+  :root{
+    --bg:#f7f9fc; --panel:#ffffff; --text:#111827; --muted:#5f6b7a;
+    --line:#d9e2ef; --brand:#0054d1; --brand2:#0068ff; --brand-soft:#eaf3ff;
+    --navy:#082b61; --success:#0f9f6e; --warning:#f59e0b; --danger:#EA4335;
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:Inter,Arial,Helvetica,sans-serif;line-height:1.5}
+  .wrap{max-width:760px;margin:0 auto;padding:32px 20px 80px}
+  .head{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+  .logo{width:36px;height:36px;border-radius:9px;
+    background:linear-gradient(135deg,var(--brand2),var(--navy));
+    display:grid;place-items:center;color:#fff;font-weight:800}
+  h1{font-size:26px;margin:0}
+  .sub{color:var(--muted);margin:6px 0 24px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px;margin-bottom:18px;box-shadow:0 1px 2px rgba(8,43,97,.04)}
+  .card h2{font-size:15px;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--brand);margin:0 0 4px}
+  .card p.hint{color:var(--muted);font-size:13px;margin:0 0 16px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:560px){.grid{grid-template-columns:1fr}}
+  label{display:block;font-size:13px;font-weight:600;margin:0 0 6px}
+  label .req{color:var(--danger)}
+  input[type=text],input[type=email],input[type=tel],input[type=password],
+  select,textarea{width:100%;padding:11px 12px;border:1px solid var(--line);
+    border-radius:9px;font:inherit;background:#fff;color:var(--text)}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand2);
+    box-shadow:0 0 0 3px var(--brand-soft)}
+  textarea{min-height:90px;resize:vertical}
+  .field{margin-bottom:14px}
+  .row{display:flex;flex-wrap:wrap;gap:10px}
+  .opt{flex:1 1 46%;display:flex;align-items:center;gap:10px;border:1px solid var(--line);
+    border-radius:9px;padding:11px 12px;cursor:pointer;transition:.15s}
+  .opt:hover{border-color:var(--brand2);background:#fbfdff}
+  .opt input{accent-color:var(--brand)}
+  .opt.checked{border-color:var(--brand2);background:var(--brand-soft)}
+  .filebox{border:1.5px dashed var(--line);border-radius:9px;padding:16px;text-align:center;
+    cursor:pointer;color:var(--muted);font-size:13px;transition:.15s}
+  .filebox:hover{border-color:var(--brand2);color:var(--brand)}
+  .filebox img{max-height:64px;margin-top:10px;border-radius:6px}
+  .note{background:#fff8e6;border:1px solid #f5e2b3;border-radius:9px;padding:12px 14px;
+    font-size:13px;color:#7a5c11;margin-bottom:14px}
+  .pw-wrap{position:relative}
+  .pw-wrap button{position:absolute;right:8px;top:7px;background:none;border:0;
+    color:var(--brand);font-size:12px;font-weight:600;cursor:pointer;padding:4px 6px}
+  .consent{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--muted)}
+  .submit{width:100%;padding:14px;border:0;border-radius:10px;background:var(--brand);
+    color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:.15s}
+  .submit:hover{background:var(--brand2)}
+  .submit:disabled{opacity:.6;cursor:not-allowed}
+  .err{color:var(--danger);font-size:13px;margin-top:8px;min-height:18px}
+  .ok{display:none;text-align:center;padding:60px 20px}
+  .ok .check{width:64px;height:64px;border-radius:50%;background:var(--success);
+    color:#fff;font-size:34px;display:grid;place-items:center;margin:0 auto 18px}
+  .foot{text-align:center;color:var(--muted);font-size:12px;margin-top:24px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><div class="logo">C2</div><h1>New Client Intake</h1></div>
+  <p class="sub">Tell us about you and how you'd like your workspace set up. This takes about 3 minutes.</p>
+
+  <form id="form" novalidate>
+    <!-- 1) Your details -->
+    <div class="card">
+      <h2>Your details</h2>
+      <p class="hint">Who we'll be working with.</p>
+      <div class="grid">
+        <div class="field"><label>First name <span class="req">*</span></label><input type="text" name="first_name" required></div>
+        <div class="field"><label>Last name <span class="req">*</span></label><input type="text" name="last_name" required></div>
+        <div class="field"><label>Email <span class="req">*</span></label><input type="email" name="email" required></div>
+        <div class="field"><label>Phone</label><input type="tel" name="phone" placeholder="+1 …"></div>
+        <div class="field"><label>Country <span class="req">*</span></label><input type="text" name="country" list="countries" required>
+          <datalist id="countries"><option>United States</option><option>United Kingdom</option><option>Ireland</option><option>Germany</option><option>France</option><option>Netherlands</option><option>Canada</option><option>Australia</option></datalist>
+        </div>
+        <div class="field"><label>Company name</label><input type="text" name="company_name"></div>
+      </div>
+    </div>
+
+    <!-- 2) Branding -->
+    <div class="card">
+      <h2>Branding</h2>
+      <p class="hint">Upload your logo (and favicon if you have one). Images only, up to 5&nbsp;MB.</p>
+      <div class="grid">
+        <div class="field"><label>Logo</label>
+          <label class="filebox" for="logo">Click to upload a logo<div id="logoPrev"></div></label>
+          <input id="logo" type="file" name="logo" accept="image/*" hidden></div>
+        <div class="field"><label>Favicon <span style="color:var(--muted);font-weight:400">(if you have one)</span></label>
+          <label class="filebox" for="favicon">Click to upload a favicon<div id="favPrev"></div></label>
+          <input id="favicon" type="file" name="favicon" accept="image/*" hidden></div>
+      </div>
+    </div>
+
+    <!-- 3) Hosting -->
+    <div class="card">
+      <h2>Hosting preferences</h2>
+      <p class="hint">Where should your data live, and which platforms should we set up?</p>
+      <div class="field">
+        <label>Data residency <span class="req">*</span></label>
+        <div class="row">
+          <label class="opt"><input type="radio" name="data_region" value="EU" required> 🇪🇺 European Union</label>
+          <label class="opt"><input type="radio" name="data_region" value="USA"> 🇺🇸 United States</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Platforms</label>
+        <div class="row">
+          <label class="opt checked"><input type="checkbox" name="platforms" value="github" checked> GitHub</label>
+          <label class="opt checked"><input type="checkbox" name="platforms" value="supabase" checked> Supabase</label>
+          <label class="opt"><input type="checkbox" name="platforms" value="oracle"> Oracle Cloud</label>
+          <label class="opt"><input type="checkbox" name="platforms" value="digitalocean"> DigitalOcean</label>
+        </div>
+      </div>
+      <div class="field"><label>Request another platform</label>
+        <input type="text" name="platform_other" placeholder="e.g. Cloudflare, AWS, Azure…"></div>
+    </div>
+
+    <!-- 4) Account setup -->
+    <div class="card">
+      <h2>Account setup</h2>
+      <p class="hint">So we can create your platform accounts for you.</p>
+      <div class="note">
+        Create a <b>new, dedicated email</b> and a <b>temporary password</b> below. We'll use them
+        only to set up your accounts, then hand them back to you — <b>change the password afterward</b>.
+        Please don't reuse a password you use anywhere else.
+      </div>
+      <div class="grid">
+        <div class="field"><label>Setup email</label><input type="email" name="setup_email" placeholder="setup@yourcompany.com"></div>
+        <div class="field"><label>Temporary password</label>
+          <div class="pw-wrap"><input id="pw" type="password" name="setup_password">
+            <button type="button" id="pwToggle">Show</button></div></div>
+      </div>
+    </div>
+
+    <!-- 5) Anything else -->
+    <div class="card">
+      <h2>Anything else</h2>
+      <p class="hint">Other requests, requirements, or context we should know.</p>
+      <div class="field"><textarea name="notes" placeholder="Tell us anything else…"></textarea></div>
+      <label class="consent"><input type="checkbox" id="consent" required>
+        <span>I agree to Connexion Two using the information above to set up my workspace, and I understand
+        the setup credentials are temporary and I'll change my password after handover.</span></label>
+    </div>
+
+    <button type="submit" class="submit" id="submit">Submit intake</button>
+    <div class="err" id="err"></div>
+  </form>
+
+  <div class="ok" id="ok">
+    <div class="check">✓</div>
+    <h1>Thank you!</h1>
+    <p class="sub">Your intake has been received. We'll be in touch shortly to finish setting up your workspace.</p>
+  </div>
+
+  <div class="foot">🔒 Sent securely · stored encrypted · Connexion Two</div>
+</div>
+
+<script>
+  // ── Configure these for your project (the new EU project after migration) ──
+  const SUPABASE_URL = window.SUPABASE_URL || "https://YOUR-PROJECT.supabase.co";
+  const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || "YOUR-ANON-KEY";
+  const ENDPOINT = `${SUPABASE_URL}/functions/v1/client-intake`;
+
+  // Checkbox/radio visual state
+  document.querySelectorAll('.opt input').forEach(i => {
+    const sync = () => {
+      if (i.type === 'radio') i.closest('.row').querySelectorAll('.opt').forEach(o => o.classList.remove('checked'));
+      i.closest('.opt').classList.toggle('checked', i.checked);
+    };
+    i.addEventListener('change', sync);
+  });
+
+  // File previews
+  function preview(inputId, boxId) {
+    const inp = document.getElementById(inputId), box = document.getElementById(boxId);
+    inp.addEventListener('change', () => {
+      box.innerHTML = '';
+      const f = inp.files[0]; if (!f) return;
+      if (f.size > 5 * 1024 * 1024) { alert('That image is over 5 MB — please pick a smaller one.'); inp.value=''; return; }
+      const img = document.createElement('img'); img.src = URL.createObjectURL(f); box.appendChild(img);
+    });
+  }
+  preview('logo', 'logoPrev'); preview('favicon', 'favPrev');
+
+  // Show/hide password
+  document.getElementById('pwToggle').addEventListener('click', () => {
+    const pw = document.getElementById('pw'), b = document.getElementById('pwToggle');
+    if (pw.type === 'password') { pw.type = 'text'; b.textContent = 'Hide'; }
+    else { pw.type = 'password'; b.textContent = 'Show'; }
+  });
+
+  // Submit
+  const form = document.getElementById('form'), err = document.getElementById('err'),
+        submit = document.getElementById('submit');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault(); err.textContent = '';
+    if (!form.checkValidity()) { err.textContent = 'Please fill in all required fields (*).'; form.reportValidity(); return; }
+    if (!document.getElementById('consent').checked) { err.textContent = 'Please accept the consent checkbox.'; return; }
+    submit.disabled = true; submit.textContent = 'Submitting…';
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: new FormData(form),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
+      form.style.display = 'none';
+      document.getElementById('ok').style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (ex) {
+      err.textContent = ex.message;
+      submit.disabled = false; submit.textContent = 'Submit intake';
+    }
+  });
+</script>
+</body>
+</html>

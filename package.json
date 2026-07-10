@@ -1,6 +1,215 @@
-{
-  "dependencies": {
-    "jsonwebtoken": "^9.0.2",
-    "@supabase/supabase-js": "^2.45.0"
+// Connexion Two — ClamAV malware scanner (internal HTTP service)
+//
+// A small Express service that wraps ClamAV. It is called ONLY by the scan-file
+// edge function (server-to-server), never by the browser, and it is protected by
+// a shared secret so nobody else on the network can use it as a free scanner or
+// probe it. Hardening vs. a naive version:
+//   • Bearer-token auth on /scan (constant-time compare)
+//   • Hard file-size limit (multer) to bound memory/disk
+//   • Temp files ALWAYS deleted (finally), so /tmp can't fill up
+//   • /health endpoint for load balancers / uptime checks
+//   • ClamAV init retried with backoff instead of crashing on first failure
+//   • Errors never leak internal detail to the caller
+//
+// Beyond-signatures defenses (so this catches more than "known malware"):
+//   • Magic-byte file-type gate: reject executables (PE/ELF/Mach-O/scripts) up
+//     front — a document app should NEVER accept these, even a brand-new one that
+//     no AV has a signature for yet. Optional strict allowlist mode on top.
+//   • Refuses to scan on STALE virus definitions (old defs = silent misses).
+//   • ClamAV heuristics (PUA, OLE2 macros, encrypted archives, broken exes) are
+//     enabled in clamd.conf (see Dockerfile).
+//
+// Env:
+//   SCANNER_TOKEN     required — shared secret; must match the edge function's SCANNER_TOKEN
+//   MAX_FILE_MB       optional — max upload size in MB (default 25)
+//   STALE_DEFS_DAYS   optional — refuse to scan if defs older than this (default 3)
+//   STRICT_TYPES      optional — "true" = allow ONLY known-good types (default off)
+//   CLAMD_HOST/PORT   optional — clamd address (default 127.0.0.1:3310)
+//   PORT              optional — listen port (default 8080)
+
+import express from "express";
+import multer from "multer";
+import NodeClam from "clamscan";
+import { promises as fs } from "node:fs";
+import crypto from "node:crypto";
+import os from "node:os";
+import path from "node:path";
+
+const PORT = Number(process.env.PORT || 8080);
+const MAX_FILE_MB = Number(process.env.MAX_FILE_MB || 25);
+const STALE_DEFS_DAYS = Number(process.env.STALE_DEFS_DAYS || 3);
+const STRICT_TYPES = String(process.env.STRICT_TYPES || "").toLowerCase() === "true";
+const SCANNER_TOKEN = process.env.SCANNER_TOKEN || "";
+const CLAM_DB_DIR = process.env.CLAM_DB_DIR || "/var/lib/clamav";
+
+if (!SCANNER_TOKEN) {
+  console.error("FATAL: SCANNER_TOKEN is not set. Refusing to start an unauthenticated scanner.");
+  process.exit(1);
+}
+
+const app = express();
+app.disable("x-powered-by");
+
+const upload = multer({
+  dest: path.join(os.tmpdir(), "c2-uploads"),
+  limits: { fileSize: MAX_FILE_MB * 1024 * 1024, files: 1 },
+});
+
+// ── File-type gate (magic bytes) ─────────────────────────────────────────────
+// Read the file's leading bytes and classify. Two lists:
+//   BLOCKED  — always reject, no matter what AV says (defense vs. novel malware).
+//   ALLOWED  — the document-app formats we expect. In STRICT_TYPES mode, anything
+//              not on this list is rejected too.
+function sniff(buf) {
+  const b = buf;
+  const startsWith = (...sig) => sig.every((v, i) => b[i] === v);
+  const asciiStarts = (s) => b.slice(0, s.length).toString("latin1") === s;
+
+  // Always-blocked executable / active-content formats.
+  if (startsWith(0x4d, 0x5a)) return { type: "pe-executable", blocked: true };            // MZ (.exe/.dll)
+  if (startsWith(0x7f, 0x45, 0x4c, 0x46)) return { type: "elf-executable", blocked: true }; // ELF
+  if (startsWith(0xca, 0xfe, 0xba, 0xbe)) return { type: "java-class", blocked: true };
+  if ([0xfeedface, 0xfeedfacf, 0xcffaedfe, 0xcefaedfe].includes(b.readUInt32BE(0))) return { type: "mach-o", blocked: true };
+  if (asciiStarts("#!")) return { type: "script-shebang", blocked: true };
+  if (asciiStarts("<?php")) return { type: "php-script", blocked: true };
+  if (startsWith(0x1f, 0x8b)) return { type: "gzip", blocked: false };                    // allowed (data), still AV-scanned
+
+  // Known-good document / image / archive-based-office formats.
+  if (asciiStarts("%PDF")) return { type: "pdf", allowed: true };
+  if (startsWith(0x50, 0x4b, 0x03, 0x04)) return { type: "zip/ooxml", allowed: true };    // docx/xlsx/pptx/odt/zip
+  if (startsWith(0xd0, 0xcf, 0x11, 0xe0)) return { type: "ole/legacy-office", allowed: true }; // doc/xls/ppt
+  if (startsWith(0x89, 0x50, 0x4e, 0x47)) return { type: "png", allowed: true };
+  if (startsWith(0xff, 0xd8, 0xff)) return { type: "jpeg", allowed: true };
+  if (asciiStarts("GIF8")) return { type: "gif", allowed: true };
+  if (startsWith(0x25, 0x21)) return { type: "postscript", allowed: true };               // %!
+
+  // Looks like UTF-8 text (csv/txt)? Allow — no executable magic present.
+  const isText = b.every((c) => c === 0x09 || c === 0x0a || c === 0x0d || (c >= 0x20 && c < 0x7f) || c >= 0x80);
+  if (isText) return { type: "text", allowed: true };
+
+  return { type: "unknown", allowed: false };
+}
+
+async function checkFileType(filePath) {
+  const fh = await fs.open(filePath, "r");
+  try {
+    const buf = Buffer.alloc(64);
+    const { bytesRead } = await fh.read(buf, 0, 64, 0);
+    const info = sniff(buf.subarray(0, bytesRead));
+    if (info.blocked) return { ok: false, reason: `Blocked file type: ${info.type}`, type: info.type };
+    if (STRICT_TYPES && !info.allowed) return { ok: false, reason: `Type not allowed: ${info.type}`, type: info.type };
+    return { ok: true, type: info.type };
+  } finally {
+    await fh.close();
   }
+}
+
+// ── Virus-definition freshness ───────────────────────────────────────────────
+// Old signatures miss recent malware. Report age, and refuse to scan when stale.
+async function defsAgeHours() {
+  let newest = 0;
+  for (const f of ["daily.cld", "daily.cvd", "main.cld", "main.cvd", "bytecode.cld", "bytecode.cvd"]) {
+    try { const s = await fs.stat(path.join(CLAM_DB_DIR, f)); newest = Math.max(newest, s.mtimeMs); } catch { /* missing */ }
+  }
+  if (!newest) return null;
+  return (Date.now() - newest) / 3_600_000;
+}
+
+// ── ClamAV init with retry/backoff ───────────────────────────────────────────
+let clamscan = null;
+async function initClam(attempt = 1) {
+  try {
+    clamscan = await new NodeClam().init({
+      removeInfected: false, quarantineInfected: false, scanLog: null, debugMode: false,
+      clamdscan: {
+        socket: false,
+        host: process.env.CLAMD_HOST || "127.0.0.1",
+        port: Number(process.env.CLAMD_PORT || 3310),
+        timeout: 120000,
+      },
+    });
+    console.log("ClamAV connected.");
+  } catch (err) {
+    const wait = Math.min(30000, 2000 * attempt);
+    console.error(`ClamAV init failed (attempt ${attempt}): ${err?.message}. Retrying in ${wait}ms`);
+    setTimeout(() => initClam(attempt + 1), wait);
+  }
+}
+initClam();
+
+// ── Constant-time bearer-token auth ──────────────────────────────────────────
+function authorized(req) {
+  const header = req.get("authorization") || "";
+  const token = header.toLowerCase().startsWith("bearer ") ? header.slice(7) : "";
+  const a = Buffer.from(token);
+  const b = Buffer.from(SCANNER_TOKEN);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+// ── Health check (no auth, no secrets) ───────────────────────────────────────
+app.get("/health", async (_req, res) => {
+  const ageH = await defsAgeHours();
+  res.json({
+    ok: true,
+    clamReady: clamscan !== null,
+    defsAgeHours: ageH === null ? null : Math.round(ageH),
+    defsFresh: ageH === null ? false : ageH <= STALE_DEFS_DAYS * 24,
+  });
+});
+
+// ── Scan endpoint ────────────────────────────────────────────────────────────
+app.post("/scan", (req, res, next) => {
+  if (!authorized(req)) return res.status(401).json({ clean: false, error: "Unauthorized" });
+  next();
+}, upload.single("file"), async (req, res) => {
+  const filePath = req.file?.path;
+  try {
+    if (!clamscan) return res.status(503).json({ clean: false, error: "Scanner warming up" });
+    if (!req.file) return res.status(400).json({ clean: false, error: "No file uploaded" });
+
+    // 1) Refuse to give a false sense of safety with stale definitions.
+    const ageH = await defsAgeHours();
+    if (ageH !== null && ageH > STALE_DEFS_DAYS * 24) {
+      return res.status(503).json({ clean: false, error: "Virus definitions are stale; scan refused" });
+    }
+
+    // 2) Type gate BEFORE handing anything to the engine — catches novel executables.
+    const type = await checkFileType(filePath);
+    if (!type.ok) {
+      return res.status(200).json({ clean: false, infected: true, viruses: [type.reason], reason: "type_gate" });
+    }
+
+    // 3) Signature + heuristic scan.
+    const { isInfected, viruses } = await clamscan.isInfected(filePath);
+    return res.json({
+      clean: !isInfected,
+      infected: isInfected,
+      viruses: viruses || [],
+      fileType: type.type,
+    });
+  } catch (err) {
+    console.error("Scan error:", err?.message);
+    return res.status(500).json({ clean: false, error: "Scan failed" });
+  } finally {
+    if (filePath) fs.unlink(filePath).catch(() => {});
+  }
+});
+
+// Multer errors (e.g. file too large) → clean JSON, not an HTML stack trace.
+app.use((err, _req, res, _next) => {
+  if (err instanceof multer.MulterError) {
+    const tooBig = err.code === "LIMIT_FILE_SIZE";
+    return res.status(tooBig ? 413 : 400).json({
+      clean: false,
+      error: tooBig ? `File exceeds ${MAX_FILE_MB} MB limit` : "Upload error",
+    });
+  }
+  console.error("Unhandled error:", err?.message);
+  return res.status(500).json({ clean: false, error: "Internal error" });
+});
+
+const server = app.listen(PORT, () => console.log(`Scanner running on port ${PORT} (strictTypes=${STRICT_TYPES})`));
+
+for (const sig of ["SIGTERM", "SIGINT"]) {
+  process.on(sig, () => { console.log(`${sig} received, shutting down`); server.close(() => process.exit(0)); });
 }

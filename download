@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Connexion Two scanner — container entrypoint.
+#
+# The original one-line CMD ("service clamav-daemon start && freshclam || true && node server.js")
+# had two bugs: freshclam fights the daemon over the DB if it runs while clamd holds it,
+# and the && / || precedence meant node could start before the DB was ready. This script
+# does it in the correct order and doesn't exit until something actually fails.
+set -euo pipefail
+
+echo "[scanner] updating virus definitions (freshclam)…"
+# First run has no DB yet; don't let a transient mirror hiccup kill the container.
+freshclam || echo "[scanner] freshclam warning — continuing with whatever DB exists"
+
+# Keep definitions fresh automatically: run freshclam in the background as a
+# daemon (checks for new signatures ~12x/day by default). Stale defs = misses,
+# and the API refuses to scan once they're older than STALE_DEFS_DAYS.
+echo "[scanner] starting freshclam daemon (auto-updates definitions)…"
+freshclam -d &
+
+echo "[scanner] starting clamd…"
+clamd
+
+# Wait for clamd to open its TCP port before starting the API, so the first
+# request doesn't hit a cold socket. Give it up to ~60s.
+echo "[scanner] waiting for clamd on 127.0.0.1:3310…"
+for i in $(seq 1 60); do
+  if (exec 3<>/dev/tcp/127.0.0.1/3310) 2>/dev/null; then
+    echo "[scanner] clamd is ready."
+    break
+  fi
+  sleep 1
+done
+
+echo "[scanner] starting API server…"
+exec node server.js
