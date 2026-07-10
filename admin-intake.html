@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connexion Two — Intake Admin (decrypt)</title>
+<style>
+  :root{--bg:#f7f9fc;--panel:#fff;--text:#111827;--muted:#5f6b7a;--line:#d9e2ef;--brand:#0054d1;--brand2:#0068ff;--brand-soft:#eaf3ff;--navy:#082b61;--success:#0f9f6e;--danger:#EA4335}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,sans-serif;line-height:1.5}
+  .wrap{max-width:920px;margin:0 auto;padding:28px 20px 80px}
+  h1{font-size:24px;margin:0 0 4px}.sub{color:var(--muted);margin:0 0 22px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px}
+  .card h2{font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--brand);margin:0 0 12px}
+  label{display:block;font-size:13px;font-weight:600;margin:0 0 6px}
+  input,textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;margin-bottom:12px}
+  textarea{min-height:70px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+  button{padding:10px 16px;border:0;border-radius:9px;background:var(--brand);color:#fff;font-weight:600;cursor:pointer}
+  button.sec{background:#eef3fb;color:var(--brand)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .warn{background:#fff8e6;border:1px solid #f5e2b3;border-radius:9px;padding:10px 12px;font-size:12px;color:#7a5c11;margin-bottom:12px}
+  .sub-item{border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:10px}
+  .sub-item .meta{font-size:13px;color:var(--muted)}
+  .sub-item b{color:var(--text)}
+  .creds{background:#0d1b2a;color:#d6f5e3;border-radius:8px;padding:12px;font-family:ui-monospace,Menlo,monospace;font-size:12px;white-space:pre-wrap;margin-top:10px}
+  .pill{display:inline-block;background:var(--brand-soft);color:var(--brand);border-radius:20px;padding:2px 10px;font-size:12px;margin:2px}
+  .err{color:var(--danger);font-size:13px;min-height:18px}
+  a{color:var(--brand2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Intake Admin</h1>
+  <p class="sub">Decrypt client credentials locally. Your private key never leaves this page.</p>
+
+  <!-- Key tools -->
+  <div class="card">
+    <h2>1 · Your encryption key</h2>
+    <div class="warn">The <b>private key</b> is the only thing that can decrypt submissions. Store it in a password manager. If you lose it, existing sealed credentials are unrecoverable. The <b>public key</b> goes into <code>intake.html</code>.</div>
+    <div class="row"><button class="sec" id="gen">Generate new keypair</button></div>
+    <div id="keyout" style="display:none;margin-top:12px">
+      <label>PUBLIC key — paste into intake.html as <code>window.C2_SEAL_PUBKEY</code></label>
+      <textarea id="pubout" readonly></textarea>
+      <label>PRIVATE key — save this somewhere safe, then paste it below to decrypt</label>
+      <textarea id="privout" readonly></textarea>
+    </div>
+    <label>Private key (JWK) — paste to enable decryption</label>
+    <textarea id="privin" placeholder='{"kty":"EC","crv":"P-256","d":"…","x":"…","y":"…"}'></textarea>
+  </div>
+
+  <!-- Sign in -->
+  <div class="card">
+    <h2>2 · Sign in (admin)</h2>
+    <div class="row" style="align-items:flex-end">
+      <div style="flex:1 1 240px"><label>Email</label><input id="email" type="email"></div>
+      <div style="flex:1 1 240px"><label>Password</label><input id="password" type="password"></div>
+      <button id="signin">Sign in</button>
+      <button class="sec" id="load" disabled>Load submissions</button>
+    </div>
+    <div class="err" id="err"></div>
+  </div>
+
+  <!-- Submissions -->
+  <div class="card">
+    <h2>3 · Submissions</h2>
+    <div id="list"><p class="sub">Sign in and load to view.</p></div>
+  </div>
+</div>
+
+<script src="./c2seal.js"></script>
+<script type="module">
+  import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+  const SUPABASE_URL = window.SUPABASE_URL || "https://YOUR-PROJECT.supabase.co";
+  const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || "YOUR-ANON-KEY";
+  const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const err = document.getElementById('err');
+
+  // 1 · keypair generation
+  document.getElementById('gen').addEventListener('click', async () => {
+    const { publicJwk, privateJwk } = await C2Seal.generateKeypair();
+    document.getElementById('keyout').style.display = 'block';
+    document.getElementById('pubout').value = JSON.stringify(publicJwk);
+    document.getElementById('privout').value = JSON.stringify(privateJwk);
+  });
+
+  // 2 · sign in
+  document.getElementById('signin').addEventListener('click', async () => {
+    err.textContent = '';
+    const { error } = await sb.auth.signInWithPassword({
+      email: document.getElementById('email').value.trim(),
+      password: document.getElementById('password').value,
+    });
+    if (error) { err.textContent = error.message; return; }
+    document.getElementById('load').disabled = false;
+    err.textContent = 'Signed in ✓';
+  });
+
+  // 3 · load + render
+  document.getElementById('load').addEventListener('click', async () => {
+    err.textContent = '';
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { err.textContent = 'Not signed in.'; return; }
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/intake-admin`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${session.access_token}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { err.textContent = data.error || 'Load failed'; return; }
+    render(data.submissions || []);
+  });
+
+  function esc(s){return String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+  function render(subs){
+    const list = document.getElementById('list');
+    if(!subs.length){ list.innerHTML = '<p class="sub">No submissions yet.</p>'; return; }
+    list.innerHTML = '';
+    for(const s of subs){
+      const el = document.createElement('div'); el.className = 'sub-item';
+      const plats = (s.platforms||[]).map(p=>`<span class="pill">${esc(p)}</span>`).join('');
+      el.innerHTML = `
+        <div><b>${esc(s.company_name||'—')}</b> · ${esc(s.first_name)} ${esc(s.last_name)}
+          <span class="pill">${esc(s.status)}</span></div>
+        <div class="meta">${esc(s.email)} · ${esc(s.phone||'')} · ${esc(s.country||'')} · region: ${esc(s.data_region||'—')}</div>
+        <div class="meta">domain: ${esc(s.domain||'—')} (${esc(s.domain_registrar||'—')}) · ${s.dns_self_manage?'client manages DNS':'login provided'}</div>
+        <div style="margin:6px 0">${plats}${s.platform_other?`<span class="pill">+ ${esc(s.platform_other)}</span>`:''}</div>
+        ${s.logo_url?`<a href="${s.logo_url}" target="_blank">logo</a> `:''}${s.favicon_url?`<a href="${s.favicon_url}" target="_blank">favicon</a>`:''}
+        ${s.notes?`<div class="meta">note: ${esc(s.notes)}</div>`:''}
+        <div class="row" style="margin-top:8px">
+          ${s.secrets_sealed?`<button class="sec dec">🔓 Decrypt credentials</button>`:'<span class="meta">no credentials provided</span>'}
+        </div>
+        <div class="creds" style="display:none"></div>`;
+      const btn = el.querySelector('.dec'), out = el.querySelector('.creds');
+      if(btn){
+        btn.addEventListener('click', async ()=>{
+          try{
+            const privRaw = document.getElementById('privin').value.trim();
+            if(!privRaw) throw new Error('Paste your private key (JWK) in section 1 first.');
+            const priv = JSON.parse(privRaw);
+            const plain = await C2Seal.open(priv, s.secrets_sealed);
+            const obj = JSON.parse(plain);
+            out.style.display='block';
+            out.textContent = Object.entries(obj).filter(([,v])=>v).map(([k,v])=>`${k}: ${v}`).join('\n') || '(empty)';
+          }catch(ex){ out.style.display='block'; out.textContent = 'Decrypt failed: ' + ex.message; }
+        });
+      }
+      list.appendChild(el);
+    }
+  }
+</script>
+</body>
+</html>
