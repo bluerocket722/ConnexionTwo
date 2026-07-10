@@ -1,0 +1,10 @@
+# Keep Vercel to the web app + /api serverless functions only.
+# These are deployed elsewhere and must NOT be built by Vercel:
+scanner/          # Docker/Node service — runs on your VM
+supabase/         # Deno edge functions + SQL — deployed via the Supabase CLI
+
+# Docs / working files — no need to ship them to the CDN
+*.md
+env.example
+.env
+.env.*
