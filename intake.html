@@ -139,7 +139,7 @@
     <div class="card">
       <h2>Account setup</h2>
       <p class="hint">So we can create your platform accounts for you.</p>
-      <div class="e2ee"><span>🔒</span><span><b>End-to-end encrypted.</b> The credentials below are encrypted in your browser to Connexion Two's key before they're sent. Our servers only ever store ciphertext — no one but Connexion Two can read them.</span></div>
+      <div class="e2ee"><span>🔒</span><span><b>Sent securely.</b> This form is submitted over an encrypted HTTPS connection. These setup credentials are temporary — change the password after we hand your accounts back.</span></div>
       <div class="note">Create a <b>new, dedicated email</b> and a <b>temporary password</b>. We'll use them only to set up your accounts, then hand them back — <b>change the password afterward</b>. Don't reuse a password from anywhere else.</div>
       <div class="grid">
         <div class="field"><label>Setup email</label><input id="setup_email" type="email" autocomplete="off" placeholder="setup@yourcompany.com"></div>
@@ -162,22 +162,16 @@
 
   <div class="ok" id="ok">
     <div class="check">✓</div><h1>Thank you!</h1>
-    <p class="sub">Your intake has been received (credentials encrypted end-to-end). We'll be in touch shortly.</p>
+    <p class="sub">Your intake has been received. We'll be in touch shortly.</p>
   </div>
-  <div class="foot">🔒 End-to-end encrypted · Connexion Two</div>
+  <div class="foot">🔒 Sent securely over HTTPS · Connexion Two</div>
 </div>
 
-<script src="./c2seal.js"></script>
 <script>
   // ── Configure for your project ──
   const SUPABASE_URL = window.SUPABASE_URL || "https://YOUR-PROJECT.supabase.co";
   const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || "YOUR-ANON-KEY";
   const ENDPOINT = `${SUPABASE_URL}/functions/v1/client-intake`;
-
-  // ── Your E2EE PUBLIC key (generate on admin-intake.html → paste the PUBLIC JWK here) ──
-  // This is safe to publish. The matching PRIVATE key stays only on your device.
-  const C2_SEAL_PUBKEY = window.C2_SEAL_PUBKEY || null;   // e.g. {"kty":"EC","crv":"P-256","x":"…","y":"…"}
-  const C2_SEAL_KEY_ID = window.C2_SEAL_KEY_ID || "primary";
 
   // Checkbox/radio visual state
   document.querySelectorAll('.opt input').forEach(i => {
@@ -217,29 +211,19 @@
     if(!form.checkValidity()){err.textContent='Please fill in all required fields (*).';form.reportValidity();return;}
     if(!document.getElementById('consent').checked){err.textContent='Please accept the consent checkbox.';return;}
 
-    // Gather sensitive fields (these inputs have NO name — they never enter the form data raw).
+    // Gather the setup credentials (sent over HTTPS; the sensitive inputs have no
+    // `name`, so we append them explicitly here).
     const selfManage = document.querySelector('input[name=dns_choice]:checked').value === 'self';
-    const secrets = {
-      setup_email: val('setup_email'),
-      setup_password: val('setup_password'),
-      registrar_login_email: selfManage ? '' : val('reg_email'),
-      registrar_login_password: selfManage ? '' : val('reg_password'),
-    };
-    const hasSecrets = Object.values(secrets).some(v => v);
 
-    submit.disabled=true; submit.textContent='Encrypting…';
+    submit.disabled=true; submit.textContent='Submitting…';
     try{
       const fd = new FormData(form);
       fd.append('dns_self_manage', selfManage ? 'true' : 'false');
+      fd.append('setup_email', val('setup_email'));
+      fd.append('setup_password', val('setup_password'));
+      fd.append('registrar_login_email', selfManage ? '' : val('reg_email'));
+      fd.append('registrar_login_password', selfManage ? '' : val('reg_password'));
 
-      if(hasSecrets){
-        if(!C2_SEAL_PUBKEY){ throw new Error('Encryption key not configured — cannot send credentials securely.'); }
-        const sealed = await C2Seal.seal(C2_SEAL_PUBKEY, JSON.stringify(secrets));
-        fd.append('secrets_sealed', sealed);
-        fd.append('sealed_key_id', C2_SEAL_KEY_ID);
-      }
-
-      submit.textContent='Submitting…';
       const res = await fetch(ENDPOINT, {
         method:'POST',
         headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${SUPABASE_ANON_KEY}` },
