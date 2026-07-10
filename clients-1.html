@@ -47,14 +47,13 @@
   <div class="logo">C2</div><h1>Client Tracker</h1>
   <input id="search" type="text" placeholder="Search name, company, email…" style="flex:0 1 260px">
   <select id="filter"><option value="">All statuses</option><option value="new">New</option><option value="in_progress">In progress</option><option value="provisioned">Provisioned</option><option value="archived">Archived</option></select>
-  <input id="token" type="password" placeholder="Admin token" style="flex:0 1 200px">
-  <button id="load">Load</button>
+  <button id="load">Refresh</button>
 </div>
 
 <div class="wrap">
   <div class="stats" id="stats"></div>
   <div class="err" id="err"></div>
-  <div id="list"><div class="empty">Enter your admin token and press <b>Load</b>.</div></div>
+  <div id="list"><div class="empty">Loading…</div></div>
 </div>
 
 <script>
@@ -81,36 +80,29 @@
   const esc = s => String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   let CLIENTS = [];
 
-  function token(){ return el('token').value.trim() || sessionStorage.getItem('c2_admin_token') || ''; }
-
   el('load').addEventListener('click', load);
   el('search').addEventListener('input', render);
   el('filter').addEventListener('change', render);
 
   async function load(){
     el('err').textContent = '';
-    const t = el('token').value.trim();
-    if(t) sessionStorage.setItem('c2_admin_token', t);
     el('load').disabled = true; el('load').textContent = 'Loading…';
     try{
-      const headers = {};
-      if(token()) headers.Authorization = `Bearer ${token()}`;   // token optional (open mode)
-      const res = await fetch(API, { headers });
-      if(res.status===401){ throw new Error('This admin API is locked — enter the admin token above.'); }
+      const res = await fetch(API);
       if(!res.ok){ throw new Error((await res.json().catch(()=>({}))).error || 'Load failed'); }
       CLIENTS = (await res.json()).submissions || [];
       render();
     }catch(ex){ el('err').textContent = ex.message; }
-    finally{ el('load').disabled=false; el('load').textContent='Load'; }
+    finally{ el('load').disabled=false; el('load').textContent='Refresh'; }
   }
 
   async function patch(id, body){
     const res = await fetch(API, {
       method:'POST',
-      headers:{ Authorization:`Bearer ${token()}`, 'Content-Type':'application/json' },
+      headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify({ id, ...body }),
     });
-    if(!res.ok){ el('err').textContent = 'Update failed — reload and retry.'; }
+    if(!res.ok){ el('err').textContent = 'Update failed — refresh and retry.'; }
   }
 
   function pct(c){
@@ -199,10 +191,7 @@
     }
   }
 
-  // Prefill token from this session if present
-  if(sessionStorage.getItem('c2_admin_token')) el('token').value = sessionStorage.getItem('c2_admin_token');
-
-  // Auto-load on open once SUPABASE_URL is configured (open mode needs no token).
+  // Auto-load on open once SUPABASE_URL is configured.
   if(!SUPABASE_URL.includes('YOUR-PROJECT')) load();
   else el('err').textContent = 'Set SUPABASE_URL at the top of this file first.';
 </script>
