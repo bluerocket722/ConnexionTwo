@@ -1,201 +1,74 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Connexion Two — Client Tracker</title>
-<style>
-  :root{--bg:#f7f9fc;--panel:#fff;--text:#111827;--muted:#5f6b7a;--line:#d9e2ef;--brand:#0054d1;--brand2:#0068ff;--brand-soft:#eaf3ff;--navy:#082b61;--success:#0f9f6e;--warn:#f59e0b;--danger:#EA4335}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,sans-serif;line-height:1.5}
-  .top{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:14px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;z-index:5}
-  .top .logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--brand2),var(--navy));display:grid;place-items:center;color:#fff;font-weight:800}
-  .top h1{font-size:18px;margin:0;flex:1 1 auto}
-  input,select,button{font:inherit}
-  input[type=text],input[type=password]{padding:8px 11px;border:1px solid var(--line);border-radius:8px}
-  button{padding:8px 14px;border:0;border-radius:8px;background:var(--brand);color:#fff;font-weight:600;cursor:pointer}
-  button.sec{background:#eef3fb;color:var(--brand)}
-  button:disabled{opacity:.5;cursor:not-allowed}
-  .wrap{max-width:1080px;margin:0 auto;padding:20px}
-  .stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
-  .stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 16px;min-width:110px}
-  .stat b{font-size:22px;display:block}.stat span{color:var(--muted);font-size:12px}
-  .bar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
-  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
-  .card .h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .card .h b{font-size:16px}
-  .meta{color:var(--muted);font-size:13px;margin:4px 0}
-  .pill{display:inline-block;border-radius:20px;padding:2px 10px;font-size:12px;background:var(--brand-soft);color:var(--brand);margin:2px}
-  .badge{font-size:12px;font-weight:700;border-radius:20px;padding:3px 11px}
-  .b-new{background:#eef2ff;color:#3730a3}.b-in_progress{background:#fef3c7;color:#92400e}
-  .b-provisioned{background:#dcfce7;color:#166534}.b-archived{background:#f3f4f6;color:#6b7280}
-  .prog{height:8px;background:#eef2f7;border-radius:20px;overflow:hidden;margin:10px 0}
-  .prog i{display:block;height:100%;background:linear-gradient(90deg,var(--brand2),var(--success));width:0}
-  .steps{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
-  .step{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer}
-  .step.done{background:#ecfdf3;border-color:#b6e2cd;color:#0d6b48}
-  .step input{accent-color:var(--success)}
-  .creds{background:#0d1b2a;color:#d6f5e3;border-radius:8px;padding:10px 12px;font-family:ui-monospace,Menlo,monospace;font-size:12px;white-space:pre-wrap;margin-top:8px;display:none}
-  .rowbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
-  .err{color:var(--danger);font-size:13px}
-  a{color:var(--brand2)}
-  .empty{color:var(--muted);text-align:center;padding:50px}
-</style>
-</head>
-<body>
-<div class="top">
-  <div class="logo">C2</div><h1>Client Tracker</h1>
-  <input id="search" type="text" placeholder="Search name, company, email…" style="flex:0 1 260px">
-  <select id="filter"><option value="">All statuses</option><option value="new">New</option><option value="in_progress">In progress</option><option value="provisioned">Provisioned</option><option value="archived">Archived</option></select>
-  <button id="load">Refresh</button>
-</div>
+// intake-admin — STANDALONE (single-file) for the Supabase DASHBOARD editor.
+//
+// Powers clients.html: list submissions and update status / progress.
+// No auth — deploy with "Verify JWT" OFF and just use it.
+//
+// ⚠️ This is WIDE OPEN: anyone who knows the function URL can read every client's
+//    details and credentials. Fine for testing with fake data. Before real
+//    clients, add a check (ask me to put the ADMIN_TOKEN gate back).
+//
+//   GET   /intake-admin              → { submissions: [...] }
+//   POST  /intake-admin  {id,status?,progress?,stage?}  → { ok: true }
+//
+// Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (auto-injected).
 
-<div class="wrap">
-  <div class="stats" id="stats"></div>
-  <div class="err" id="err"></div>
-  <div id="list"><div class="empty">Loading…</div></div>
-</div>
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-<script>
-  // ── Configure (same two values you put in intake.html) ──
-  const SUPABASE_URL = window.SUPABASE_URL || "https://rfdvogakvyodixgpvqvz.supabase.co";
-  const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E";
-  const API = `${SUPABASE_URL}/functions/v1/intake-admin`;
-  const HEADERS = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
+const svc = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  { auth: { persistSession: false } },
+);
 
-  const STEP_CATALOG = [
-    {key:'review',       label:'Review intake', always:true},
-    {key:'github',       label:'GitHub',        platform:'github'},
-    {key:'supabase',     label:'Supabase',      platform:'supabase'},
-    {key:'brevo',        label:'Brevo email',   platform:'brevo'},
-    {key:'vercel',       label:'Vercel',        platform:'vercel'},
-    {key:'aws',          label:'AWS',           platform:'aws'},
-    {key:'oracle',       label:'Oracle Cloud',  platform:'oracle'},
-    {key:'digitalocean', label:'DigitalOcean',  platform:'digitalocean'},
-    {key:'domain',       label:'Domain / DNS',  when:c=>!!c.domain},
-    {key:'handoff',      label:'Handoff & password reset', always:true},
-  ];
-  const stepsFor = c => STEP_CATALOG.filter(s =>
-    s.always || (s.platform && (c.platforms||[]).includes(s.platform)) || (s.when && s.when(c)));
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, content-type, apikey",
+  "Access-Control-Max-Age": "86400",
+};
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...CORS } });
 
-  const el = id => document.getElementById(id);
-  const esc = s => String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-  let CLIENTS = [];
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
-  el('load').addEventListener('click', load);
-  el('search').addEventListener('input', render);
-  el('filter').addEventListener('change', render);
-
-  async function load(){
-    el('err').textContent = '';
-    el('load').disabled = true; el('load').textContent = 'Loading…';
-    try{
-      const res = await fetch(API, { headers: HEADERS });
-      if(!res.ok){ throw new Error((await res.json().catch(()=>({}))).error || 'Load failed'); }
-      CLIENTS = (await res.json()).submissions || [];
-      render();
-    }catch(ex){ el('err').textContent = ex.message; }
-    finally{ el('load').disabled=false; el('load').textContent='Refresh'; }
-  }
-
-  async function patch(id, body){
-    const res = await fetch(API, {
-      method:'POST',
-      headers:{ ...HEADERS, 'Content-Type':'application/json' },
-      body: JSON.stringify({ id, ...body }),
-    });
-    if(!res.ok){ el('err').textContent = 'Update failed — refresh and retry.'; }
-  }
-
-  function pct(c){
-    const steps = stepsFor(c); if(!steps.length) return 0;
-    const done = steps.filter(s => (c.progress||{})[s.key]).length;
-    return Math.round(done/steps.length*100);
-  }
-
-  function render(){
-    const q = el('search').value.toLowerCase(), f = el('filter').value;
-    const rows = CLIENTS.filter(c=>{
-      if(f && c.status!==f) return false;
-      if(!q) return true;
-      return [c.first_name,c.last_name,c.company_name,c.email,c.domain].join(' ').toLowerCase().includes(q);
-    });
-
-    // stats
-    const by = s => CLIENTS.filter(c=>c.status===s).length;
-    el('stats').innerHTML = `
-      <div class="stat"><b>${CLIENTS.length}</b><span>Total</span></div>
-      <div class="stat"><b>${by('new')}</b><span>New</span></div>
-      <div class="stat"><b>${by('in_progress')}</b><span>In progress</span></div>
-      <div class="stat"><b>${by('provisioned')}</b><span>Provisioned</span></div>`;
-
-    const list = el('list');
-    if(!rows.length){ list.innerHTML = `<div class="empty">No clients${q||f?' match your filter':' yet'}.</div>`; return; }
-    list.innerHTML = '';
-    for(const c of rows){
-      const steps = stepsFor(c), p = pct(c);
-      let creds = {}; try{ creds = JSON.parse(c.secrets_sealed||'{}'); }catch{}
-      const platforms = (c.platforms||[]).map(x=>`<span class="pill">${esc(x)}</span>`).join('')
-        + (c.platform_other?`<span class="pill">+ ${esc(c.platform_other)}</span>`:'');
-      const card = document.createElement('div'); card.className='card';
-      card.innerHTML = `
-        <div class="h">
-          <b>${esc(c.company_name||(c.first_name+' '+c.last_name))}</b>
-          <span class="badge b-${c.status}">${esc(c.status.replace('_',' '))}</span>
-          <span class="meta" style="margin-left:auto">${new Date(c.created_at).toLocaleDateString()}</span>
-        </div>
-        <div class="meta">${esc(c.first_name)} ${esc(c.last_name)} · ${esc(c.email)} · ${esc(c.phone||'')} · ${esc(c.country||'')} · <b>${esc(c.data_region||'—')}</b></div>
-        <div class="meta">domain: ${esc(c.domain||'—')} (${esc(c.domain_registrar||'—')}) · ${c.dns_self_manage?'client manages DNS':'login provided'}</div>
-        <div>${platforms}</div>
-        <div class="prog"><i style="width:${p}%"></i></div>
-        <div class="meta">${p}% complete</div>
-        <div class="steps"></div>
-        <div class="rowbtns">
-          <label class="meta">Status:
-            <select class="st">
-              ${['new','in_progress','provisioned','archived'].map(s=>`<option value="${s}" ${c.status===s?'selected':''}>${s.replace('_',' ')}</option>`).join('')}
-            </select>
-          </label>
-          ${c.logo_url?`<a href="${c.logo_url}" target="_blank">logo</a>`:''}
-          ${c.favicon_url?`<a href="${c.favicon_url}" target="_blank">favicon</a>`:''}
-          ${(creds.setup_email||creds.setup_password)?`<button class="sec reveal">🔓 Credentials</button>`:''}
-        </div>
-        ${c.notes?`<div class="meta">note: ${esc(c.notes)}</div>`:''}
-        <div class="creds"></div>`;
-
-      // steps
-      const stepsEl = card.querySelector('.steps');
-      for(const s of steps){
-        const done = !!(c.progress||{})[s.key];
-        const lab = document.createElement('label'); lab.className='step'+(done?' done':'');
-        lab.innerHTML = `<input type="checkbox" ${done?'checked':''}> ${esc(s.label)}`;
-        lab.querySelector('input').addEventListener('change', async e=>{
-          c.progress = {...(c.progress||{}), [s.key]: e.target.checked};
-          lab.classList.toggle('done', e.target.checked);
-          card.querySelector('.prog i').style.width = pct(c)+'%';
-          card.querySelectorAll('.meta').forEach(()=>{});
-          card.querySelector('.prog').nextElementSibling.textContent = pct(c)+'% complete';
-          await patch(c.id, { progress: c.progress });
-        });
-        stepsEl.appendChild(lab);
+  // ── List ──
+  if (req.method === "GET") {
+    const { data, error } = await svc
+      .from("intake_submissions")
+      .select("id,first_name,last_name,email,phone,company_name,country,data_region,platforms,platform_other,domain,domain_registrar,dns_self_manage,logo_path,favicon_path,notes,secrets_sealed,status,progress,stage,created_at,updated_at")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (error) return json({ error: error.message }, 500);
+    for (const r of data ?? []) {
+      for (const k of ["logo_path", "favicon_path"] as const) {
+        if (r[k]) {
+          const u = await svc.storage.from("intake-uploads").createSignedUrl(r[k] as string, 3600);
+          (r as Record<string, unknown>)[k.replace("_path", "_url")] = u.data?.signedUrl || "";
+        }
       }
-      // status
-      card.querySelector('.st').addEventListener('change', async e=>{
-        c.status = e.target.value; await patch(c.id, { status: c.status }); render();
-      });
-      // credentials reveal
-      const rb = card.querySelector('.reveal'), cout = card.querySelector('.creds');
-      if(rb){ rb.addEventListener('click', ()=>{
-        cout.style.display = cout.style.display==='block'?'none':'block';
-        cout.textContent = Object.entries(creds).filter(([,v])=>v).map(([k,v])=>`${k}: ${v}`).join('\n') || '(none)';
-      });}
-      list.appendChild(card);
     }
+    return json({ submissions: data ?? [] });
   }
 
-  // Auto-load on open once SUPABASE_URL is configured.
-  if(!SUPABASE_URL.includes('YOUR-PROJECT')) load();
-  else el('err').textContent = 'Set SUPABASE_URL at the top of this file first.';
-</script>
-</body>
-</html>
+  // ── Update ──
+  if (req.method === "POST") {
+    let body: Record<string, unknown>;
+    try { body = await req.json(); } catch { return json({ error: "Bad JSON" }, 400); }
+    const id = String(body.id || "");
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "Missing/invalid id" }, 400);
+
+    const patch: Record<string, unknown> = {};
+    if (typeof body.status === "string" &&
+        ["new", "in_progress", "provisioned", "archived"].includes(body.status)) patch.status = body.status;
+    if (body.progress && typeof body.progress === "object") patch.progress = body.progress;
+    if (typeof body.stage === "string") patch.stage = body.stage;
+    if (Object.keys(patch).length === 0) return json({ error: "Nothing to update" }, 400);
+
+    const { error } = await svc.from("intake_submissions").update(patch).eq("id", id);
+    if (error) return json({ error: error.message }, 500);
+    return json({ ok: true });
+  }
+
+  return json({ error: "Method not allowed" }, 405);
+});
