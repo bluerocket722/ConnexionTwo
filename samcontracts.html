@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connexion Two — Federal Contract Tracker</title>
+<style>
+  :root{--bg:#f7f9fc;--panel:#fff;--text:#111827;--muted:#5f6b7a;--line:#d9e2ef;--brand:#0054d1;--brand2:#0068ff;--brand-soft:#eaf3ff;--navy:#082b61;--success:#0f9f6e;--warn:#f59e0b;--danger:#EA4335}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,sans-serif;line-height:1.5}
+  .top{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:14px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;z-index:5}
+  .top .logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--brand2),var(--navy));display:grid;place-items:center;color:#fff;font-weight:800}
+  .top h1{font-size:18px;margin:0;flex:1 1 auto}
+  input,select,button,textarea{font:inherit}
+  input[type=text],input[type=password],input[type=date],select,textarea{padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text)}
+  button{padding:8px 14px;border:0;border-radius:8px;background:var(--brand);color:#fff;font-weight:600;cursor:pointer}
+  button.sec{background:#eef3fb;color:var(--brand)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .wrap{max-width:1080px;margin:0 auto;padding:20px}
+  .stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 16px;min-width:104px}
+  .stat b{font-size:22px;display:block}.stat span{color:var(--muted);font-size:12px}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+  .panel h2{font-size:14px;margin:0 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+  .field input,.field select{width:100%}
+  .bar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+  .bar input,.bar select{flex:0 1 auto}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:12px}
+  .card .h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .card .h b{font-size:16px}
+  .card .h a{margin-left:auto;font-size:13px}
+  .meta{color:var(--muted);font-size:13px;margin:4px 0}
+  .pill{display:inline-block;border-radius:20px;padding:2px 10px;font-size:12px;background:var(--brand-soft);color:var(--brand);margin:2px 4px 2px 0}
+  .pill.warn{background:#fef3c7;color:#92400e}
+  .due{font-weight:700}
+  .due.soon{color:var(--warn)}.due.today{color:var(--danger)}.due.past{color:var(--muted);text-decoration:line-through}
+  .b-new{background:#eef2ff;color:#3730a3}.b-interested{background:#e0f2fe;color:#075985}
+  .b-bidding{background:#fef3c7;color:#92400e}.b-submitted{background:#ede9fe;color:#5b21b6}
+  .b-won{background:#dcfce7;color:#166534}.b-lost{background:#fee2e2;color:#991b1b}.b-passed{background:#f3f4f6;color:#6b7280}
+  .badge{font-size:12px;font-weight:700;border-radius:20px;padding:3px 11px}
+  .rowbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+  .rowbtns select{padding:6px 10px}
+  .notes{width:100%;min-height:44px;margin-top:8px;resize:vertical;display:none}
+  .err{color:var(--danger);font-size:13px;margin-bottom:8px}
+  .ok{color:var(--success);font-size:13px;margin-bottom:8px}
+  a{color:var(--brand2)}
+  .empty{color:var(--muted);text-align:center;padding:50px}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="logo">C2</div><h1>Federal Contract Tracker</h1>
+  <input id="token" type="password" placeholder="Admin token" style="flex:0 1 200px">
+  <button id="load">Load</button>
+</div>
+
+<div class="wrap">
+  <!-- Pull fresh opportunities from SAM.gov -->
+  <div class="panel">
+    <h2>Pull from SAM.gov</h2>
+    <div class="grid">
+      <div class="field"><label>Posted from</label><input id="from" type="date"></div>
+      <div class="field"><label>Posted to</label><input id="to" type="date"></div>
+      <div class="field"><label>Keyword (title)</label><input id="keyword" type="text" placeholder="e.g. janitorial"></div>
+      <div class="field"><label>NAICS code</label><input id="naics" type="text" placeholder="e.g. 561720"></div>
+      <div class="field"><label>Notice type</label>
+        <select id="ptype">
+          <option value="">Any</option>
+          <option value="o">Solicitation</option>
+          <option value="k">Combined Synopsis/Solicitation</option>
+          <option value="p">Presolicitation</option>
+          <option value="r">Sources Sought</option>
+          <option value="g">Sale of Surplus</option>
+          <option value="a">Award Notice</option>
+        </select>
+      </div>
+      <div class="field"><label>Set-aside</label>
+        <select id="setAside">
+          <option value="">Any</option>
+          <option value="SBA">Total Small Business</option>
+          <option value="SBP">Partial Small Business</option>
+          <option value="8A">8(a)</option>
+          <option value="WOSB">Women-Owned (WOSB)</option>
+          <option value="SDVOSBC">Service-Disabled Vet (SDVOSB)</option>
+          <option value="HZC">HUBZone</option>
+        </select>
+      </div>
+      <div class="field"><label>State (place of perf.)</label><input id="state" type="text" placeholder="e.g. TX" maxlength="2"></div>
+      <div class="field"><label>Max to fetch</label><input id="limit" type="text" value="100"></div>
+    </div>
+    <div class="rowbtns">
+      <button id="sync">⇩ Sync now</button>
+      <span class="meta" id="synced"></span>
+    </div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <!-- Filter / search what's stored -->
+  <div class="bar">
+    <input id="search" type="text" placeholder="Search title, agency, solicitation #…" style="flex:1 1 240px">
+    <select id="fstatus">
+      <option value="">All bid statuses</option>
+      <option value="new">New</option><option value="interested">Interested</option>
+      <option value="bidding">Bidding</option><option value="submitted">Submitted</option>
+      <option value="won">Won</option><option value="lost">Lost</option><option value="passed">Passed</option>
+    </select>
+    <select id="fsort">
+      <option value="deadline">Sort: deadline (soonest)</option>
+      <option value="posted">Sort: newest posted</option>
+    </select>
+    <label class="meta"><input type="checkbox" id="fopen" checked> Hide closed/expired</label>
+  </div>
+
+  <div class="err" id="err"></div>
+  <div class="ok" id="msg"></div>
+  <div id="list"><div class="empty">Enter your admin token and press <b>Load</b>.</div></div>
+</div>
+
+<script>
+  // Backend that holds the SAM.gov API key + Supabase service role (never the browser).
+  const API = "/api/sam-sync";
+
+  const STATUSES = ['new','interested','bidding','submitted','won','lost','passed'];
+  const el = id => document.getElementById(id);
+  const esc = s => String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  let OPPS = [];
+
+  const token = () => el('token').value.trim() || sessionStorage.getItem('c2_admin_token') || '';
+
+  // default the sync window to the last 30 days
+  (function(){
+    const d = new Date(), p = n => String(n).padStart(2,'0');
+    const iso = x => `${x.getFullYear()}-${p(x.getMonth()+1)}-${p(x.getDate())}`;
+    el('to').value = iso(d);
+    el('from').value = iso(new Date(d.getTime()-30*864e5));
+    if(sessionStorage.getItem('c2_admin_token')) el('token').value = sessionStorage.getItem('c2_admin_token');
+  })();
+
+  el('load').addEventListener('click', load);
+  el('sync').addEventListener('click', sync);
+  el('search').addEventListener('input', render);
+  el('fstatus').addEventListener('change', render);
+  el('fsort').addEventListener('change', render);
+  el('fopen').addEventListener('change', render);
+
+  function flash(msg, isErr){
+    el(isErr?'err':'msg').textContent = msg;
+    el(isErr?'msg':'err').textContent = '';
+    if(!isErr && msg) setTimeout(()=>{ if(el('msg').textContent===msg) el('msg').textContent=''; }, 4000);
+  }
+
+  async function load(){
+    const t = el('token').value.trim();
+    if(t) sessionStorage.setItem('c2_admin_token', t);
+    if(!token()){ flash('Enter your admin token.', true); return; }
+    el('load').disabled = true; el('load').textContent = 'Loading…';
+    try{
+      const res = await fetch(API, { headers:{ Authorization:`Bearer ${token()}` }});
+      if(res.status===401) throw new Error('Wrong admin token.');
+      if(!res.ok) throw new Error((await res.json().catch(()=>({}))).error || 'Load failed');
+      const data = await res.json();
+      OPPS = data.opportunities || [];
+      if(data.lastSync) el('synced').textContent = `Last sync: ${data.lastSync.upserted||0} saved on ${new Date(data.lastSync.ran_at).toLocaleString()}`;
+      flash('');
+      render();
+    }catch(ex){ flash(ex.message, true); }
+    finally{ el('load').disabled=false; el('load').textContent='Load'; }
+  }
+
+  async function sync(){
+    if(!token()){ flash('Enter your admin token and press Load first.', true); return; }
+    el('sync').disabled = true; el('sync').textContent = 'Syncing…';
+    try{
+      const body = {
+        action:'sync',
+        postedFrom: el('from').value, postedTo: el('to').value,
+        keyword: el('keyword').value.trim() || undefined,
+        naics: el('naics').value.trim() || undefined,
+        ptype: el('ptype').value || undefined,
+        setAside: el('setAside').value || undefined,
+        state: el('state').value.trim().toUpperCase() || undefined,
+        limit: el('limit').value.trim() || undefined,
+      };
+      const res = await fetch(API, {
+        method:'POST',
+        headers:{ Authorization:`Bearer ${token()}`, 'Content-Type':'application/json' },
+        body: JSON.stringify(body),
+      });
+      const out = await res.json().catch(()=>({}));
+      if(!res.ok) throw new Error(out.error || 'Sync failed');
+      flash(`Synced ${out.synced} opportunities (SAM.gov had ${out.totalAvailable} in this window).`);
+      await load();
+    }catch(ex){ flash(ex.message, true); }
+    finally{ el('sync').disabled=false; el('sync').textContent='⇩ Sync now'; }
+  }
+
+  async function update(notice_id, patch){
+    try{
+      const res = await fetch(API, {
+        method:'POST',
+        headers:{ Authorization:`Bearer ${token()}`, 'Content-Type':'application/json' },
+        body: JSON.stringify({ action:'update', notice_id, ...patch }),
+      });
+      if(!res.ok) throw new Error((await res.json().catch(()=>({}))).error || 'Update failed');
+    }catch(ex){ flash(ex.message, true); }
+  }
+
+  function dueInfo(iso){
+    if(!iso) return { txt:'no deadline', cls:'' };
+    const d = new Date(iso), now = new Date();
+    const days = Math.ceil((d - now)/864e5);
+    const txt = d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}) +
+      (days<0 ? ' (closed)' : days===0 ? ' (due today)' : ` (${days} day${days===1?'':'s'} left)`);
+    const cls = days<0 ? 'past' : days===0 ? 'today' : days<=7 ? 'soon' : '';
+    return { txt, cls, days };
+  }
+
+  function render(){
+    const q = el('search').value.toLowerCase(), f = el('fstatus').value;
+    const hideClosed = el('fopen').checked, sortBy = el('fsort').value;
+
+    let rows = OPPS.filter(o=>{
+      if(f && (o.bid_status||'new')!==f) return false;
+      if(hideClosed){
+        const d = o.response_deadline ? new Date(o.response_deadline) : null;
+        if(d && d < new Date()) return false;
+      }
+      if(!q) return true;
+      return [o.title,o.agency,o.solicitation_number,o.naics_code,o.notice_type].join(' ').toLowerCase().includes(q);
+    });
+    rows.sort((a,b)=> sortBy==='posted'
+      ? String(b.posted_date||'').localeCompare(String(a.posted_date||''))
+      : (new Date(a.response_deadline||'2999') - new Date(b.response_deadline||'2999')));
+
+    // stat tiles
+    const by = s => OPPS.filter(o=>(o.bid_status||'new')===s).length;
+    el('stats').innerHTML = `
+      <div class="stat"><b>${OPPS.length}</b><span>Tracked</span></div>
+      <div class="stat"><b>${by('interested')}</b><span>Interested</span></div>
+      <div class="stat"><b>${by('bidding')}</b><span>Bidding</span></div>
+      <div class="stat"><b>${by('submitted')}</b><span>Submitted</span></div>
+      <div class="stat"><b>${by('won')}</b><span>Won</span></div>`;
+
+    const list = el('list');
+    if(!rows.length){ list.innerHTML = `<div class="empty">No opportunities${OPPS.length?' match your filter':' yet — set a window above and press Sync now'}.</div>`; return; }
+    list.innerHTML = '';
+    for(const o of rows){
+      const st = o.bid_status || 'new';
+      const due = dueInfo(o.response_deadline);
+      const card = document.createElement('div'); card.className = 'card';
+      card.innerHTML = `
+        <div class="h">
+          <b>${esc(o.title||'(untitled)')}</b>
+          <span class="badge b-${st}">${st}</span>
+          ${o.ui_link?`<a href="${esc(o.ui_link)}" target="_blank" rel="noopener">View on SAM.gov ↗</a>`:''}
+        </div>
+        <div class="meta">${esc(o.agency||'—')}</div>
+        <div class="meta">
+          ${o.solicitation_number?`Sol # <b>${esc(o.solicitation_number)}</b> · `:''}
+          ${o.notice_type?esc(o.notice_type)+' · ':''}
+          Posted ${o.posted_date?new Date(o.posted_date).toLocaleDateString():'—'} ·
+          Response due <span class="due ${due.cls}">${esc(due.txt)}</span>
+        </div>
+        <div>
+          ${o.naics_code?`<span class="pill">NAICS ${esc(o.naics_code)}</span>`:''}
+          ${o.classification_code?`<span class="pill">PSC ${esc(o.classification_code)}</span>`:''}
+          ${o.set_aside?`<span class="pill warn">${esc(o.set_aside)}</span>`:''}
+          ${o.place_of_performance?`<span class="pill">${esc(o.place_of_performance)}</span>`:''}
+        </div>
+        <div class="rowbtns">
+          <label class="meta">Bid status:
+            <select class="st">${STATUSES.map(s=>`<option value="${s}" ${st===s?'selected':''}>${s}</option>`).join('')}</select>
+          </label>
+          <button class="sec notebtn">📝 Notes</button>
+        </div>
+        <textarea class="notes" placeholder="Your notes: POC, teaming, go/no-go, price target…">${esc(o.bid_notes||'')}</textarea>`;
+
+      card.querySelector('.st').addEventListener('change', async e=>{
+        o.bid_status = e.target.value;
+        card.querySelector('.badge').className = 'badge b-'+o.bid_status;
+        card.querySelector('.badge').textContent = o.bid_status;
+        await update(o.notice_id, { bid_status:o.bid_status });
+        render();
+      });
+
+      const nb = card.querySelector('.notebtn'), ta = card.querySelector('.notes');
+      nb.addEventListener('click', ()=>{ ta.style.display = ta.style.display==='block'?'none':'block'; if(ta.style.display==='block') ta.focus(); });
+      let t; ta.addEventListener('input', ()=>{ clearTimeout(t); t = setTimeout(async ()=>{ o.bid_notes = ta.value; await update(o.notice_id, { bid_notes:o.bid_notes }); flash('Notes saved.'); }, 700); });
+
+      list.appendChild(card);
+    }
+  }
+</script>
+</body>
+</html>
