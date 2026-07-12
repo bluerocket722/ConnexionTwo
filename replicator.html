@@ -333,6 +333,34 @@ live in Supabase (REST + the finalize-document edge function).
     notes:'# SAM.gov Contracts\n\nsamcontracts.html talks to a backend that holds the SAM.gov API key + Supabase service role — never put those in the browser.'
   },
   {
+    id:'govcon', name:'GovCon Platform (AI)', icon:'🏛️', cat:'core',
+    blurb:'AI-powered government-contracting suite: RFP discovery, Autopilot, six AI proposal tools, pipeline, partners, analytics — front end + two edge functions + SQL.',
+    files:[
+      'govcon.html','govcon_backend.sql',
+      'functions/autopilot-run/index.ts','functions/govcon-ai/index.ts'
+    ],
+    notes:
+`# GovCon Platform (AI)
+
+Full AI government-contracting app (the "Imperium Path" feature set) rebranded
+as Connexion Two. Single Supabase project, per-user rows locked with RLS.
+
+1. Run govcon_backend.sql in the customer's Supabase SQL editor — creates the
+   profiles, rfps, pipeline, proposals, autopilot, custom-sources, and partner
+   tables (all RLS-locked to auth.uid()).
+2. Deploy the two edge functions:
+     supabase functions deploy autopilot-run   (from functions/autopilot-run/index.ts)
+     supabase functions deploy govcon-ai        (from functions/govcon-ai/index.ts)
+   Set secrets:  ANTHROPIC_API_KEY, SAM_API_KEY, SUPABASE_SERVICE_ROLE_KEY,
+   SUPABASE_ANON_KEY, SUPABASE_URL, optional ALLOWED_ORIGINS.
+3. Point govcon.html at the customer's SUPABASE_URL + anon key (the Find &
+   replace panel does this on download).
+4. Optional: schedule Autopilot with pg_cron (commented block at the bottom of
+   govcon_backend.sql) once autopilot-run is deployed.
+
+The Anthropic key lives only in the edge functions — the browser never holds it.`
+  },
+  {
     id:'vault', name:'Document Vault', icon:'🔒', cat:'ops',
     blurb:'Encrypted document vault view.',
     files:['vault.html'],
