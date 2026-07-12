@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connexion Two | AI-Powered Government Contracting</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --blue-950:#041124; --blue-900:#061a3a; --blue-800:#082b61; --blue-700:#0054d1;
+    --blue-600:#0068ff; --blue-500:#1683ff; --blue-100:#eaf3ff; --blue-050:#f5f9ff;
+    --ink:#0b1220; --muted:#5a6b8c; --line:#e2e8f2; --bg:#f4f7fc; --panel:#fff;
+    --good:#12a150; --warn:#c77700; --bad:#d33; --chip:#eef3fb;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5}
+  a{color:var(--blue-700);text-decoration:none}
+  /* ── shell ── */
+  .app{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+  .side{background:linear-gradient(180deg,var(--blue-900),var(--blue-950));color:#dce8ff;
+    padding:20px 14px;position:sticky;top:0;height:100vh;overflow:auto}
+  .brand{display:flex;align-items:center;gap:10px;margin:0 6px 22px}
+  .brand .mark{width:38px;height:38px;border-radius:10px;flex:0 0 auto;font-weight:800;color:#fff;
+    background:linear-gradient(135deg,var(--blue-600),var(--blue-900));display:grid;place-items:center;letter-spacing:-.5px}
+  .brand .nm{font-weight:800;font-size:15px;letter-spacing:-.3px;color:#fff}
+  .brand .sub{font-size:10.5px;color:#8fb4f0;letter-spacing:.3px}
+  .nav a{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;color:#c6d8f7;
+    font-size:14px;font-weight:600;cursor:pointer;margin-bottom:2px}
+  .nav a .ic{width:18px;text-align:center}
+  .nav a:hover{background:rgba(255,255,255,.06)}
+  .nav a.active{background:var(--blue-700);color:#fff}
+  .nav .sec{font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:#6f92c8;margin:16px 12px 6px}
+  .main{padding:26px 30px 70px;max-width:1180px}
+  .topbar{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+  .topbar h1{font-size:23px;margin:0;letter-spacing:-.4px;color:var(--blue-950)}
+  .topbar .who{margin-left:auto;font-size:13px;color:var(--muted)}
+  .topbar .who b{color:var(--ink)}
+  /* ── components ── */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+  .cards{display:grid;gap:16px}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+  .kpi .lbl{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .kpi .val{font-size:30px;font-weight:800;letter-spacing:-1px;color:var(--blue-800);margin-top:4px}
+  .kpi .sub{font-size:12px;color:var(--muted)}
+  h2.section{font-size:15px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:26px 0 12px}
+  .btn{appearance:none;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:9px;
+    padding:9px 14px;font-size:13.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{border-color:var(--blue-500)}
+  .btn.primary{background:var(--blue-700);color:#fff;border:none;box-shadow:0 10px 24px rgba(0,84,209,.22)}
+  .btn.primary:hover{background:var(--blue-800)}
+  .btn.sm{padding:6px 10px;font-size:12px}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  label{display:block;font-size:12px;color:var(--muted);font-weight:600;margin:0 0 5px}
+  input,textarea,select{width:100%;background:var(--blue-050);border:1px solid var(--line);border-radius:9px;
+    padding:9px 11px;font-size:13.5px;font-family:inherit;color:var(--ink)}
+  textarea{min-height:80px;resize:vertical}
+  .field{margin-bottom:13px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;background:var(--chip);color:var(--blue-700)}
+  .pill.high{background:#fde8e8;color:var(--bad)} .pill.medium{background:#fff3e0;color:var(--warn)} .pill.low{background:#e8f5ee;color:var(--good)}
+  .rfp{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;background:#fff}
+  .rfp .t{font-weight:700;font-size:15px;color:var(--blue-900)}
+  .rfp .m{font-size:12.5px;color:var(--muted);margin:3px 0}
+  .rfp .scores{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px}
+  .rfp .acts{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+  .board{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;overflow-x:auto}
+  .col{background:var(--blue-050);border:1px solid var(--line);border-radius:12px;padding:9px;min-width:150px}
+  .col h4{margin:0 0 8px;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:flex;justify-content:space-between}
+  .col .n{background:#fff;border:1px solid var(--line);color:var(--muted);border-radius:12px;padding:0 7px;font-size:11px}
+  .pcard{background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px;margin-bottom:8px;font-size:12.5px}
+  .pcard .pt{font-weight:700;color:var(--blue-900);font-size:12.5px}
+  .pcard select{padding:4px 6px;font-size:11px;margin-top:6px}
+  .tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:13px}
+  .tool{border:1px solid var(--line);border-radius:12px;padding:15px;background:#fff;cursor:pointer;transition:border-color .15s}
+  .tool:hover{border-color:var(--blue-500);box-shadow:0 10px 24px rgba(6,26,58,.07)}
+  .tool .ic{font-size:24px} .tool .nm{font-weight:800;margin:8px 0 3px;color:var(--blue-900)} .tool .d{font-size:12.5px;color:var(--muted)}
+  .out{white-space:pre-wrap;font-size:13.5px;background:var(--blue-050);border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:12px;max-height:460px;overflow:auto}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);font-weight:600;margin-bottom:10px}
+  .toggle input{width:auto}
+  .banner{border-radius:10px;padding:11px 14px;font-size:13px;margin-bottom:16px;border:1px solid}
+  .banner.info{background:var(--blue-100);border-color:#bcd8ff}
+  .banner.warn{background:#fff8ec;border-color:#f2d79a}
+  .banner.bad{background:#fdeaea;border-color:#f2b4b4;color:var(--bad)}
+  .muted{color:var(--muted)} .center{text-align:center}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{background:var(--chip);border:1px solid var(--line);border-radius:20px;padding:3px 10px;font-size:12px;display:flex;align-items:center;gap:6px}
+  .chip .x{cursor:pointer;color:var(--muted);font-weight:800}
+  .hide{display:none!important}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid #fff6;border-top-color:#fff;border-radius:50%;animation:s .7s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+  /* ── auth ── */
+  #auth{position:fixed;inset:0;background:linear-gradient(135deg,var(--blue-900),var(--blue-950));
+    display:grid;place-items:center;padding:20px;z-index:50}
+  #auth .box{background:#fff;border-radius:18px;padding:30px;max-width:400px;width:100%}
+  #auth .mark{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--blue-600),var(--blue-900));
+    display:grid;place-items:center;color:#fff;font-weight:800;font-size:18px;margin-bottom:14px}
+  #auth h2{margin:0 0 4px;color:var(--blue-950)} #auth p{margin:0 0 18px;color:var(--muted);font-size:13.5px}
+  @media(max-width:860px){.app{grid-template-columns:1fr}.side{position:static;height:auto}.board{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- ══ AUTH ══ -->
+<div id="auth">
+  <div class="box">
+    <div class="mark">C2</div>
+    <h2>Connexion Two</h2>
+    <p>AI-Powered Government Contracting Platform</p>
+    <div class="field"><label>Email</label><input id="authEmail" type="email" placeholder="you@company.com"></div>
+    <div class="field"><label>Password</label><input id="authPass" type="password" placeholder="••••••••"></div>
+    <div id="authErr" class="banner bad hide"></div>
+    <button class="btn primary" id="btnSignIn" style="width:100%;justify-content:center">Sign in</button>
+    <button class="btn" id="btnSignUp" style="width:100%;justify-content:center;margin-top:8px">Create account</button>
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div class="app hide" id="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="mark">C2</div>
+      <div><div class="nm">Connexion Two</div><div class="sub">GOVERNMENT CONTRACTING</div></div>
+    </div>
+    <nav class="nav" id="nav">
+      <a data-view="dashboard" class="active"><span class="ic">▚</span>Dashboard</a>
+      <a data-view="rfps"><span class="ic">▤</span>RFP Discovery</a>
+      <a data-view="autopilot"><span class="ic">✈</span>Autopilot</a>
+      <a data-view="sources"><span class="ic">◎</span>Custom Sources</a>
+      <a data-view="ai"><span class="ic">✦</span>AI Tools</a>
+      <a data-view="pipeline"><span class="ic">▦</span>Pipeline</a>
+      <a data-view="partners"><span class="ic">◈</span>Partner Network</a>
+      <a data-view="analytics"><span class="ic">▲</span>Analytics</a>
+      <div class="sec">Account</div>
+      <a data-view="profile"><span class="ic">◐</span>Profile &amp; Settings</a>
+      <a id="btnSignOut"><span class="ic">⏻</span>Sign out</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h1 id="viewTitle">Dashboard</h1>
+      <div class="who">Signed in as <b id="whoEmail"></b></div>
+    </div>
+    <div id="views"></div>
+  </main>
+</div>
+
+<script>
+/* ═══════════════ CONFIG ═══════════════
+   Same project as intake.html. On replication, the Replicator's find/replace
+   swaps these for the customer's own Supabase project + anon key. */
+const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
+const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
+const sb = supabase.createClient(SB_URL, SB_KEY);
+const FN = (name) => `${SB_URL}/functions/v1/${name}`;
+
+let SESSION = null, PROFILE = null;
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString() : '—';
+
+/* REST + function helpers (authenticated as the user) */
+async function api(path, opts={}) {
+  const token = SESSION.access_token;
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${token}`,
+      'Content-Type':'application/json', Prefer: opts.prefer || 'return=representation', ...(opts.headers||{}) },
+  });
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  return res.status === 204 ? null : res.json();
+}
+async function callFn(name, body) {
+  const res = await fetch(FN(name), {
+    method:'POST', headers:{ apikey:SB_KEY, Authorization:`Bearer ${SESSION.access_token}`, 'Content-Type':'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(()=>({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+/* ═══════════════ AUTH ═══════════════ */
+$('#btnSignIn').onclick = () => auth('in');
+$('#btnSignUp').onclick = () => auth('up');
+async function auth(mode) {
+  const email = $('#authEmail').value.trim(), password = $('#authPass').value;
+  const err = $('#authErr'); err.classList.add('hide');
+  const fn = mode==='in' ? sb.auth.signInWithPassword({email,password}) : sb.auth.signUp({email,password});
+  const { data, error } = await fn;
+  if (error) { err.textContent = error.message; err.classList.remove('hide'); return; }
+  if (mode==='up' && !data.session) { err.textContent='Check your email to confirm, then sign in.'; err.classList.remove('hide'); return; }
+  boot(data.session);
+}
+$('#btnSignOut').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+async function boot(session) {
+  SESSION = session;
+  $('#auth').classList.add('hide'); $('#app').classList.remove('hide');
+  $('#whoEmail').textContent = session.user.email;
+  const rows = await api(`govcon_profiles?user_id=eq.${session.user.id}&select=*`);
+  PROFILE = rows[0] || null;
+  if (!PROFILE) { // first login → create a profile row + default autopilot settings
+    PROFILE = (await api('govcon_profiles', {method:'POST', body:JSON.stringify({user_id:session.user.id})}))[0];
+    await api('govcon_autopilot_settings', {method:'POST', prefer:'resolution=ignore-duplicates',
+      body:JSON.stringify({owner:session.user.id})}).catch(()=>{});
+  }
+  route('dashboard');
+}
+
+/* ═══════════════ ROUTER ═══════════════ */
+$('#nav').addEventListener('click', e => {
+  const a = e.target.closest('a[data-view]'); if (a) route(a.dataset.view);
+});
+const TITLES = {dashboard:'Dashboard',rfps:'RFP Discovery',autopilot:'Autopilot',sources:'Custom Sources',
+  ai:'AI Tools',pipeline:'Pipeline',partners:'Partner Network',analytics:'Analytics',profile:'Profile & Settings'};
+function route(view) {
+  $$('#nav a[data-view]').forEach(a => a.classList.toggle('active', a.dataset.view===view));
+  $('#viewTitle').textContent = TITLES[view] || view;
+  ({dashboard:renderDashboard,rfps:renderRfps,autopilot:renderAutopilot,sources:renderSources,
+    ai:renderAi,pipeline:renderPipeline,partners:renderPartners,analytics:renderAnalytics,profile:renderProfile}[view]||renderDashboard)();
+}
+const V = () => $('#views');
+const loading = () => V().innerHTML = '<div class="card center muted">Loading…</div>';
+
+/* ═══════════════ DASHBOARD ═══════════════ */
+async function renderDashboard() {
+  loading();
+  const uid = SESSION.user.id;
+  const [rfps, pipeline, proposals, runs] = await Promise.all([
+    api(`govcon_rfps?owner=eq.${uid}&select=id,status,priority,win_probability`),
+    api(`govcon_pipeline_items?owner=eq.${uid}&select=id,stage`),
+    api(`govcon_proposals?owner=eq.${uid}&select=id,status`),
+    api(`govcon_autopilot_runs?owner=eq.${uid}&select=*&order=started_at.desc&limit=5`),
+  ]);
+  const awarded = pipeline.filter(p=>p.stage==='awarded').length;
+  const closed = pipeline.filter(p=>p.stage==='awarded'||p.stage==='lost').length;
+  const winRate = closed ? Math.round(awarded/closed*100) : 0;
+  V().innerHTML = `
+    <div class="cards kpis">
+      ${kpi('Total RFPs', rfps.length, 'all opportunities')}
+      ${kpi('Pipeline', pipeline.length, 'actively pursuing')}
+      ${kpi('Proposals', proposals.length, 'drafts & submissions')}
+      ${kpi('Win Rate', winRate+'%', `${awarded} of ${closed} closed`)}
+    </div>
+    <h2 class="section">Quick actions</h2>
+    <div class="card"><div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn primary" onclick="route('rfps')">Discover RFPs</button>
+      <button class="btn" onclick="route('ai')">Create Proposal</button>
+      <button class="btn" onclick="route('pipeline')">View Pipeline</button>
+      <button class="btn" onclick="runAutopilotNow()">✈ Run Autopilot</button>
+    </div></div>
+    <h2 class="section">Recent Autopilot runs</h2>
+    <div class="card">${runs.length ? runs.map(r=>`
+      <div class="rfp" style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between">
+          <b>${fmtDate(r.started_at)}</b>
+          <span class="pill ${r.status==='error'?'high':'low'}">${r.status}</span>
+        </div>
+        <div class="m">Found ${r.rfps_found} · New ${r.new_rfps} · High-priority ${r.high_priority} · Proposals ${r.proposals_generated} · Pipeline +${r.added_to_pipeline}</div>
+        ${r.error?`<div class="m" style="color:var(--bad)">${esc(r.error)}</div>`:''}
+      </div>`).join('') : '<p class="muted">No runs yet. Configure Autopilot and run it.</p>'}
+    </div>`;
+}
+const kpi = (l,v,s) => `<div class="card kpi"><div class="lbl">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
+
+/* ═══════════════ RFP DISCOVERY ═══════════════ */
+let RFP_FILTER = '';
+async function renderRfps() {
+  loading();
+  const uid = SESSION.user.id;
+  const rfps = await api(`govcon_rfps?owner=eq.${uid}&select=*&order=created_at.desc&limit=500`);
+  const q = RFP_FILTER.toLowerCase();
+  const shown = rfps.filter(r => !q || `${r.title} ${r.agency} ${r.category}`.toLowerCase().includes(q));
+  V().innerHTML = `
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <input id="rfpSearch" placeholder="Search opportunities…" value="${esc(RFP_FILTER)}" style="flex:1;min-width:220px">
+        <button class="btn primary" onclick="runAutopilotNow()">✈ Run Autopilot</button>
+        <button class="btn" onclick="showAddRfp()">+ Add RFP</button>
+      </div>
+    </div>
+    <div id="addRfpBox"></div>
+    <div class="muted" style="margin-bottom:10px">${shown.length} of ${rfps.length} opportunities</div>
+    <div id="rfpList">${shown.map(rfpCard).join('') || '<div class="card center muted">No RFPs yet — run Autopilot or add one manually.</div>'}</div>`;
+  $('#rfpSearch').oninput = (e) => { RFP_FILTER = e.target.value; clearTimeout(window._rt); window._rt = setTimeout(renderRfps, 250); };
+}
+function rfpCard(r) {
+  return `<div class="rfp">
+    <div class="t">${esc(r.title)}</div>
+    <div class="m">${esc(r.agency||'—')} · ${esc(r.source)} · deadline ${fmtDate(r.deadline)}${r.set_aside?` · ${esc(r.set_aside)}`:''}</div>
+    ${r.description?`<div class="m">${esc(String(r.description).slice(0,200))}${r.description.length>200?'…':''}</div>`:''}
+    <div class="scores">
+      ${r.relevance_score!=null?`<span class="pill">Relevance ${r.relevance_score}%</span>`:''}
+      ${r.win_probability!=null?`<span class="pill">Win ${r.win_probability}%</span>`:''}
+      ${r.priority?`<span class="pill ${r.priority}">${r.priority}</span>`:''}
+    </div>
+    <div class="acts">
+      <button class="btn sm" onclick="addToPipeline('${r.id}')">+ Pipeline</button>
+      <button class="btn sm" onclick="aiFor('${r.id}','analyzer')">Analyze</button>
+      <button class="btn sm primary" onclick="aiFor('${r.id}','writer')">Generate proposal</button>
+      ${r.url?`<a class="btn sm" href="${esc(r.url)}" target="_blank">Source ↗</a>`:''}
+    </div></div>`;
+}
+function showAddRfp() {
+  $('#addRfpBox').innerHTML = `<div class="card" style="margin-bottom:16px">
+    <h3 style="margin-top:0">Add RFP manually</h3>
+    <div class="field"><label>Title *</label><input id="ar_title"></div>
+    <div class="row2"><div class="field"><label>Agency</label><input id="ar_agency"></div>
+      <div class="field"><label>Deadline</label><input id="ar_deadline" type="date"></div></div>
+    <div class="row2"><div class="field"><label>Set-aside</label><input id="ar_setaside" placeholder="8(a), WOSB…"></div>
+      <div class="field"><label>Source URL</label><input id="ar_url"></div></div>
+    <div class="field"><label>Requirements / description</label><textarea id="ar_desc"></textarea></div>
+    <button class="btn primary" onclick="saveRfp()">Save</button>
+    <button class="btn" onclick="$('#addRfpBox').innerHTML=''">Cancel</button>
+  </div>`;
+}
+async function saveRfp() {
+  const title = $('#ar_title').value.trim(); if (!title) return alert('Title is required');
+  await api('govcon_rfps', {method:'POST', body:JSON.stringify({
+    owner:SESSION.user.id, title, agency:$('#ar_agency').value.trim()||null,
+    deadline:$('#ar_deadline').value||null, set_aside:$('#ar_setaside').value.trim()||null,
+    url:$('#ar_url').value.trim()||null, description:$('#ar_desc').value.trim()||null, source:'manual',
+  })});
+  renderRfps();
+}
+async function addToPipeline(rfpId) {
+  try {
+    await api('govcon_pipeline_items', {method:'POST', prefer:'resolution=ignore-duplicates',
+      body:JSON.stringify({owner:SESSION.user.id, rfp_id:rfpId, stage:'lead'})});
+    toast('Added to pipeline');
+  } catch(e){ alert(e.message); }
+}
+async function runAutopilotNow() {
+  toast('Running Autopilot…', true);
+  try { const r = await callFn('autopilot-run', {action:'run'});
+    toast(`Autopilot: ${r.new_rfps} new, ${r.added_to_pipeline} to pipeline, ${r.proposals_generated} drafts`);
+    if (r.errors?.length) console.warn('Autopilot source errors:', r.errors);
+  } catch(e){ toast('Autopilot failed: '+e.message); }
+}
+
+/* ═══════════════ AUTOPILOT SETTINGS ═══════════════ */
+async function renderAutopilot() {
+  loading();
+  const uid = SESSION.user.id;
+  const rows = await api(`govcon_autopilot_settings?owner=eq.${uid}&select=*`);
+  const s = rows[0] || {owner:uid};
+  const srcChecked = (v) => (s.sources||[]).includes(v) ? 'checked' : '';
+  V().innerHTML = `
+    <div class="banner info">Autopilot discovers, scores, and (optionally) drafts proposals for RFPs matching your profile and keywords. Configure it once, then run manually or on a schedule.</div>
+    <div class="card">
+      <label class="toggle"><input type="checkbox" id="ap_enabled" ${s.enabled?'checked':''}> Enable Autopilot</label>
+      <div class="row2">
+        <div class="field"><label>Discovery interval (hours)</label><input id="ap_interval" type="number" min="1" max="24" value="${s.interval_hours||6}"></div>
+        <div class="field"><label>Max RFPs per run</label><input id="ap_max" type="number" value="${s.max_per_run||50}"></div>
+      </div>
+      <div class="field"><label>Sources</label>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;font-weight:600">
+          <label class="toggle"><input type="checkbox" class="ap_src" value="sam.gov" ${srcChecked('sam.gov')}> SAM.gov</label>
+          <label class="toggle"><input type="checkbox" class="ap_src" value="grants.gov" ${srcChecked('grants.gov')}> Grants.gov</label>
+          <label class="toggle"><input type="checkbox" class="ap_src" value="custom" ${srcChecked('custom')}> Custom Sources</label>
+        </div>
+      </div>
+      <div class="field"><label>Keywords (comma-separated — match your NAICS &amp; capabilities)</label>
+        <input id="ap_keywords" value="${esc((s.keywords||[]).join(', '))}" placeholder="cybersecurity, staffing, IT services"></div>
+
+      <h2 class="section" style="margin-top:8px">Analysis thresholds</h2>
+      <label class="toggle"><input type="checkbox" id="ap_analyze" ${s.auto_analyze!==false?'checked':''}> Auto-analyze relevance &amp; win probability</label>
+      <div class="row2">
+        <div class="field"><label>Min relevance %</label><input id="ap_minrel" type="number" min="0" max="100" value="${s.min_relevance??70}"></div>
+        <div class="field"><label>Min win probability %</label><input id="ap_minwin" type="number" min="0" max="100" value="${s.min_win_probability??60}"></div>
+      </div>
+      <h2 class="section">Proposal generation</h2>
+      <label class="toggle"><input type="checkbox" id="ap_gen" ${s.auto_generate?'checked':''}> Auto-generate drafts when threshold met</label>
+      <div class="row2">
+        <div class="field"><label>Generation threshold (win %)</label><input id="ap_genth" type="number" min="0" max="100" value="${s.generation_threshold??70}"></div>
+        <div class="field"><label>Mode</label><select id="ap_genmode"><option value="draft" ${s.generation_mode!=='comprehensive'?'selected':''}>Draft (faster)</option><option value="comprehensive" ${s.generation_mode==='comprehensive'?'selected':''}>Comprehensive</option></select></div>
+      </div>
+      <h2 class="section">Pipeline</h2>
+      <label class="toggle"><input type="checkbox" id="ap_addpipe" ${s.auto_add_pipeline!==false?'checked':''}> Auto-add qualifying RFPs to Pipeline</label>
+      <label class="toggle"><input type="checkbox" id="ap_prio" ${s.auto_prioritize!==false?'checked':''}> Auto-prioritize by win probability &amp; deadline</label>
+
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn primary" onclick="saveAutopilot()">Save settings</button>
+        <button class="btn" onclick="runAutopilotNow()">✈ Run now</button>
+      </div>
+    </div>`;
+}
+async function saveAutopilot() {
+  const body = {
+    owner: SESSION.user.id,
+    enabled: $('#ap_enabled').checked,
+    interval_hours: +$('#ap_interval').value || 6,
+    max_per_run: +$('#ap_max').value || 50,
+    sources: $$('.ap_src').filter(c=>c.checked).map(c=>c.value),
+    keywords: $('#ap_keywords').value.split(',').map(s=>s.trim()).filter(Boolean),
+    auto_analyze: $('#ap_analyze').checked,
+    min_relevance: +$('#ap_minrel').value, min_win_probability: +$('#ap_minwin').value,
+    auto_generate: $('#ap_gen').checked, generation_threshold: +$('#ap_genth').value,
+    generation_mode: $('#ap_genmode').value,
+    auto_add_pipeline: $('#ap_addpipe').checked, auto_prioritize: $('#ap_prio').checked,
+    updated_at: new Date().toISOString(),
+  };
+  await api('govcon_autopilot_settings', {method:'POST', prefer:'resolution=merge-duplicates', body:JSON.stringify(body)});
+  toast('Autopilot settings saved');
+}
+
+/* ═══════════════ CUSTOM SOURCES ═══════════════ */
+async function renderSources() {
+  loading();
+  const rows = await api(`govcon_custom_sources?owner=eq.${SESSION.user.id}&select=*&order=created_at.desc`);
+  V().innerHTML = `
+    <div class="banner info">Add public opportunity sites for Autopilot to search using CSS selectors. Right-click an element on the site → Inspect → Copy selector. <b>Do not enter site logins here</b> — v1 supports public pages only.</div>
+    <button class="btn primary" onclick="showAddSource()" style="margin-bottom:14px">+ Add source</button>
+    <div id="addSrcBox"></div>
+    ${rows.map(s=>`<div class="rfp">
+      <div class="t">${esc(s.name)} ${s.last_status?`<span class="pill ${s.last_status==='error'?'high':'low'}">${s.last_status}</span>`:''}</div>
+      <div class="m">${esc(s.url)}</div>
+      ${s.last_error?`<div class="m" style="color:var(--bad)">${esc(s.last_error)}</div>`:''}
+      <div class="acts">
+        <button class="btn sm" onclick="testSource('${s.id}')">Test</button>
+        <button class="btn sm" onclick="delSource('${s.id}')">Delete</button>
+      </div></div>`).join('') || '<div class="card center muted">No custom sources yet.</div>'}
+    <div id="srcTest"></div>`;
+}
+function showAddSource() {
+  $('#addSrcBox').innerHTML = `<div class="card" style="margin-bottom:14px">
+    <div class="row2"><div class="field"><label>Name *</label><input id="s_name"></div>
+      <div class="field"><label>Website URL *</label><input id="s_url" placeholder="https://…"></div></div>
+    <div class="field"><label>Search URL (use {query} for keywords)</label><input id="s_search" placeholder="https://site/search?q={query}"></div>
+    <h2 class="section" style="margin-top:4px">CSS selectors</h2>
+    <div class="row3">
+      <div class="field"><label>Results (each item)</label><input id="s_results" placeholder=".result-row"></div>
+      <div class="field"><label>Title</label><input id="s_title" placeholder="h3 a"></div>
+      <div class="field"><label>Link</label><input id="s_link" placeholder="a"></div>
+    </div>
+    <div class="row3">
+      <div class="field"><label>Description</label><input id="s_desc"></div>
+      <div class="field"><label>Deadline</label><input id="s_deadline"></div>
+      <div class="field"><label>Agency</label><input id="s_agency"></div>
+    </div>
+    <button class="btn primary" onclick="saveSource()">Add source</button>
+    <button class="btn" onclick="$('#addSrcBox').innerHTML=''">Cancel</button>
+  </div>`;
+}
+async function saveSource() {
+  const name=$('#s_name').value.trim(), url=$('#s_url').value.trim();
+  if(!name||!url) return alert('Name and URL are required');
+  await api('govcon_custom_sources',{method:'POST',body:JSON.stringify({
+    owner:SESSION.user.id, name, url, search_url:$('#s_search').value.trim()||null,
+    selectors:{results:$('#s_results').value.trim(),title:$('#s_title').value.trim(),link:$('#s_link').value.trim(),
+      description:$('#s_desc').value.trim(),deadline:$('#s_deadline').value.trim(),agency:$('#s_agency').value.trim()},
+  })});
+  renderSources();
+}
+async function testSource(id) {
+  $('#srcTest').innerHTML = '<div class="card muted">Testing…</div>';
+  try { const r = await callFn('autopilot-run',{action:'test-source',source_id:id});
+    $('#srcTest').innerHTML = `<div class="card"><h3 style="margin-top:0">Sample (${r.sample.length})</h3>${
+      r.sample.map(x=>`<div class="rfp"><div class="t">${esc(x.title)}</div><div class="m">${esc(x.agency||'')} · ${esc(x.deadline||'')}</div></div>`).join('')||'<p class="muted">No rows matched — check your selectors.</p>'}</div>`;
+  } catch(e){ $('#srcTest').innerHTML = `<div class="banner bad">${esc(e.message)}</div>`; }
+}
+async function delSource(id){ if(!confirm('Delete this source?'))return; await api(`govcon_custom_sources?id=eq.${id}`,{method:'DELETE'}); renderSources(); }
+
+/* ═══════════════ AI TOOLS ═══════════════ */
+const AI_TOOLS = [
+  {id:'writer',ic:'✍️',nm:'Proposal Writer',d:'Generate a structured proposal draft aligned to RFP requirements.'},
+  {id:'compliance',ic:'✅',nm:'Compliance Checker',d:'Confirm required sections and identify gaps before submission.'},
+  {id:'analyzer',ic:'🔍',nm:'RFP Analyzer',d:'Extract requirements, evaluation factors, and recommended strategy.'},
+  {id:'win-predictor',ic:'📊',nm:'Win Predictor',d:'Estimate win probability based on fit and profile.'},
+  {id:'cost-estimator',ic:'💰',nm:'Cost Estimator',d:'Build a starting cost model from the requirements.'},
+  {id:'team-matcher',ic:'🤝',nm:'Team Matcher',d:'Find partners who fill capability gaps.'},
+];
+let AI_RFPS = [];
+async function renderAi(preselectRfp, preselectTool) {
+  loading();
+  AI_RFPS = await api(`govcon_rfps?owner=eq.${SESSION.user.id}&select=id,title&order=created_at.desc&limit=200`);
+  V().innerHTML = `
+    <div class="tools" id="toolGrid">${AI_TOOLS.map(t=>`
+      <div class="tool" data-tool="${t.id}"><div class="ic">${t.ic}</div><div class="nm">${t.nm}</div><div class="d">${t.d}</div></div>`).join('')}</div>
+    <div id="aiPanel"></div>`;
+  $$('#toolGrid .tool').forEach(el => el.onclick = () => openTool(el.dataset.tool));
+  if (preselectTool) openTool(preselectTool, preselectRfp);
+}
+function openTool(toolId, rfpId) {
+  const t = AI_TOOLS.find(x=>x.id===toolId);
+  $('#aiPanel').innerHTML = `<div class="card" style="margin-top:16px">
+    <h3 style="margin-top:0">${t.ic} ${t.nm}</h3>
+    <div class="field"><label>Choose an RFP</label>
+      <select id="ai_rfp"><option value="">— paste requirements instead —</option>
+        ${AI_RFPS.map(r=>`<option value="${r.id}" ${r.id===rfpId?'selected':''}>${esc(r.title)}</option>`).join('')}</select></div>
+    <div class="field" id="ai_textbox"><label>Or paste RFP requirements</label><textarea id="ai_text" placeholder="Paste key requirements here if not selecting a stored RFP…"></textarea></div>
+    ${toolId==='writer'?`<div class="row2">
+      <div class="field"><label>Mode</label><select id="ai_mode"><option value="draft">Draft (faster)</option><option value="comprehensive">Comprehensive</option></select></div>
+      <div class="field"><label>Tone (optional)</label><input id="ai_tone" placeholder="formal, technical…"></div></div>`:''}
+    <button class="btn primary" id="ai_run">Generate</button>
+    <div id="ai_out"></div>
+  </div>`;
+  $('#ai_run').onclick = () => runAi(toolId);
+}
+function aiFor(rfpId, toolId){ route('ai'); setTimeout(()=>openTool(toolId, rfpId), 60); }
+async function runAi(toolId) {
+  const rfp_id = $('#ai_rfp').value || undefined;
+  const text = $('#ai_text')?.value.trim() || undefined;
+  if (!rfp_id && !text) return alert('Select an RFP or paste requirements.');
+  const btn = $('#ai_run'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Generating…';
+  $('#ai_out').innerHTML = '<div class="muted" style="margin-top:12px">Working — this can take up to a minute for comprehensive output…</div>';
+  try {
+    const options = toolId==='writer' ? {mode:$('#ai_mode').value, tone:$('#ai_tone').value.trim()||undefined} : {};
+    const r = await callFn('govcon-ai', {tool:toolId, rfp_id, text, options});
+    $('#ai_out').innerHTML = `<div class="out">${esc(r.content)}</div>
+      <div class="muted" style="margin-top:8px">Saved to Proposals · ${r.usage?.output_tokens||0} tokens</div>`;
+  } catch(e){ $('#ai_out').innerHTML = `<div class="banner bad" style="margin-top:12px">${esc(e.message)}</div>`; }
+  btn.disabled = false; btn.textContent = 'Generate';
+}
+
+/* ═══════════════ PIPELINE ═══════════════ */
+const STAGES = [['lead','Lead'],['qualified','Qualified'],['in_development','In Development'],['submitted','Submitted'],['awarded','Awarded'],['lost','Lost']];
+async function renderPipeline() {
+  loading();
+  const items = await api(`govcon_pipeline_items?owner=eq.${SESSION.user.id}&select=*,govcon_rfps(title,agency,deadline)&order=stage_updated_at.desc`);
+  V().innerHTML = `<div class="board">${STAGES.map(([key,label])=>{
+    const col = items.filter(i=>i.stage===key);
+    return `<div class="col"><h4>${label}<span class="n">${col.length}</span></h4>${col.map(pipeCard).join('')}</div>`;
+  }).join('')}</div>`;
+}
+function pipeCard(i) {
+  const r = i.govcon_rfps || {};
+  return `<div class="pcard">
+    <div class="pt">${esc(r.title||'RFP')}</div>
+    <div class="muted" style="font-size:11px">${esc(r.agency||'')} · ${fmtDate(r.deadline)}</div>
+    <span class="pill ${i.priority}">${i.priority}</span>
+    <select onchange="moveStage('${i.id}',this.value)">${STAGES.map(([k,l])=>`<option value="${k}" ${k===i.stage?'selected':''}>${l}</option>`).join('')}</select>
+  </div>`;
+}
+async function moveStage(id, stage) {
+  await api(`govcon_pipeline_items?id=eq.${id}`, {method:'PATCH', body:JSON.stringify({stage, stage_updated_at:new Date().toISOString()})});
+  renderPipeline();
+}
+
+/* ═══════════════ PARTNERS ═══════════════ */
+async function renderPartners() {
+  loading();
+  const [all, mine] = await Promise.all([
+    api(`govcon_partners?select=*&order=created_at.desc&limit=200`),
+    api(`govcon_partners?owner=eq.${SESSION.user.id}&select=id`),
+  ]);
+  const mineIds = new Set(mine.map(m=>m.id));
+  V().innerHTML = `
+    <div class="banner info">Find teaming partners to fill capability gaps and strengthen bids. List your own company so others can find you.</div>
+    <button class="btn primary" onclick="showAddPartner()" style="margin-bottom:14px">+ List my company</button>
+    <div id="addPartnerBox"></div>
+    ${all.map(p=>`<div class="rfp">
+      <div class="t">${esc(p.company_name)} ${mineIds.has(p.id)?'<span class="pill">you</span>':''}</div>
+      <div class="m">${esc(p.location||'')} ${p.contact_email?'· '+esc(p.contact_email):''}</div>
+      ${p.description?`<div class="m">${esc(p.description)}</div>`:''}
+      <div class="chips" style="margin-top:6px">${(p.capabilities||[]).map(c=>`<span class="chip">${esc(c)}</span>`).join('')}${(p.certifications||[]).map(c=>`<span class="chip">${esc(c)}</span>`).join('')}</div>
+      ${!mineIds.has(p.id)?`<div class="acts"><button class="btn sm primary" onclick="requestPartner('${p.id}','${esc(p.company_name)}')">Request to team</button></div>`:''}
+    </div>`).join('') || '<div class="card center muted">No partners listed yet.</div>'}`;
+}
+function showAddPartner() {
+  $('#addPartnerBox').innerHTML = `<div class="card" style="margin-bottom:14px">
+    <div class="field"><label>Company name *</label><input id="p_name" value="${esc(PROFILE?.company_name||'')}"></div>
+    <div class="field"><label>Description</label><textarea id="p_desc"></textarea></div>
+    <div class="row2"><div class="field"><label>Capabilities (comma-separated)</label><input id="p_caps"></div>
+      <div class="field"><label>Certifications</label><input id="p_certs" value="${esc((PROFILE?.certifications||[]).join(', '))}"></div></div>
+    <div class="row2"><div class="field"><label>Location</label><input id="p_loc"></div>
+      <div class="field"><label>Contact email</label><input id="p_email" value="${esc(SESSION.user.email)}"></div></div>
+    <button class="btn primary" onclick="savePartner()">Publish listing</button>
+  </div>`;
+}
+async function savePartner() {
+  const company_name=$('#p_name').value.trim(); if(!company_name) return alert('Company name required');
+  await api('govcon_partners',{method:'POST',body:JSON.stringify({
+    owner:SESSION.user.id, company_name, description:$('#p_desc').value.trim()||null,
+    capabilities:$('#p_caps').value.split(',').map(s=>s.trim()).filter(Boolean),
+    certifications:$('#p_certs').value.split(',').map(s=>s.trim()).filter(Boolean),
+    location:$('#p_loc').value.trim()||null, contact_email:$('#p_email').value.trim()||null,
+  })});
+  renderPartners();
+}
+async function requestPartner(id, name) {
+  const message = prompt(`Message to ${name}:`, 'We would like to explore teaming on an upcoming opportunity.');
+  if (message===null) return;
+  await api('govcon_partner_requests',{method:'POST',body:JSON.stringify({from_owner:SESSION.user.id,to_partner:id,message})});
+  toast('Teaming request sent');
+}
+
+/* ═══════════════ ANALYTICS ═══════════════ */
+async function renderAnalytics() {
+  loading();
+  const uid = SESSION.user.id;
+  const [pipeline, proposals] = await Promise.all([
+    api(`govcon_pipeline_items?owner=eq.${uid}&select=stage`),
+    api(`govcon_proposals?owner=eq.${uid}&select=id,status`),
+  ]);
+  const byStage = Object.fromEntries(STAGES.map(([k])=>[k, pipeline.filter(p=>p.stage===k).length]));
+  const awarded = byStage.awarded||0, lost = byStage.lost||0, closed = awarded+lost;
+  const winRate = closed ? Math.round(awarded/closed*100) : 0;
+  const leads = pipeline.length;
+  const conv = leads ? Math.round(awarded/leads*100) : 0;
+  V().innerHTML = `
+    <div class="cards kpis">
+      ${kpi('Win Rate', winRate+'%', `${awarded}/${closed} closed`)}
+      ${kpi('Conversion', conv+'%', 'lead → award')}
+      ${kpi('Proposals', proposals.length, 'total generated')}
+      ${kpi('Active', (leads-closed), 'in pipeline')}
+    </div>
+    <h2 class="section">Pipeline by stage</h2>
+    <div class="card">${STAGES.map(([k,l])=>{
+      const n = byStage[k]||0; const pct = leads ? Math.round(n/leads*100) : 0;
+      return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px"><b>${l}</b><span class="muted">${n}</span></div>
+        <div style="background:var(--blue-050);border-radius:8px;height:12px;overflow:hidden;margin-top:3px"><div style="width:${pct}%;height:100%;background:var(--blue-600)"></div></div></div>`;
+    }).join('')}</div>`;
+}
+
+/* ═══════════════ PROFILE & SETTINGS ═══════════════ */
+async function renderProfile() {
+  loading();
+  const p = PROFILE || {};
+  const pref = p.preferences || {};
+  V().innerHTML = `<div class="card">
+    <h2 class="section" style="margin-top:0">Company profile</h2>
+    <div class="row2">
+      <div class="field"><label>Company name</label><input id="pf_company" value="${esc(p.company_name||'')}"></div>
+      <div class="field"><label>Legal business name</label><input id="pf_legal" value="${esc(p.legal_name||'')}"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>UEI</label><input id="pf_uei" value="${esc(p.uei||'')}"></div>
+      <div class="field"><label>CAGE code</label><input id="pf_cage" value="${esc(p.cage||'')}"></div>
+    </div>
+    <div class="field"><label>NAICS codes (comma-separated, up to 5)</label><input id="pf_naics" value="${esc((p.naics||[]).join(', '))}"></div>
+    <div class="row2">
+      <div class="field"><label>Business size</label><input id="pf_size" value="${esc(p.business_size||'')}" placeholder="Small / Large"></div>
+      <div class="field"><label>Certifications (comma-separated)</label><input id="pf_certs" value="${esc((p.certifications||[]).join(', '))}" placeholder="8(a), WOSB, HUBZone, SDVOSB"></div>
+    </div>
+    <div class="field"><label>Capabilities statement</label><textarea id="pf_caps">${esc(p.capabilities||'')}</textarea></div>
+
+    <h2 class="section">Preferences</h2>
+    <div class="row2">
+      <div class="field"><label>Categories of interest</label><input id="pf_cats" value="${esc((pref.categories||[]).join(', '))}" placeholder="IT, Construction, Professional Services"></div>
+      <div class="field"><label>Geographic preference</label><input id="pf_geo" value="${esc(pref.geo||'')}"></div>
+    </div>
+    <button class="btn primary" onclick="saveProfile()">Save profile</button>
+  </div>`;
+}
+async function saveProfile() {
+  const body = {
+    company_name:$('#pf_company').value.trim()||null, legal_name:$('#pf_legal').value.trim()||null,
+    uei:$('#pf_uei').value.trim()||null, cage:$('#pf_cage').value.trim()||null,
+    naics:$('#pf_naics').value.split(',').map(s=>s.trim()).filter(Boolean),
+    business_size:$('#pf_size').value.trim()||null,
+    certifications:$('#pf_certs').value.split(',').map(s=>s.trim()).filter(Boolean),
+    capabilities:$('#pf_caps').value.trim()||null,
+    preferences:{categories:$('#pf_cats').value.split(',').map(s=>s.trim()).filter(Boolean), geo:$('#pf_geo').value.trim()},
+    updated_at:new Date().toISOString(),
+  };
+  const rows = await api(`govcon_profiles?user_id=eq.${SESSION.user.id}`, {method:'PATCH', body:JSON.stringify(body)});
+  PROFILE = rows[0] || {...PROFILE, ...body};
+  toast('Profile saved');
+}
+
+/* ═══════════════ TOAST ═══════════════ */
+function toast(msg, sticky) {
+  let t = $('#toast'); if(!t){ t=document.createElement('div'); t.id='toast';
+    t.style.cssText='position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--blue-900);color:#fff;padding:11px 18px;border-radius:10px;font-size:13.5px;font-weight:600;z-index:60;box-shadow:0 12px 30px rgba(0,0,0,.25)';
+    document.body.appendChild(t); }
+  t.textContent = msg; t.style.opacity='1';
+  clearTimeout(window._tt); if(!sticky) window._tt = setTimeout(()=>t.style.opacity='0', 3200);
+}
+
+/* ═══════════════ INIT ═══════════════ */
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data.session) boot(data.session);
+})();
+</script>
+</body>
+</html>
