@@ -132,6 +132,7 @@
       <a data-view="sources"><span class="ic">◎</span>Custom Sources</a>
       <a data-view="ai"><span class="ic">✦</span>AI Tools</a>
       <a data-view="pipeline"><span class="ic">▦</span>Pipeline</a>
+      <a data-view="awards"><span class="ic">◆</span>Awards Research</a>
       <a data-view="partners"><span class="ic">◈</span>Partner Network</a>
       <a data-view="analytics"><span class="ic">▲</span>Analytics</a>
       <div class="sec">Account</div>
@@ -229,12 +230,12 @@ $('#nav').addEventListener('click', e => {
   const a = e.target.closest('a[data-view]'); if (a) route(a.dataset.view);
 });
 const TITLES = {dashboard:'Dashboard',rfps:'RFP Discovery',autopilot:'Autopilot',sources:'Custom Sources',
-  ai:'AI Tools',pipeline:'Pipeline',partners:'Partner Network',analytics:'Analytics',profile:'Profile & Settings'};
+  ai:'AI Tools',pipeline:'Pipeline',awards:'Awards Research',partners:'Partner Network',analytics:'Analytics',profile:'Profile & Settings'};
 function route(view) {
   $$('#nav a[data-view]').forEach(a => a.classList.toggle('active', a.dataset.view===view));
   $('#viewTitle').textContent = TITLES[view] || view;
   ({dashboard:renderDashboard,rfps:renderRfps,autopilot:renderAutopilot,sources:renderSources,
-    ai:renderAi,pipeline:renderPipeline,partners:renderPartners,analytics:renderAnalytics,profile:renderProfile}[view]||renderDashboard)();
+    ai:renderAi,pipeline:renderPipeline,awards:renderAwards,partners:renderPartners,analytics:renderAnalytics,profile:renderProfile}[view]||renderDashboard)();
 }
 const V = () => $('#views');
 const loading = () => V().innerHTML = '<div class="card center muted">Loading…</div>';
@@ -436,9 +437,10 @@ async function renderAutopilot() {
     <div class="card">
       <label class="toggle"><input type="checkbox" id="ap_enabled" ${s.enabled?'checked':''}> Enable Autopilot</label>
       <div class="row2">
-        <div class="field"><label>Discovery interval (hours)</label><input id="ap_interval" type="number" min="1" max="24" value="${s.interval_hours||6}"></div>
+        <div class="field"><label>Run every (hours) — 24 = once a day</label><input id="ap_interval" type="number" min="1" max="24" value="${s.interval_hours||6}"></div>
         <div class="field"><label>Max RFPs per run</label><input id="ap_max" type="number" value="${s.max_per_run||50}"></div>
       </div>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Scheduled runs honor this interval once the pg_cron job is enabled (bottom of govcon_backend.sql). "Run now" works any time.</div>
       <div class="field"><label>Sources</label>
         <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;font-weight:600">
           <label class="toggle"><input type="checkbox" class="ap_src" value="sam.gov" ${srcChecked('sam.gov')}> SAM.gov</label>
@@ -448,6 +450,13 @@ async function renderAutopilot() {
       </div>
       <div class="field"><label>Keywords (comma-separated — match your NAICS &amp; capabilities)</label>
         <input id="ap_keywords" value="${esc((s.keywords||[]).join(', '))}" placeholder="cybersecurity, staffing, IT services"></div>
+
+      <h2 class="section" style="margin-top:8px">Bid window — only keep opportunities due within…</h2>
+      <div class="row2">
+        <div class="field"><label>Earliest (days from today)</label><input id="ap_dmin" type="number" min="0" max="365" value="${s.deadline_min_days??5}"></div>
+        <div class="field"><label>Latest (days from today)</label><input id="ap_dmax" type="number" min="1" max="365" value="${s.deadline_max_days??90}"></div>
+      </div>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Anything with no due date, or due outside this window, is skipped — you only see solicitations you can actually bid.</div>
 
       <h2 class="section" style="margin-top:8px">Analysis thresholds</h2>
       <label class="toggle"><input type="checkbox" id="ap_analyze" ${s.auto_analyze!==false?'checked':''}> Auto-analyze relevance &amp; win probability</label>
@@ -480,6 +489,8 @@ async function saveAutopilot() {
     sources: $$('.ap_src').filter(c=>c.checked).map(c=>c.value),
     keywords: $('#ap_keywords').value.split(',').map(s=>s.trim()).filter(Boolean),
     auto_analyze: $('#ap_analyze').checked,
+    deadline_min_days: Math.max(0, +$('#ap_dmin').value||0),
+    deadline_max_days: Math.max(1, +$('#ap_dmax').value||90),
     min_relevance: +$('#ap_minrel').value, min_win_probability: +$('#ap_minwin').value,
     auto_generate: $('#ap_gen').checked, generation_threshold: +$('#ap_genth').value,
     generation_mode: $('#ap_genmode').value,
@@ -623,6 +634,50 @@ async function moveStage(id, stage) {
   renderPipeline();
 }
 
+/* ═══════════════ AWARDS RESEARCH ═══════════════ */
+let AWARD_SORT = 'amount';
+async function renderAwards() {
+  loading();
+  const order = AWARD_SORT==='amount' ? 'amount.desc.nullslast' : 'award_date.desc.nullslast';
+  const rows = await api(`govcon_awards?owner=eq.${SESSION.user.id}&select=*&order=${order}&limit=300`);
+  const money = (v) => v==null ? '—' : '$'+Number(v).toLocaleString();
+  V().innerHTML = `
+    <div class="banner info">Previously <b>won</b> contracts from SAM.gov award notices matching your keywords and NAICS codes — with the awarded amount, so you can see what this work actually pays. Uses your saved Autopilot keywords.</div>
+    <div class="card" style="margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn primary" id="awSearch">◆ Search awarded contracts</button>
+      <label style="margin:0">Look back</label>
+      <select id="awLookback" style="width:auto">
+        <option value="90">90 days</option><option value="180">180 days</option><option value="365" selected>1 year</option>
+      </select>
+      <label style="margin:0">Sort by</label>
+      <select id="awSort" style="width:auto">
+        <option value="amount" ${AWARD_SORT==='amount'?'selected':''}>Amount (high → low)</option>
+        <option value="date" ${AWARD_SORT==='date'?'selected':''}>Award date (newest)</option>
+      </select>
+      <span class="muted">${rows.length} stored</span>
+    </div>
+    <div id="awList">${rows.map(a=>`<div class="rfp">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div class="t">${esc(a.title)}</div>
+        <div class="t" style="color:var(--good);white-space:nowrap">${money(a.amount)}</div>
+      </div>
+      <div class="m">${esc(a.agency||'—')} · awarded ${fmtDate(a.award_date)} · NAICS ${esc(a.naics||'—')}${a.set_aside?` · ${esc(a.set_aside)}`:''}</div>
+      ${a.awardee?`<div class="m">Won by: <b>${esc(a.awardee)}</b></div>`:''}
+      <div class="acts">${a.url?`<a class="btn sm" href="${esc(a.url)}" target="_blank">View notice ↗</a>`:''}
+        <button class="btn sm" style="color:var(--bad)" onclick="delAward('${a.id}')">Remove</button></div>
+    </div>`).join('') || '<div class="card center muted">No awards stored yet — click "Search awarded contracts".</div>'}</div>`;
+  $('#awSort').onchange = (e)=>{ AWARD_SORT=e.target.value; renderAwards(); };
+  $('#awSearch').onclick = async () => {
+    const b=$('#awSearch'); b.disabled=true; b.textContent='Searching…';
+    try {
+      const r = await callFn('autopilot-run', {action:'awards', lookback_days:+$('#awLookback').value});
+      toast(`Awards: ${r.found} found, ${r.new_awards} new`);
+      renderAwards();
+    } catch(e){ toast('Award search failed: '+e.message); b.disabled=false; b.textContent='◆ Search awarded contracts'; }
+  };
+}
+async function delAward(id){ await api(`govcon_awards?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); renderAwards(); }
+
 /* ═══════════════ PARTNERS ═══════════════ */
 async function renderPartners() {
   loading();
@@ -727,8 +782,53 @@ async function renderProfile() {
       <div class="field"><label>Geographic preference</label><input id="pf_geo" value="${esc(pref.geo||'')}"></div>
     </div>
     <button class="btn primary" onclick="saveProfile()">Save profile</button>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h2 class="section" style="margin-top:0">API keys</h2>
+    <div class="muted" style="font-size:12.5px;margin-bottom:12px">
+      Add as many labeled keys as you want. Autopilot and Awards Research use your newest
+      <b>sam.gov</b> key automatically. Keys for other portals (eMMA, Ohio, …) are stored for
+      those sources as they come online — pair them with a Custom Source for now.
+    </div>
+    <div id="keyList" class="muted">Loading…</div>
+    <h2 class="section">Add a key</h2>
+    <div class="row3">
+      <div class="field"><label>Label</label><input id="k_label" placeholder="My SAM key"></div>
+      <div class="field"><label>Provider</label>
+        <select id="k_provider">
+          <option value="sam.gov">sam.gov</option>
+          <option value="emma">eMMA (Maryland)</option>
+          <option value="ohio">Ohio</option>
+          <option value="other">other…</option>
+        </select></div>
+      <div class="field"><label>Key</label><input id="k_value" placeholder="paste key"></div>
+    </div>
+    <div class="field hide" id="k_otherBox"><label>Provider name</label><input id="k_other" placeholder="e.g. texas-smartbuy"></div>
+    <button class="btn primary" onclick="addKey()">Add key</button>
   </div>`;
+  $('#k_provider').onchange = (e)=>$('#k_otherBox').classList.toggle('hide', e.target.value!=='other');
+  loadKeys();
 }
+async function loadKeys() {
+  const rows = await api(`govcon_api_keys?owner=eq.${SESSION.user.id}&select=id,label,provider,key_value,created_at&order=created_at.desc`);
+  const mask = (v)=> v.length>10 ? v.slice(0,6)+'…'+v.slice(-4) : '••••';
+  $('#keyList').innerHTML = rows.length ? rows.map(k=>`
+    <div class="rfp" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div><b>${esc(k.label)}</b> <span class="pill">${esc(k.provider)}</span>
+        <span class="muted" style="font-family:monospace;font-size:12px">${esc(mask(k.key_value))}</span></div>
+      <button class="btn sm" style="color:var(--bad)" onclick="delKey('${k.id}')">Delete</button>
+    </div>`).join('') : '<p class="muted">No keys yet.</p>';
+}
+async function addKey() {
+  const label=$('#k_label').value.trim(), value=$('#k_value').value.trim();
+  let provider=$('#k_provider').value;
+  if (provider==='other') provider = $('#k_other').value.trim().toLowerCase();
+  if (!label||!value||!provider) return alert('Label, provider, and key are all required.');
+  await api('govcon_api_keys',{method:'POST',body:JSON.stringify({owner:SESSION.user.id,label,provider,key_value:value})});
+  $('#k_label').value=$('#k_value').value='';
+  toast('Key saved'); loadKeys();
+}
+async function delKey(id){ if(!confirm('Delete this key?'))return; await api(`govcon_api_keys?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); loadKeys(); }
 async function saveProfile() {
   const body = {
     company_name:$('#pf_company').value.trim()||null, legal_name:$('#pf_legal').value.trim()||null,
