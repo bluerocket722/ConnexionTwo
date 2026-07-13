@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Connexion Two | AI-Powered Government Contracting</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230054d1'/%3E%3Ctext x='16' y='21' font-family='Arial' font-size='13' font-weight='800' fill='white' text-anchor='middle'%3EC2%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
@@ -163,9 +164,18 @@ const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString() : '—';
 
-/* REST + function helpers (authenticated as the user) */
+/* REST + function helpers (authenticated as the user).
+   Always pull a FRESH token from supabase-js — it auto-refreshes sessions,
+   so this never sends an expired JWT. If the session is truly gone
+   (signed out elsewhere / refresh token revoked), bounce to sign-in. */
+async function freshToken() {
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session) { toast('Session expired — please sign in again'); setTimeout(()=>location.reload(), 1200); throw new Error('Signed out'); }
+  SESSION = session;
+  return session.access_token;
+}
 async function api(path, opts={}) {
-  const token = SESSION.access_token;
+  const token = await freshToken();
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
     ...opts,
     headers: { apikey: SB_KEY, Authorization: `Bearer ${token}`,
@@ -175,8 +185,9 @@ async function api(path, opts={}) {
   return res.status === 204 ? null : res.json();
 }
 async function callFn(name, body) {
+  const token = await freshToken();
   const res = await fetch(FN(name), {
-    method:'POST', headers:{ apikey:SB_KEY, Authorization:`Bearer ${SESSION.access_token}`, 'Content-Type':'application/json' },
+    method:'POST', headers:{ apikey:SB_KEY, Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(()=>({}));
@@ -200,6 +211,7 @@ $('#btnSignOut').onclick = async () => { await sb.auth.signOut(); location.reloa
 
 async function boot(session) {
   SESSION = session;
+  sb.auth.onAuthStateChange((_evt, s) => { if (s) SESSION = s; });   // keep token fresh
   $('#auth').classList.add('hide'); $('#app').classList.remove('hide');
   $('#whoEmail').textContent = session.user.email;
   const rows = await api(`govcon_profiles?user_id=eq.${session.user.id}&select=*`);
