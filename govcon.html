@@ -282,29 +282,86 @@ async function renderDashboard() {
 const kpi = (l,v,s) => `<div class="card kpi"><div class="lbl">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
 
 /* ═══════════════ RFP DISCOVERY ═══════════════ */
-let RFP_FILTER = '';
+let RFP_FILTER = '', RFP_DUE_FROM = '', RFP_DUE_TO = '';
+const RFP_SEL = new Set();
 async function renderRfps() {
   loading();
   const uid = SESSION.user.id;
-  const rfps = await api(`govcon_rfps?owner=eq.${uid}&select=*&order=created_at.desc&limit=500`);
+  const rfps = await api(`govcon_rfps?owner=eq.${uid}&select=*&order=deadline.asc.nullslast&limit=500`);
   const q = RFP_FILTER.toLowerCase();
-  const shown = rfps.filter(r => !q || `${r.title} ${r.agency} ${r.category}`.toLowerCase().includes(q));
+  const shown = rfps.filter(r => {
+    if (q && !`${r.title} ${r.agency} ${r.category} ${r.description||''}`.toLowerCase().includes(q)) return false;
+    if (RFP_DUE_FROM && (!r.deadline || r.deadline < RFP_DUE_FROM)) return false;
+    if (RFP_DUE_TO && (!r.deadline || r.deadline > RFP_DUE_TO)) return false;
+    return true;
+  });
+  const shownIds = new Set(shown.map(r=>r.id));
+  for (const id of [...RFP_SEL]) if (!rfps.some(r=>r.id===id)) RFP_SEL.delete(id); // prune stale
+  const allShownSelected = shown.length>0 && shown.every(r=>RFP_SEL.has(r.id));
   V().innerHTML = `
-    <div class="card" style="margin-bottom:16px">
+    <div class="card" style="margin-bottom:12px">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-        <input id="rfpSearch" placeholder="Search opportunities…" value="${esc(RFP_FILTER)}" style="flex:1;min-width:220px">
+        <input id="rfpSearch" placeholder="Filter by keyword (title, agency, description)…" value="${esc(RFP_FILTER)}" style="flex:1;min-width:200px">
+        <label style="margin:0">Due from</label><input id="rfpDueFrom" type="date" value="${RFP_DUE_FROM}" style="width:auto">
+        <label style="margin:0">to</label><input id="rfpDueTo" type="date" value="${RFP_DUE_TO}" style="width:auto">
+        <button class="btn sm" id="rfpClear">Clear filters</button>
         <button class="btn primary" onclick="runAutopilotNow()">✈ Run Autopilot</button>
         <button class="btn" onclick="showAddRfp()">+ Add RFP</button>
       </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+        <label class="toggle" style="margin:0"><input type="checkbox" id="selAllRfps" ${allShownSelected?'checked':''}> Select all shown (${shown.length})</label>
+        <b id="rfpSelCount" class="muted">${RFP_SEL.size} selected</b>
+        <span style="flex:1"></span>
+        <button class="btn sm" id="bulkPipe" ${RFP_SEL.size?'':'disabled'}>+ Pipeline selected</button>
+        <button class="btn sm" id="bulkDel" style="color:var(--bad)" ${RFP_SEL.size?'':'disabled'}>Delete selected</button>
+        <button class="btn sm" id="bulkClear" ${RFP_SEL.size?'':'disabled'}>Clear selection</button>
+      </div>
     </div>
     <div id="addRfpBox"></div>
-    <div class="muted" style="margin-bottom:10px">${shown.length} of ${rfps.length} opportunities</div>
-    <div id="rfpList">${shown.map(rfpCard).join('') || '<div class="card center muted">No RFPs yet — run Autopilot or add one manually.</div>'}</div>`;
+    <div class="muted" style="margin-bottom:10px">${shown.length} of ${rfps.length} opportunities · sorted by due date</div>
+    <div id="rfpList">${shown.map(rfpCard).join('') || '<div class="card center muted">Nothing matches these filters.</div>'}</div>`;
   $('#rfpSearch').oninput = (e) => { RFP_FILTER = e.target.value; clearTimeout(window._rt); window._rt = setTimeout(renderRfps, 250); };
+  $('#rfpDueFrom').onchange = (e) => { RFP_DUE_FROM = e.target.value; renderRfps(); };
+  $('#rfpDueTo').onchange = (e) => { RFP_DUE_TO = e.target.value; renderRfps(); };
+  $('#rfpClear').onclick = () => { RFP_FILTER=RFP_DUE_FROM=RFP_DUE_TO=''; renderRfps(); };
+  $('#selAllRfps').onchange = (e) => {
+    if (e.target.checked) shownIds.forEach(id=>RFP_SEL.add(id)); else shownIds.forEach(id=>RFP_SEL.delete(id));
+    renderRfps();
+  };
+  $('#rfpList').addEventListener('change', (e) => {
+    const cb = e.target.closest('.selrfp'); if (!cb) return;
+    if (cb.checked) RFP_SEL.add(cb.dataset.id); else RFP_SEL.delete(cb.dataset.id);
+    $('#rfpSelCount').textContent = `${RFP_SEL.size} selected`;
+    ['bulkPipe','bulkDel','bulkClear'].forEach(b=>$('#'+b).disabled = !RFP_SEL.size);
+  });
+  $('#bulkClear').onclick = () => { RFP_SEL.clear(); renderRfps(); };
+  $('#bulkDel').onclick = bulkDeleteRfps;
+  $('#bulkPipe').onclick = bulkPipelineRfps;
+}
+async function bulkDeleteRfps() {
+  const ids = [...RFP_SEL];
+  if (!ids.length || !confirm(`Delete ${ids.length} RFP(s)? Their pipeline entries are removed too.`)) return;
+  for (let i=0; i<ids.length; i+=50)                      // batch: keep URLs short
+    await api(`govcon_rfps?id=in.(${ids.slice(i,i+50).join(',')})`, {method:'DELETE', prefer:'return=minimal'});
+  RFP_SEL.clear();
+  toast(`Deleted ${ids.length} RFP(s)`);
+  renderRfps();
+}
+async function bulkPipelineRfps() {
+  const ids = [...RFP_SEL]; if (!ids.length) return;
+  const items = ids.map(id=>({owner:SESSION.user.id, rfp_id:id, stage:'lead'}));
+  await api('govcon_pipeline_items?on_conflict=owner,rfp_id', {method:'POST',
+    prefer:'resolution=ignore-duplicates,return=minimal', body:JSON.stringify(items)});
+  toast(`Added ${ids.length} to pipeline`);
+  RFP_SEL.clear();
+  renderRfps();
 }
 function rfpCard(r) {
   return `<div class="rfp">
-    <div class="t" style="cursor:pointer" onclick="openRfp('${r.id}')" title="Click to view / edit">${esc(r.title)}</div>
+    <div style="display:flex;align-items:flex-start;gap:9px">
+      <input type="checkbox" class="selrfp" data-id="${r.id}" ${RFP_SEL.has(r.id)?'checked':''} style="width:auto;margin-top:4px">
+      <div class="t" style="cursor:pointer;flex:1" onclick="openRfp('${r.id}')" title="Click to view / edit">${esc(r.title)}</div>
+    </div>
     <div class="m">${esc(r.agency||'—')} · ${esc(r.source)} · deadline ${fmtDate(r.deadline)}${r.set_aside?` · ${esc(r.set_aside)}`:''}</div>
     ${r.description?`<div class="m">${esc(String(r.description).slice(0,200))}${r.description.length>200?'…':''}</div>`:''}
     <div class="scores">
