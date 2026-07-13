@@ -303,7 +303,7 @@ async function renderRfps() {
 }
 function rfpCard(r) {
   return `<div class="rfp">
-    <div class="t">${esc(r.title)}</div>
+    <div class="t" style="cursor:pointer" onclick="openRfp('${r.id}')" title="Click to view / edit">${esc(r.title)}</div>
     <div class="m">${esc(r.agency||'—')} · ${esc(r.source)} · deadline ${fmtDate(r.deadline)}${r.set_aside?` · ${esc(r.set_aside)}`:''}</div>
     ${r.description?`<div class="m">${esc(String(r.description).slice(0,200))}${r.description.length>200?'…':''}</div>`:''}
     <div class="scores">
@@ -312,11 +312,77 @@ function rfpCard(r) {
       ${r.priority?`<span class="pill ${r.priority}">${r.priority}</span>`:''}
     </div>
     <div class="acts">
+      <button class="btn sm" onclick="openRfp('${r.id}')">View / Edit</button>
       <button class="btn sm" onclick="addToPipeline('${r.id}')">+ Pipeline</button>
       <button class="btn sm" onclick="aiFor('${r.id}','analyzer')">Analyze</button>
       <button class="btn sm primary" onclick="aiFor('${r.id}','writer')">Generate proposal</button>
       ${r.url?`<a class="btn sm" href="${esc(r.url)}" target="_blank">Source ↗</a>`:''}
+      <button class="btn sm" style="color:var(--bad)" onclick="deleteRfp('${r.id}')">Delete</button>
     </div></div>`;
+}
+
+/* view / edit / delete a single RFP */
+async function openRfp(id) {
+  const rows = await api(`govcon_rfps?id=eq.${id}&select=*`);
+  const r = rows[0]; if (!r) return toast('RFP not found');
+  $('#addRfpBox').innerHTML = `<div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 style="margin:0">Edit RFP</h3>
+      <span class="muted" style="font-size:12px">${esc(r.source)} · added ${fmtDate(r.created_at)}</span>
+    </div>
+    <div class="field" style="margin-top:12px"><label>Title *</label><input id="er_title" value="${esc(r.title)}"></div>
+    <div class="row3">
+      <div class="field"><label>Agency</label><input id="er_agency" value="${esc(r.agency||'')}"></div>
+      <div class="field"><label>Category / NAICS</label><input id="er_category" value="${esc(r.category||'')}"></div>
+      <div class="field"><label>Deadline</label><input id="er_deadline" type="date" value="${r.deadline||''}"></div>
+    </div>
+    <div class="row3">
+      <div class="field"><label>Set-aside</label><input id="er_setaside" value="${esc(r.set_aside||'')}"></div>
+      <div class="field"><label>Budget min ($)</label><input id="er_bmin" type="number" value="${r.budget_min??''}"></div>
+      <div class="field"><label>Budget max ($)</label><input id="er_bmax" type="number" value="${r.budget_max??''}"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Location</label><input id="er_loc" value="${esc(r.location||'')}"></div>
+      <div class="field"><label>Source URL</label><input id="er_url" value="${esc(r.url||'')}"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Status</label>
+        <select id="er_status">${['new','reviewed','archived'].map(s=>`<option ${s===r.status?'selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="field"><label>Priority</label>
+        <select id="er_prio"><option value="">—</option>${['low','medium','high'].map(s=>`<option ${s===r.priority?'selected':''}>${s}</option>`).join('')}</select></div>
+    </div>
+    <div class="field"><label>Description / requirements</label><textarea id="er_desc" style="min-height:120px">${esc(r.description||'')}</textarea></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" onclick="updateRfp('${r.id}')">Save changes</button>
+      <button class="btn" onclick="addToPipeline('${r.id}')">+ Pipeline</button>
+      <button class="btn" onclick="aiFor('${r.id}','analyzer')">Analyze</button>
+      <button class="btn" onclick="aiFor('${r.id}','writer')">Generate proposal</button>
+      <span style="flex:1"></span>
+      <button class="btn" style="color:var(--bad)" onclick="deleteRfp('${r.id}')">Delete</button>
+      <button class="btn" onclick="$('#addRfpBox').innerHTML=''">Close</button>
+    </div>
+  </div>`;
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+async function updateRfp(id) {
+  const title = $('#er_title').value.trim(); if (!title) return alert('Title is required');
+  await api(`govcon_rfps?id=eq.${id}`, {method:'PATCH', body:JSON.stringify({
+    title, agency:$('#er_agency').value.trim()||null, category:$('#er_category').value.trim()||null,
+    deadline:$('#er_deadline').value||null, set_aside:$('#er_setaside').value.trim()||null,
+    budget_min:$('#er_bmin').value===''?null:+$('#er_bmin').value,
+    budget_max:$('#er_bmax').value===''?null:+$('#er_bmax').value,
+    location:$('#er_loc').value.trim()||null, url:$('#er_url').value.trim()||null,
+    status:$('#er_status').value, priority:$('#er_prio').value||null,
+    description:$('#er_desc').value.trim()||null,
+  })});
+  toast('RFP saved');
+  renderRfps();
+}
+async function deleteRfp(id) {
+  if (!confirm('Delete this RFP? Its pipeline entry is removed too.')) return;
+  await api(`govcon_rfps?id=eq.${id}`, {method:'DELETE', prefer:'return=minimal'});
+  toast('RFP deleted');
+  renderRfps();
 }
 function showAddRfp() {
   $('#addRfpBox').innerHTML = `<div class="card" style="margin-bottom:16px">
@@ -350,8 +416,11 @@ async function addToPipeline(rfpId) {
 async function runAutopilotNow() {
   toast('Running Autopilot…', true);
   try { const r = await callFn('autopilot-run', {action:'run'});
-    toast(`Autopilot: ${r.new_rfps} new, ${r.added_to_pipeline} to pipeline, ${r.proposals_generated} drafts`);
+    let msg = `Autopilot: ${r.new_rfps} new, ${r.added_to_pipeline} to pipeline, ${r.proposals_generated} drafts`;
+    if (r.errors?.length) msg += ` · ⚠ ${r.errors[0]}`;
+    toast(msg);
     if (r.errors?.length) console.warn('Autopilot source errors:', r.errors);
+    if ($('#rfpList')) renderRfps();
   } catch(e){ toast('Autopilot failed: '+e.message); }
 }
 
