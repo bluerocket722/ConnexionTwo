@@ -210,8 +210,7 @@ async function api(path, opts={}) {
       'Content-Type':'application/json', Prefer: opts.prefer || 'return=representation', ...(opts.headers||{}) },
   });
   if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
-  const text = await res.text();               // handle empty bodies (return=minimal / 204)
-  return text ? JSON.parse(text) : null;
+  return res.status === 204 ? null : res.json();
 }
 async function callFn(name, body) {
   const token = await freshToken();
@@ -882,7 +881,8 @@ async function openLead(itemId) {
   $('#matrixHost').addEventListener('change', e=>{ if(e.target.matches('select[data-c]')){ syncMatrixFromDom(); renderMatrix(); } });
   // template generator (async — fill after the modal is up)
   tplSectionHtml(r).then(html=>{ const host=$('#tplSection'); if(!host) return; host.innerHTML=html;
-    if($('#tpl_pick')){ tplRenderFields(); $('#tpl_pick').onchange=tplRenderFields; $('#tpl_gen').onclick=tplGenerate; }
+    if($('#tpl_pick')){ tplRenderFields(); $('#tpl_pick').onchange=tplRenderFields; $('#tpl_gen').onclick=tplGenerate;
+      if($('#tpl_enrich')) $('#tpl_enrich').onclick=tplEnrich; }
   });
 }
 async function saveLead(itemId, rfpId) {
@@ -1054,6 +1054,30 @@ async function renderProfile() {
     </div>
     <div class="field"><label>Capabilities statement</label><textarea id="pf_caps">${esc(p.capabilities||'')}</textarea></div>
 
+    <h2 class="section">Company details (auto-fills proposal templates)</h2>
+    <div class="muted" style="font-size:12px;margin:-6px 0 10px">These fill {{placeholders}} like address, FEIN, DUNS, phone, website, and signer when you generate a proposal.</div>
+    ${(()=>{ const c=pref.company||{}; return `
+    <div class="field"><label>Street address</label><input id="pf_addr" value="${esc(c.address||'')}"></div>
+    <div class="row3">
+      <div class="field"><label>City</label><input id="pf_city" value="${esc(c.city||'')}"></div>
+      <div class="field"><label>State</label><input id="pf_state" value="${esc(c.state||'')}"></div>
+      <div class="field"><label>ZIP</label><input id="pf_zip" value="${esc(c.zip||'')}"></div>
+    </div>
+    <div class="row3">
+      <div class="field"><label>FEIN / EIN</label><input id="pf_fein" value="${esc(c.fein||'')}"></div>
+      <div class="field"><label>DUNS</label><input id="pf_duns" value="${esc(c.duns||'')}"></div>
+      <div class="field"><label>SUB tier</label><input id="pf_subtier" value="${esc(c.sub_tier||'Prime')}"></div>
+    </div>
+    <div class="row3">
+      <div class="field"><label>Company phone</label><input id="pf_phone" value="${esc(c.phone||'')}"></div>
+      <div class="field"><label>Company email</label><input id="pf_email" value="${esc(c.email||'')}"></div>
+      <div class="field"><label>Website</label><input id="pf_web" value="${esc(c.website||'')}"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Signer / POC name</label><input id="pf_poc" value="${esc(c.poc_name||'')}"></div>
+      <div class="field"><label>Signer / POC title</label><input id="pf_poctitle" value="${esc(c.poc_title||'')}"></div>
+    </div>`; })()}
+
     <h2 class="section">Preferences</h2>
     <div class="row2">
       <div class="field"><label>Categories of interest</label><input id="pf_cats" value="${esc((pref.categories||[]).join(', '))}" placeholder="IT, Construction, Professional Services"></div>
@@ -1188,11 +1212,19 @@ async function saveProfile() {
     business_size:$('#pf_size').value.trim()||null,
     certifications:$('#pf_certs').value.split(',').map(s=>s.trim()).filter(Boolean),
     capabilities:$('#pf_caps').value.trim()||null,
-    preferences:{categories:$('#pf_cats').value.split(',').map(s=>s.trim()).filter(Boolean), geo:$('#pf_geo').value.trim()},
+    preferences:{
+      categories:$('#pf_cats').value.split(',').map(s=>s.trim()).filter(Boolean), geo:$('#pf_geo').value.trim(),
+      company:{
+        address:$('#pf_addr').value.trim(), city:$('#pf_city').value.trim(), state:$('#pf_state').value.trim(), zip:$('#pf_zip').value.trim(),
+        fein:$('#pf_fein').value.trim(), duns:$('#pf_duns').value.trim(), sub_tier:$('#pf_subtier').value.trim(),
+        phone:$('#pf_phone').value.trim(), email:$('#pf_email').value.trim(), website:$('#pf_web').value.trim(),
+        poc_name:$('#pf_poc').value.trim(), poc_title:$('#pf_poctitle').value.trim(),
+      },
+    },
     updated_at:new Date().toISOString(),
   };
-  const rows = await api(`govcon_profiles?user_id=eq.${SESSION.user.id}`, {method:'PATCH', body:JSON.stringify(body)});
-  PROFILE = rows[0] || {...PROFILE, ...body};
+  const rows = await api(`govcon_profiles?user_id=eq.${SESSION.user.id}`, {method:'PATCH', prefer:'return=representation', body:JSON.stringify(body)});
+  PROFILE = (rows&&rows[0]) || {...PROFILE, ...body};
   toast('Profile saved');
 }
 
@@ -1333,34 +1365,25 @@ function abToB64(buf){ const bytes=new Uint8Array(buf); let bin=''; const chunk=
   for(let i=0;i<bytes.length;i+=chunk) bin+=String.fromCharCode.apply(null, bytes.subarray(i,i+chunk)); return btoa(bin); }
 async function tplEnsureLibs(){ await loadScript(PIZZIP_CDN); await loadScript(DOCXT_CDN); }
 function tplDelimOpts(extra){ return Object.assign({paragraphLoop:true, linebreaks:true, delimiters:{start:'{{',end:'}}'}}, extra||{}); }
-// Tolerant token scan — reads the docx XML directly (document + headers/footers),
-// strips tags to reunite tokens split across runs, and regexes {{tokens}}.
-// Does NOT compile the template, so a malformed tag (e.g. a missing "}}") does
-// not block upload — it's surfaced later, at generation time.
 async function tplExtractTokens(binaryString){
-  await loadScript(PIZZIP_CDN);
+  await tplEnsureLibs();
   const zip = new window.PizZip(binaryString);
-  let text = '';
-  Object.keys(zip.files).forEach(fn=>{
-    if(/word\/(document|header\d*|footer\d*)\.xml$/.test(fn)) text += ' ' + zip.files[fn].asText().replace(/<[^>]+>/g, '');
-  });
+  const doc = new window.docxtemplater(zip, tplDelimOpts());
+  const text = doc.getFullText();                 // template text incl. {{tokens}}
   const set = new Set();
   (text.match(/\{\{\s*[^{}]+?\s*\}\}/g)||[]).forEach(m=>{ const t=m.replace(/^\{\{\s*|\s*\}\}$/g,'').trim(); if(t) set.add(t); });
-  // detect an unbalanced {{ … }} so we can warn
-  const opens = (text.match(/\{\{/g)||[]).length, closes = (text.match(/\}\}/g)||[]).length;
-  return { tokens:[...set], unbalanced: opens!==closes };
+  return [...set];
 }
 async function tplUpload(file){
   if(!/\.docx$/i.test(file.name)) return alert('Please upload a .docx template.');
   try {
     const buf = await file.arrayBuffer();
     const b64 = abToB64(buf);
-    const { tokens, unbalanced } = await tplExtractTokens(atob(b64));
+    const tokens = await tplExtractTokens(atob(b64));
     await api('govcon_templates', {method:'POST', prefer:'return=minimal', body:JSON.stringify({
       owner:SESSION.user.id, name:file.name.replace(/\.docx$/i,''), tokens, docx_b64:b64,
     })});
-    toast(`Template saved — ${tokens.length} field(s) found` + (unbalanced?' · ⚠ a {{placeholder}} looks unclosed — fix it before generating':''));
-    renderEditor();
+    toast(`Template saved — ${tokens.length} field(s) found`); renderEditor();
   } catch(e){ alert('Could not read that template: '+e.message); }
 }
 async function tplDelete(id){ if(!confirm('Delete this template?'))return; await api(`govcon_templates?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); renderEditor(); }
@@ -1382,7 +1405,9 @@ async function tplSectionHtml(r){
   if(!tpls.length) return `<div class="muted" style="font-size:13px">No templates yet — upload one under <b>Documents → Proposal templates</b> to generate proposals here.</div>`;
   const opts = tpls.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
   window._LEAD_TPLS = tpls; window._LEAD_RFP = r;
+  const isSam = (r.source||'').startsWith('sam');
   return `<div class="field"><label>Template</label><select id="tpl_pick">${opts}</select></div>
+    ${isSam?`<button class="btn sm" id="tpl_enrich" style="margin-bottom:10px">↻ Pull full detail from SAM.gov</button>`:''}
     <div id="tpl_fields"></div>
     <button class="btn primary" id="tpl_gen">Generate document</button>
     <div id="tpl_out"></div>`;
@@ -1393,6 +1418,17 @@ function tplRenderFields(){
   $('#tpl_fields').innerHTML = (t.tokens||[]).length
     ? `<div class="row2">${t.tokens.map((tk,i)=>`<div class="field"><label>${esc(tk)}</label><input class="tplv" data-k="${esc(tk)}" value="${esc(tplGuess(tk,r))}"></div>`).join('')}</div>`
     : '<div class="muted" style="font-size:13px">This template has no {{placeholders}} — generating will just copy it.</div>';
+}
+async function tplEnrich(){
+  const b=$('#tpl_enrich'); if(!b) return; b.disabled=true; b.textContent='Pulling from SAM.gov…';
+  try {
+    const r = await callFn('autopilot-run', {action:'enrich', rfp_id: window._LEAD_RFP.id});
+    if (window._LEAD_RFP){ window._LEAD_RFP.description = r.description || window._LEAD_RFP.description;
+      window._LEAD_RFP.details = Object.assign(window._LEAD_RFP.details||{}, r.details||{}); }
+    tplRenderFields();               // re-fill fields with the richer data
+    toast('Pulled latest detail from SAM.gov');
+  } catch(e){ toast('Enrich failed: '+e.message); }
+  b.disabled=false; b.textContent='↻ Pull full detail from SAM.gov';
 }
 async function tplGenerate(){
   const t = (window._LEAD_TPLS||[]).find(x=>x.id===$('#tpl_pick').value); if(!t) return;
@@ -1413,11 +1449,8 @@ async function tplGenerate(){
     edDownload(blob, fname);
     out.innerHTML = `<div class="banner info" style="margin-top:10px">✓ Generated <b>${esc(fname)}</b>. ${saved?'Saved to your Document Editor library — ':''}downloaded to your device.${saved?` <a href="#" onclick="closeModal();route('editor');return false">Open the editor →</a>`:''}</div>`;
   } catch(e){
-    // docxtemplater packs details in e.properties.errors — surface the exact tag
-    let detail = e.message;
-    const errs = e.properties && e.properties.errors;
-    if (Array.isArray(errs) && errs.length) detail = errs.map(x=>(x.properties&&x.properties.explanation)||x.message).join(' · ');
-    out.innerHTML = `<div class="banner bad" style="margin-top:10px">Template problem: ${esc(detail)}<br><span style="font-size:12px">Fix the placeholder in Word (a missing "}}" is the usual cause), re-upload the template, and try again.</span></div>`;
+    const msg = /unclosed|unopened|tag/i.test(e.message) ? `Template syntax problem: ${e.message}. Check for a mistyped placeholder (e.g. a missing "}}").` : e.message;
+    out.innerHTML = `<div class="banner bad" style="margin-top:10px">${esc(msg)}</div>`;
   }
   btn.disabled=false; btn.textContent='Generate document';
 }
