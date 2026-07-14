@@ -1,0 +1,30 @@
+name: GovCon portal scrapers
+
+# Runs hourly. run.py asks the server whether the user's weekly schedule
+# (e.g. Friday 5pm) says it's due; if not, it exits immediately, so this is
+# cheap. Set the two repo secrets under Settings -> Secrets and variables ->
+# Actions:  SUPABASE_URL and C2_INGEST_TOKEN.
+on:
+  schedule:
+    - cron: "0 * * * *"      # top of every hour (UTC)
+  workflow_dispatch:          # lets you run it manually from the Actions tab
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        working-directory: scrapers
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+      - name: Run scrapers (schedule-aware)
+        working-directory: scrapers
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          C2_INGEST_TOKEN: ${{ secrets.C2_INGEST_TOKEN }}
+        run: python run.py
