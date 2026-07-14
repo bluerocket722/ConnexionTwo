@@ -210,7 +210,8 @@ async function api(path, opts={}) {
       'Content-Type':'application/json', Prefer: opts.prefer || 'return=representation', ...(opts.headers||{}) },
   });
   if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
-  return res.status === 204 ? null : res.json();
+  const text = await res.text();               // handle empty bodies (return=minimal / 204)
+  return text ? JSON.parse(text) : null;
 }
 async function callFn(name, body) {
   const token = await freshToken();
