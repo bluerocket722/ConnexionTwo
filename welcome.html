@@ -1,1077 +1,1428 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Connexion Two | Documents</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://docs.connexiontwo.com/web-apps/apps/api/documents/api.js"></script>
-  <style>
-    :root {
-      --blue-900: #061a3a;
-      --blue-800: #082b61;
-      --blue-700: #0054d1;
-      --blue-600: #0068ff;
-      --blue-500: #1683ff;
-      --blue-100: #eaf3ff;
-      --blue-050: #f5f9ff;
-      --text: #111827;
-      --muted: #5f6b7a;
-      --line: #d9e2ef;
-      --panel: #ffffff;
-      --bg: #f7f9fc;
-      --word: #2b579a;
-      --cell: #217346;
-      --slide: #c43e1c;
-      --pdf: #d93025;
-      --gray: #6b7785;
-      --danger: #d93025;
-      --shadow: 0 22px 70px rgba(6, 26, 58, 0.10);
-      --shadow-soft: 0 12px 38px rgba(6, 26, 58, 0.06);
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { min-height: 100%; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: Inter, Arial, Helvetica, sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    a { color: inherit; text-decoration: none; }
-    button { font: inherit; }
-
-    .app {
-      min-height: 100vh;
-      background:
-        radial-gradient(circle at 88% 16%, rgba(0, 104, 255, 0.08), transparent 30%),
-        linear-gradient(180deg, #ffffff 0%, #f7f9fc 48%, #f2f6fb 100%);
-    }
-
-    .top-nav {
-      height: 84px;
-      display: grid;
-      grid-template-columns: 258px 1fr auto;
-      align-items: center;
-      gap: 24px;
-      padding: 0 28px;
-      background: rgba(255,255,255,0.98);
-      border-bottom: 1px solid var(--line);
-      backdrop-filter: blur(14px);
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      box-shadow: 0 1px 0 rgba(6, 26, 58, 0.06);
-    }
-
-    .brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
-
-    .c2-logo {
-      width: 42px;
-      height: 42px;
-      display: grid;
-      place-items: center;
-      color: #fff;
-      background: linear-gradient(135deg, var(--blue-900), var(--blue-700));
-      border-radius: 12px;
-      font-weight: 950;
-      font-size: 1rem;
-      letter-spacing: -0.04em;
-      position: relative;
-      isolation: isolate;
-      flex: 0 0 auto;
-      box-shadow: 0 10px 24px rgba(0, 84, 209, 0.18);
-    }
-
-    .brand-text { display: flex; flex-direction: column; gap: 2px; line-height: 1; }
-    .brand-name { color: var(--blue-900); font-weight: 950; font-size: 1.08rem; letter-spacing: -0.035em; }
-    .brand .brand-sub { display: none; }
-    .brand-sub { color: var(--muted); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
-
-    .nav-tabs { display: flex; align-items: stretch; align-self: stretch; gap: 2px; }
-    .nav-tabs a { display: flex; align-items: center; padding: 0 22px; color: #475569; font-size: 0.98rem; font-weight: 800; border-bottom: 3px solid transparent; transition: 0.18s ease; }
-    .nav-tabs a:hover, .nav-tabs a.active { color: var(--blue-900); border-bottom-color: var(--blue-700); background: linear-gradient(180deg, transparent, rgba(0,104,255,0.045)); }
-
-    .top-actions { display: flex; align-items: center; gap: 12px; }
-    .trial-left { color: var(--blue-800); font-size: 0.96rem; font-weight: 900; white-space: nowrap; }
-    .buy-btn { height: 44px; padding: 0 20px; border: 1px solid var(--blue-700); border-radius: 8px; background: var(--blue-700); color: white; font-size: 0.95rem; font-weight: 900; cursor: pointer; box-shadow: 0 10px 22px rgba(0, 84, 209, 0.22); }
-    .icon-btn { width: auto; min-width: 42px; height: 42px; padding: 0 13px; border: 1px solid var(--line); background: #fff; color: var(--blue-800); border-radius: 8px; cursor: pointer; display: grid; place-items: center; font-size: 0.82rem; font-weight: 900; letter-spacing: -0.01em; white-space: nowrap; position: relative; }
-    .icon-btn:hover, .buy-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 28px rgba(6, 26, 58, 0.12); }
-    .notify-dot { width: 8px; height: 8px; border-radius: 50%; background: #e11d48; position: absolute; top: 8px; right: 8px; }
-    .avatar { width: 46px; height: 46px; border-radius: 50%; background: linear-gradient(135deg, var(--blue-100), #d8ebff); color: var(--blue-800); display: grid; place-items: center; font-size: 0.98rem; font-weight: 900; border: 1px solid #c7dcf8; }
-
-    .system-strip { min-height: 58px; background: #f3f7fc; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: center; gap: 10px; color: #25364f; font-size: 0.95rem; padding: 12px 24px; }
-    .info-dot { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--blue-800); color: var(--blue-800); display: grid; place-items: center; font-size: 0.82rem; font-weight: 950; flex: 0 0 auto; }
-    .system-strip a { color: var(--blue-700); text-decoration: underline; font-weight: 800; }
-
-    .hero-panel {
-      min-height: 330px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 64px 28px 68px;
-      background:
-        radial-gradient(circle at 24% 22%, rgba(255,255,255,0.18), transparent 28%),
-        linear-gradient(125deg, var(--blue-900) 0%, var(--blue-800) 42%, var(--blue-700) 100%);
-      position: relative;
-      overflow: hidden;
-      color: #fff;
-    }
-
-    .hero-panel::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px); background-size: 48px 48px; mask-image: linear-gradient(90deg, transparent 0%, black 20%, black 80%, transparent 100%); opacity: 0.26; }
-    .hero-panel::after { content: ""; position: absolute; right: -120px; top: -120px; width: 380px; height: 380px; border: 44px solid rgba(255,255,255,0.12); border-radius: 50%; opacity: 0.55; }
-    .hero-inner { width: min(1080px, 100%); text-align: center; position: relative; z-index: 1; }
-    .welcome-label { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.08); border-radius: 999px; font-size: 0.77rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.16em; margin-bottom: 22px; }
-    .status-light { width: 8px; height: 8px; background: #6ee7b7; border-radius: 50%; box-shadow: 0 0 0 4px rgba(110, 231, 183, 0.18); }
-    h1 { font-size: clamp(2rem, 4.2vw, 3.25rem); line-height: 1; letter-spacing: -0.055em; font-weight: 650; margin-bottom: 14px; }
-    .hero-sub { color: rgba(255,255,255,0.82); font-size: 1rem; max-width: 740px; line-height: 1.65; margin: 0 auto 34px; }
-
-    .main-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 18px; margin-bottom: 0; }
-    .primary-action, .outline-action { min-height: 56px; min-width: 220px; border-radius: 10px; padding: 0 22px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; font-size: 1rem; font-weight: 900; letter-spacing: -0.015em; cursor: pointer; transition: 0.18s ease; }
-    .primary-action { background: #ffffff; color: var(--blue-900); border: 1px solid #ffffff; }
-    .outline-action { background: rgba(255,255,255,0.08); color: #ffffff; border: 1px solid rgba(255,255,255,0.34); backdrop-filter: blur(8px); }
-    .primary-action:hover, .outline-action:hover { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(6, 26, 58, 0.22); }
-    .action-icon { font-size: 1.35rem; line-height: 1; font-weight: 900; }
-
-    .workspace { max-width: 1280px; margin: 0 auto; padding: 46px 28px 58px; display: grid; grid-template-columns: 1fr 320px; gap: 28px; }
-    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-soft); overflow: visible; }
-    .panel-header { padding: 20px 22px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 14px; background: linear-gradient(180deg, #fff, #fbfdff); }
-    .panel-title { color: var(--blue-900); font-size: 1.02rem; font-weight: 950; letter-spacing: -0.02em; }
-    .view-all { color: var(--blue-700); font-size: 0.9rem; font-weight: 900; }
-    .docs-body { padding: 22px; }
-
-    .cmdbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border: 1px solid var(--line); background: #fff; color: var(--blue-900); font-size: 0.92rem; font-weight: 900; padding: 0 16px; border-radius: 8px; cursor: pointer; transition: 0.18s ease; }
-    .btn:hover { border-color: #aac8ef; background: var(--blue-050); transform: translateY(-1px); }
-    .btn-primary { background: var(--blue-700); border-color: var(--blue-700); color: #fff; box-shadow: 0 10px 22px rgba(0, 84, 209, 0.20); }
-    .btn-primary:hover { background: var(--blue-600); color: #fff; }
-    .spacer { flex: 1; }
-
-    .search { position: relative; }
-    .search input { height: 44px; width: 260px; max-width: 46vw; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 0 14px; font-size: 0.92rem; font-family: inherit; outline: none; transition: 0.18s ease; }
-    .search input:focus { border-color: var(--blue-600); box-shadow: 0 0 0 3px rgba(0, 104, 255, 0.14); }
-
-    .menu-anchor { position: relative; }
-    .menu { position: absolute; top: 50px; left: 0; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 8px; min-width: 250px; z-index: 40; display: none; }
-    .menu.open { display: block; }
-    .menu-item { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 9px; cursor: pointer; font-size: 0.92rem; font-weight: 900; color: var(--blue-900); }
-    .menu-item:hover { background: var(--blue-050); }
-    .menu-item small { display: block; font-weight: 650; color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
-    .mi-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 950; font-size: 0.78rem; flex: 0 0 auto; }
-
-    .sec-head { display: flex; align-items: baseline; gap: 10px; margin: 24px 0 14px; }
-    .sec-head h2 { color: var(--blue-900); font-size: 0.94rem; font-weight: 950; }
-    .sec-head .count { color: var(--muted); font-size: 0.84rem; font-weight: 700; }
-
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
-    .file { position: relative; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; cursor: pointer; transition: 0.18s ease; }
-    .file:hover { box-shadow: var(--shadow-soft); border-color: #aac8ef; transform: translateY(-2px); }
-    .file .ftop { display: flex; align-items: flex-start; gap: 12px; }
-    .ficon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 950; font-size: 0.82rem; flex-shrink: 0; letter-spacing: .3px; }
-    .fmeta { min-width: 0; flex: 1; }
-    .fname { font-size: 0.92rem; font-weight: 850; line-height: 1.35; color: var(--blue-900); word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .fsub { margin-top: 6px; font-size: 0.78rem; color: var(--muted); }
-    .fdel { position: absolute; top: 10px; right: 10px; width: auto; height: 30px; padding: 0 8px; border: none; background: transparent; border-radius: 7px; color: var(--gray); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.12s ease; font-size: 0.72rem; font-weight: 850; }
-    .file:hover .fdel { opacity: 1; }
-    .fdel:hover { background: #fde7e6; color: var(--danger); }
-
-    .empty { text-align: center; color: var(--muted); background: var(--blue-050); border: 1px dashed #bcd3ef; border-radius: 14px; padding: 54px 20px; }
-    .empty .big { width: auto; height: auto; background: transparent; color: var(--blue-700); margin: 0 auto 12px; font-size: 0.86rem; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 950; }
-    .empty .t { color: var(--blue-900); font-size: 1.1rem; font-weight: 950; margin-bottom: 6px; }
-    .empty .s { font-size: 0.9rem; }
-    .loading { color: var(--muted); font-size: 0.94rem; padding: 18px 2px; }
-
-    .side-stack { display: grid; gap: 18px; }
-    .side-card { padding: 22px; }
-    .usage-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 0.94rem; }
-    .usage-row:last-child { border-bottom: 0; }
-    .usage-row strong { color: var(--blue-900); }
-    .progress-track { height: 8px; background: #edf3fb; border-radius: 999px; overflow: hidden; margin-top: 16px; }
-    .progress-fill { height: 100%; width: 24%; background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-radius: 999px; }
-
-    .sidebar-overlay { position: fixed; inset: 0; background: rgba(6, 26, 58, 0.38); z-index: 850; opacity: 0; pointer-events: none; transition: 0.18s ease; }
-    .sidebar-overlay.open { opacity: 1; pointer-events: auto; }
-    .left-sidebar { position: fixed; top: 0; left: 0; width: 404px; max-width: 88vw; height: 100vh; background: #fff; border-right: 1px solid var(--line); box-shadow: 30px 0 80px rgba(6, 26, 58, 0.18); z-index: 900; transform: translateX(-104%); transition: 0.22s ease; display: flex; flex-direction: column; }
-    .left-sidebar.open { transform: translateX(0); }
-    .sidebar-head { height: 94px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 0 22px; border-bottom: 1px solid var(--line); background: #ffffff; }
-    .sidebar-title { color: var(--blue-900); font-size: 1rem; font-weight: 950; letter-spacing: -0.02em; }
-    .sidebar-brand-row { display: flex; align-items: center; gap: 12px; }
-    .sidebar-logo { width: 38px; height: 38px; border-radius: 11px; }
-    .sidebar-close { width: auto; height: 40px; padding: 0 12px; border: 1px solid var(--line); background: #fff; color: var(--blue-800); border-radius: 10px; cursor: pointer; display: grid; place-items: center; font-size: 0.82rem; font-weight: 950; }
-    .sidebar-close:hover { background: var(--blue-050); border-color: #aac8ef; }
-    .sidebar-search { padding: 22px 26px 18px; border-bottom: 1px solid var(--line); background: #ffffff; }
-    .sidebar-search input { width: 100%; height: 46px; border: 1px solid #b9c6d8; border-radius: 10px; outline: none; padding: 0 14px; color: var(--blue-900); font-size: 0.95rem; font-family: inherit; background: #ffffff; }
-    .sidebar-search input:focus { border-color: var(--blue-700); box-shadow: 0 0 0 4px rgba(0,84,209,0.10); }
-    .sidebar-tabs.sidebar-nav-list { display: grid; grid-template-columns: 1fr; gap: 0; padding: 0; border-bottom: 1px solid var(--line); background: #ffffff; }
-    .sidebar-tab { min-height: 48px; border: 0; border-radius: 0; justify-content: flex-start; text-align: left; padding: 0 30px; background: #ffffff; color: #334155; font-size: 0.95rem; font-weight: 800; position: relative; cursor: pointer; }
-    .sidebar-tab::before { content: ""; width: 10px; height: 10px; border: 2px solid #8a96a8; border-radius: 50%; margin-right: 14px; display: inline-block; vertical-align: middle; }
-    .sidebar-tab:hover, .sidebar-tab.active { background: #f1f6ff; color: var(--blue-900); border-color: transparent; }
-    .sidebar-tab.active::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--blue-700); }
-    .sidebar-content { padding: 24px 26px; overflow-y: auto; flex: 1; }
-    .sidebar-panel { display: none; }
-    .sidebar-panel.active { display: block; }
-    .sidebar-section-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--blue-800); margin-bottom: 14px; font-weight: 950; }
-    .template-table-lite { border-top: 1px solid var(--line); }
-    .template-row-lite { width: 100%; display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 12px; min-height: 62px; border: 0; border-bottom: 1px solid var(--line); background: #ffffff; cursor: pointer; text-align: left; color: var(--blue-900); font-family: inherit; }
-    .template-row-lite:hover { background: var(--blue-050); }
-    .radio-dot { width: 18px; height: 18px; border: 2px solid #8a96a8; border-radius: 50%; display: block; }
-    .template-row-main { font-weight: 850; font-size: 0.92rem; }
-    .template-row-cat { color: var(--muted); font-size: 0.78rem; font-weight: 750; }
-    .sidebar-empty-state { min-height: 130px; border: 1px dashed #bcd3ef; border-radius: 14px; background: var(--blue-050); color: var(--muted); display: flex; align-items: center; justify-content: center; padding: 18px; text-align: center; font-size: 0.9rem; line-height: 1.5; }
-
-    .editor-screen { position: fixed; inset: 0; z-index: 1000; background: #fff; display: none; }
-    .editor-screen.open { display: block; }
-    #placeholder { width: 100%; height: 100%; }
-    #logoBlock { position: absolute; top: 0; left: 0; width: 165px; height: 30px; z-index: 1001; background: transparent; cursor: default; }
-
-    .mobile-menu { display: none; }
-
-    /* Mobile hamburger navigation */
-    .hamburger-btn {
-      width: 44px;
-      height: 44px;
-      border: 1px solid var(--line);
-      background: #fff;
-      color: var(--blue-800);
-      border-radius: 10px;
-      cursor: pointer;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      gap: 5px;
-      box-shadow: 0 10px 22px rgba(6, 26, 58, 0.06);
-    }
-    .hamburger-btn span {
-      display: block;
-      width: 22px;
-      height: 2px;
-      background: var(--blue-900);
-      border-radius: 999px;
-      transition: 0.22s ease;
-    }
-    .hamburger-btn.active span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-    .hamburger-btn.active span:nth-child(2) { opacity: 0; }
-    .hamburger-btn.active span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-
-    .mobile-nav-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(6, 26, 58, 0.38);
-      z-index: 740;
-      opacity: 0;
-      pointer-events: none;
-      transition: 0.18s ease;
-    }
-    .mobile-nav-overlay.open { opacity: 1; pointer-events: auto; }
-    .mobile-nav-drawer {
-      position: fixed;
-      top: 0;
-      right: 0;
-      width: min(86vw, 360px);
-      height: 100vh;
-      background: #fff;
-      border-left: 1px solid var(--line);
-      box-shadow: -30px 0 80px rgba(6, 26, 58, 0.18);
-      z-index: 760;
-      transform: translateX(105%);
-      transition: 0.22s ease;
-      display: flex;
-      flex-direction: column;
-    }
-    .mobile-nav-drawer.open { transform: translateX(0); }
-    .mobile-nav-head {
-      min-height: 86px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      padding: 0 20px;
-      border-bottom: 1px solid var(--line);
-    }
-    .mobile-nav-title { color: var(--blue-900); font-weight: 950; letter-spacing: -0.02em; }
-    .mobile-nav-close {
-      min-width: 44px;
-      height: 44px;
-      padding: 0 12px;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      background: #fff;
-      color: var(--blue-800);
-      cursor: pointer;
-      font-weight: 950;
-    }
-    .mobile-nav-links {
-      display: grid;
-      gap: 10px;
-      padding: 20px;
-    }
-    .mobile-nav-links a, .mobile-nav-links button {
-      min-height: 48px;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      background: #fff;
-      color: var(--blue-900);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 14px;
-      font-weight: 900;
-      cursor: pointer;
-      font-family: inherit;
-      text-align: left;
-    }
-    .mobile-nav-links a:hover, .mobile-nav-links button:hover { background: var(--blue-050); border-color: #aac8ef; }
-    .mobile-nav-links .mobile-pay-link { background: var(--blue-700); color: #fff; border-color: var(--blue-700); justify-content: center; }
-    .mobile-nav-note { padding: 0 20px 20px; color: var(--muted); font-size: 0.84rem; line-height: 1.5; }
-
-    .mobile-locked-note { display: none; }
-
-    @media (max-width: 1120px) {
-      .top-nav { grid-template-columns: auto 1fr auto; }
-      .nav-tabs a { padding: 0 14px; font-size: 0.92rem; }
-      .workspace { grid-template-columns: 1fr; }
-    }
-
-    @media (max-width: 780px) {
-      .top-nav { height: auto; min-height: 76px; grid-template-columns: 1fr auto; padding: 12px 16px; }
-      .nav-tabs { display: none; }
-      .trial-left, .buy-btn, #openSidebar, #signout, .avatar { display: none; }
-      .hamburger-btn.mobile-menu { display: inline-flex; }
-      .system-strip { justify-content: flex-start; align-items: flex-start; }
-      .hero-panel { padding: 44px 16px 52px; }
-      .main-actions { flex-direction: column; align-items: stretch; }
-      .primary-action, .outline-action { width: 100%; }
-      .workspace { padding: 22px 16px 42px; grid-template-columns: 1fr; }
-      .cmdbar { align-items: stretch; }
-      .search, .search input { width: 100%; max-width: 100%; }
-      .side-stack { display: none; }
-      .panel { border-radius: 12px; }
-      .docs-body { padding: 18px; }
-      .grid { grid-template-columns: 1fr; }
-      .file { cursor: default; }
-      .file:hover { transform: none; }
-      .fdel { opacity: 1; }
-      .mobile-locked-note {
-        display: block;
-        margin: 12px 0 16px;
-        background: var(--blue-050);
-        border: 1px solid #bcd3ef;
-        color: var(--blue-900);
-        padding: 12px 14px;
-        border-radius: 12px;
-        font-size: 0.88rem;
-        line-height: 1.45;
-        font-weight: 750;
-      }
-    }
-
-    /* Billing plan modal */
-    .billing-overlay { position: fixed; inset: 0; background: rgba(4, 17, 36, 0.58); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 28px; }
-    .billing-overlay.open { display: flex; }
-    .billing-modal { width: min(100%, 1120px); max-height: calc(100vh - 56px); background: #fff; color: var(--blue-900); border-radius: 22px; box-shadow: 0 34px 100px rgba(4, 17, 36, 0.30); overflow: hidden; position: relative; display: grid; grid-template-rows: auto 1fr auto; }
-    .billing-modal-head { padding: 46px 54px 32px; display: grid; grid-template-columns: 1fr 420px; gap: 34px; align-items: start; border-bottom: 1px solid var(--line); background: #fff; }
-    .billing-close { position: absolute; top: 24px; right: 26px; border: 0; background: transparent; color: var(--blue-900); font-size: 2.2rem; line-height: 1; cursor: pointer; width: 42px; height: 42px; display: grid; place-items: center; }
-    .billing-modal h2 { font-size: clamp(2.35rem, 4.4vw, 4.15rem); line-height: 0.98; letter-spacing: -0.07em; font-weight: 760; color: var(--blue-900); margin-bottom: 58px; }
-    .billing-subtitle { font-size: 1.18rem; color: var(--blue-800); letter-spacing: -0.02em; }
-    .billing-save-card { border: 1px solid #14a778; border-radius: 12px; overflow: hidden; background: #fff; margin-top: 26px; }
-    .billing-save-top { background: #bff4df; color: #075f45; padding: 10px 18px; font-weight: 900; font-size: 0.96rem; }
-    .billing-select-box { padding: 14px 18px 16px; border-top: 1px solid rgba(20,167,120,0.20); display: flex; justify-content: space-between; align-items: center; gap: 20px; }
-    .billing-select-label { color: #3d4a5f; font-size: 0.84rem; margin-bottom: 4px; }
-    .billing-select-value { color: var(--blue-900); font-size: 1.08rem; font-weight: 800; }
-    .billing-chevron { width: 13px; height: 13px; border-right: 3px solid var(--blue-900); border-bottom: 3px solid var(--blue-900); transform: rotate(45deg); margin-right: 4px; }
-    .billing-modal-body { overflow-y: auto; padding: 0 54px; background: #fff; }
-    .billing-plan-card { margin: 38px 0 34px; border: 5px solid #5d88ff; border-radius: 8px; padding: 28px 28px 32px; position: relative; min-height: 330px; }
-    .billing-radio { position: absolute; top: 28px; right: 28px; width: 28px; height: 28px; border: 3px solid #5d88ff; border-radius: 50%; }
-    .billing-radio::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: #5d88ff; }
-    .billing-recommended { display: inline-flex; align-items: center; min-height: 34px; padding: 0 13px; background: var(--blue-700); color: #fff; border-radius: 5px; font-size: 0.86rem; font-weight: 950; margin-bottom: 22px; }
-    .billing-plan-title { font-size: 1.3rem; font-weight: 950; color: var(--blue-900); margin-bottom: 14px; }
-    .billing-price { display: flex; align-items: flex-end; gap: 3px; margin-bottom: 10px; color: var(--blue-900); }
-    .billing-price strong { font-size: 3rem; line-height: 1; letter-spacing: -0.06em; }
-    .billing-price span { font-size: 1rem; font-weight: 850; padding-bottom: 8px; }
-    .billing-billing-line { font-size: 1.1rem; color: var(--blue-900); font-weight: 800; margin-bottom: 6px; }
-    .billing-small { color: var(--blue-900); font-size: 0.96rem; line-height: 1.45; }
-    .billing-feature-title { margin: 28px 0 14px; color: var(--blue-900); font-weight: 800; }
-    .billing-features { list-style: none; display: grid; gap: 14px; margin: 0; }
-    .billing-features li { position: relative; padding-left: 32px; color: var(--blue-900); font-size: 1rem; }
-    .billing-features li::before { content: ""; position: absolute; left: 0; top: 6px; width: 14px; height: 8px; border-left: 3px solid var(--blue-900); border-bottom: 3px solid var(--blue-900); transform: rotate(-45deg); background: transparent; border-radius: 0; }
-    .billing-modal-footer { min-height: 92px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; align-items: center; gap: 18px; padding: 18px 54px; background: #fff; }
-    .billing-secondary-btn, .billing-next-btn { min-height: 54px; border-radius: 7px; padding: 0 28px; font-size: 1rem; font-weight: 850; cursor: pointer; font-family: inherit; }
-    .billing-secondary-btn { background: #fff; color: var(--blue-900); border: 1px solid #9aa6bd; }
-    .billing-next-btn { background: var(--blue-700); color: #fff; border: 1px solid var(--blue-700); min-width: 100px; }
-
-    @media (max-width: 820px) {
-      .billing-overlay { padding: 0; }
-      .billing-modal { width: 100%; height: 100vh; max-height: 100vh; border-radius: 0; }
-      .billing-modal-head { grid-template-columns: 1fr; padding: 34px 24px 24px; }
-      .billing-modal h2 { margin-bottom: 26px; }
-      .billing-modal-body { padding: 0 24px; }
-      .billing-modal-footer { padding: 16px 24px; flex-wrap: wrap; }
-      .billing-secondary-btn, .billing-next-btn { flex: 1; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connexion Two | AI-Powered Government Contracting</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230054d1'/%3E%3Ctext x='16' y='21' font-family='Arial' font-size='13' font-weight='800' fill='white' text-anchor='middle'%3EC2%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --blue-950:#041124; --blue-900:#061a3a; --blue-800:#082b61; --blue-700:#0054d1;
+    --blue-600:#0068ff; --blue-500:#1683ff; --blue-100:#eaf3ff; --blue-050:#f5f9ff;
+    --ink:#0b1220; --muted:#5a6b8c; --line:#e2e8f2; --bg:#f4f7fc; --panel:#fff;
+    --good:#12a150; --warn:#c77700; --bad:#d33; --chip:#eef3fb;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5}
+  a{color:var(--blue-700);text-decoration:none}
+  /* ── shell ── */
+  .app{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+  .side{background:linear-gradient(180deg,var(--blue-900),var(--blue-950));color:#dce8ff;
+    padding:20px 14px;position:sticky;top:0;height:100vh;overflow:auto}
+  .brand{display:flex;align-items:center;gap:10px;margin:0 6px 22px}
+  .brand .mark{width:38px;height:38px;border-radius:10px;flex:0 0 auto;font-weight:800;color:#fff;
+    background:linear-gradient(135deg,var(--blue-600),var(--blue-900));display:grid;place-items:center;letter-spacing:-.5px}
+  .brand .nm{font-weight:800;font-size:15px;letter-spacing:-.3px;color:#fff}
+  .brand .sub{font-size:10.5px;color:#8fb4f0;letter-spacing:.3px}
+  .nav a{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;color:#c6d8f7;
+    font-size:14px;font-weight:600;cursor:pointer;margin-bottom:2px}
+  .nav a .ic{width:18px;text-align:center}
+  .nav a:hover{background:rgba(255,255,255,.06)}
+  .nav a.active{background:var(--blue-700);color:#fff}
+  .nav .sec{font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:#6f92c8;margin:16px 12px 6px}
+  .main{padding:26px 30px 70px;max-width:1180px}
+  .topbar{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+  .topbar h1{font-size:23px;margin:0;letter-spacing:-.4px;color:var(--blue-950)}
+  .topbar .who{margin-left:auto;font-size:13px;color:var(--muted)}
+  .topbar .who b{color:var(--ink)}
+  /* ── components ── */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+  .cards{display:grid;gap:16px}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+  .kpi .lbl{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .kpi .val{font-size:30px;font-weight:800;letter-spacing:-1px;color:var(--blue-800);margin-top:4px}
+  .kpi .sub{font-size:12px;color:var(--muted)}
+  h2.section{font-size:15px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:26px 0 12px}
+  .btn{appearance:none;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:9px;
+    padding:9px 14px;font-size:13.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{border-color:var(--blue-500)}
+  .btn.primary{background:var(--blue-700);color:#fff;border:none;box-shadow:0 10px 24px rgba(0,84,209,.22)}
+  .btn.primary:hover{background:var(--blue-800)}
+  .btn.sm{padding:6px 10px;font-size:12px}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  label{display:block;font-size:12px;color:var(--muted);font-weight:600;margin:0 0 5px}
+  input,textarea,select{width:100%;background:var(--blue-050);border:1px solid var(--line);border-radius:9px;
+    padding:9px 11px;font-size:13.5px;font-family:inherit;color:var(--ink)}
+  textarea{min-height:80px;resize:vertical}
+  .field{margin-bottom:13px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;background:var(--chip);color:var(--blue-700)}
+  .pill.high{background:#fde8e8;color:var(--bad)} .pill.medium{background:#fff3e0;color:var(--warn)} .pill.low{background:#e8f5ee;color:var(--good)}
+  .rfp{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;background:#fff}
+  .rfp .t{font-weight:700;font-size:15px;color:var(--blue-900)}
+  .rfp .m{font-size:12.5px;color:var(--muted);margin:3px 0}
+  .rfp .scores{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px}
+  .rfp .acts{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+  .board{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;overflow-x:auto}
+  .col{background:var(--blue-050);border:1px solid var(--line);border-radius:12px;padding:9px;min-width:150px}
+  .col h4{margin:0 0 8px;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:flex;justify-content:space-between}
+  .col .n{background:#fff;border:1px solid var(--line);color:var(--muted);border-radius:12px;padding:0 7px;font-size:11px}
+  .pcard{background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px;margin-bottom:8px;font-size:12.5px}
+  .pcard .pt{font-weight:700;color:var(--blue-900);font-size:12.5px}
+  .pcard select{padding:4px 6px;font-size:11px;margin-top:6px}
+  .tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:13px}
+  .tool{border:1px solid var(--line);border-radius:12px;padding:15px;background:#fff;cursor:pointer;transition:border-color .15s}
+  .tool:hover{border-color:var(--blue-500);box-shadow:0 10px 24px rgba(6,26,58,.07)}
+  .tool .ic{font-size:24px} .tool .nm{font-weight:800;margin:8px 0 3px;color:var(--blue-900)} .tool .d{font-size:12.5px;color:var(--muted)}
+  .out{white-space:pre-wrap;font-size:13.5px;background:var(--blue-050);border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:12px;max-height:460px;overflow:auto}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);font-weight:600;margin-bottom:10px}
+  /* scrollable pop-up */
+  .ovl{position:fixed;inset:0;background:rgba(4,17,36,.55);display:grid;place-items:start center;
+    z-index:80;padding:24px 16px;overflow-y:auto}
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:100%;max-width:920px;
+    max-height:calc(100vh - 48px);overflow-y:auto;box-shadow:0 30px 80px rgba(4,17,36,.4);margin:auto}
+  .sheet .shd{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);
+    padding:15px 20px;display:flex;align-items:center;gap:10px;z-index:2}
+  .sheet .shd h3{margin:0;font-size:17px;color:var(--blue-950)}
+  .sheet .sbd{padding:20px}
+  .sheet .sclose{margin-left:auto;background:transparent;border:none;font-size:22px;line-height:1;
+    color:var(--muted);cursor:pointer;padding:0 4px}
+  .sheet .sclose:hover{color:var(--bad)}
+  /* capability matrix */
+  .matx{width:100%;border-collapse:collapse;font-size:13px}
+  .matx th,.matx td{border:1px solid var(--line);padding:0;vertical-align:top}
+  .matx th{background:var(--blue-050);padding:6px 8px;font-size:11.5px;text-transform:uppercase;
+    letter-spacing:.4px;color:var(--muted);position:relative}
+  .matx td textarea,.matx td input{width:100%;border:none;background:transparent;padding:7px 8px;
+    font-size:13px;font-family:inherit;resize:vertical;min-height:34px;color:var(--ink)}
+  .matx td textarea:focus,.matx td input:focus{outline:2px solid var(--blue-500);outline-offset:-2px;background:#fff}
+  .matx .stat-Met{background:#e8f5ee}.matx .stat-Partial{background:#fff3e0}.matx .stat-Gap{background:#fdeaea}.matx .stat-NA{background:transparent}
+  .matx .colx,.matx .rowx{cursor:pointer;color:var(--muted);font-weight:800;border:none;background:transparent;padding:2px 6px}
+  .matx .colx:hover,.matx .rowx:hover{color:var(--bad)}
+  .toggle input{width:auto}
+  .banner{border-radius:10px;padding:11px 14px;font-size:13px;margin-bottom:16px;border:1px solid}
+  .banner.info{background:var(--blue-100);border-color:#bcd8ff}
+  .banner.warn{background:#fff8ec;border-color:#f2d79a}
+  .banner.bad{background:#fdeaea;border-color:#f2b4b4;color:var(--bad)}
+  .muted{color:var(--muted)} .center{text-align:center}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{background:var(--chip);border:1px solid var(--line);border-radius:20px;padding:3px 10px;font-size:12px;display:flex;align-items:center;gap:6px}
+  .chip .x{cursor:pointer;color:var(--muted);font-weight:800}
+  .hide{display:none!important}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid #fff6;border-top-color:#fff;border-radius:50%;animation:s .7s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+  /* ── auth ── */
+  #auth{position:fixed;inset:0;background:linear-gradient(135deg,var(--blue-900),var(--blue-950));
+    display:grid;place-items:center;padding:20px;z-index:50}
+  #auth .box{background:#fff;border-radius:18px;padding:30px;max-width:400px;width:100%}
+  #auth .mark{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--blue-600),var(--blue-900));
+    display:grid;place-items:center;color:#fff;font-weight:800;font-size:18px;margin-bottom:14px}
+  #auth h2{margin:0 0 4px;color:var(--blue-950)} #auth p{margin:0 0 18px;color:var(--muted);font-size:13.5px}
+  @media(max-width:860px){.app{grid-template-columns:1fr}.side{position:static;height:auto}.board{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
-  <div class="app">
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-    <aside class="left-sidebar" id="leftSidebar" aria-label="Document workspace sidebar">
-      <div class="sidebar-head">
-        <div class="sidebar-brand-row">
-          <div class="c2-logo sidebar-logo" aria-hidden="true">C2</div>
-          <div>
-            <div class="sidebar-title">Connexion Two</div>
-            <div class="brand-sub">Document OS</div>
-          </div>
-        </div>
-        <button class="sidebar-close" type="button" id="closeSidebar" aria-label="Close sidebar">Close</button>
-      </div>
+<!-- ══ AUTH ══ -->
+<div id="auth">
+  <div class="box">
+    <div class="mark">C2</div>
+    <h2>Connexion Two</h2>
+    <p>AI-Powered Government Contracting Platform</p>
+    <div class="field"><label>Email</label><input id="authEmail" type="email" placeholder="you@company.com"></div>
+    <div class="field"><label>Password</label><input id="authPass" type="password" placeholder="••••••••"></div>
+    <div id="authErr" class="banner bad hide"></div>
+    <button class="btn primary" id="btnSignIn" style="width:100%;justify-content:center">Sign in</button>
+    <button class="btn" id="btnSignUp" style="width:100%;justify-content:center;margin-top:8px">Create account</button>
+  </div>
+</div>
 
-            <div class="sidebar-content">
-        <div class="sidebar-section-title">Templates</div>
-        <div id="sidebarTemplates" class="template-table-lite"><div class="sidebar-empty-state">Loading templates…</div></div>
-        <button class="sidebar-tab" type="button" id="inviteFriendBtn" style="margin-top:18px;border:1px solid var(--blue-700);border-radius:10px;color:var(--blue-700);font-weight:950;justify-content:center;padding:0 16px;min-height:48px;">＋ Invite a Friend (+7 days)</button>
-      </div>
-    </aside>
-
-    <header class="top-nav">
-      <a href="/welcome" class="brand" aria-label="Connexion Two dashboard home">
-        <div class="c2-logo" aria-hidden="true">C2</div>
-        <div class="brand-text">
-          <div class="brand-name">Connexion Two</div>
-          <div class="brand-sub">Document OS</div>
-        </div>
-      </a>
-
-      <nav class="nav-tabs" aria-label="Main navigation">
-        <a href="/welcome" class="active">Home</a>
-        <a href="agreements">Agreements</a>
-        <a href="/templates">Templates</a>
-        <div class="menu-anchor">
-          <a href="#" id="toolsTrigger" aria-haspopup="true" aria-expanded="false">Tools &#9662;</a>
-          <div class="menu" id="toolsMenu" style="min-width:280px;">
-            <a class="menu-item" href="/submission-checklist"><div>Submission Checklist<small>Never miss a required document</small></div></a>
-            <a class="menu-item" href="/kiosk"><div>In-Person Signing<small>Sign on this device, no email</small></div></a>
-            <a class="menu-item" href="/proof-packet"><div>Signature Evidence Pack<small>Bundle signed docs for audits</small></div></a>
-            <a class="menu-item" href="/certificate-demo"><div>Certificate of Completion<small>Proof a document is unaltered</small></div></a>
-            <a class="menu-item" href="/#verify"><div>Verify a Document<small>Confirm a file is genuine</small></div></a>
-            <a class="menu-item" href="/data-map"><div>Data Map &amp; Records<small>See where sensitive data lives</small></div></a>
-            <a class="menu-item" href="/access-log"><div>Access Log<small>Who opened or exported what</small></div></a>
-            <a class="menu-item" href="/vault"><div>Encrypted Vault<small>Files only you can open</small></div></a>
-            <a class="menu-item" href="/webhooks"><div>Webhooks<small>Connect your CRM / Zapier</small></div></a>
-          </div>
-        </div>
-      </nav>
-
-      <div class="top-actions">
-        <div class="trial-left" id="trialLeft">7 Days Left</div>
-        <button class="buy-btn" type="button" id="buyNowBtn">Buy Now</button>
-        <button class="icon-btn" type="button" id="openSidebar" aria-label="Open workspace menu">Menu</button>
-        <button class="icon-btn" type="button" id="signout" aria-label="Sign out">Sign out</button>
-        <div class="avatar">AP</div>
-        <button class="hamburger-btn mobile-menu" type="button" id="openMobileNav" aria-label="Open mobile menu" aria-expanded="false"><span></span><span></span><span></span></button>
-      </div>
-    </header>
-
-    <div class="mobile-nav-overlay" id="mobileNavOverlay"></div>
-    <nav class="mobile-nav-drawer" id="mobileNavDrawer" aria-label="Mobile navigation" aria-hidden="true">
-      <div class="mobile-nav-head">
-        <div class="sidebar-brand-row">
-          <div class="c2-logo sidebar-logo" aria-hidden="true">C2</div>
-          <div>
-            <div class="mobile-nav-title">Connexion Two</div>
-            <div class="brand-sub">Document OS</div>
-          </div>
-        </div>
-        <button class="mobile-nav-close" type="button" id="closeMobileNav" aria-label="Close mobile menu">Close</button>
-      </div>
-      <div class="mobile-nav-links">
-        <a href="/welcome">Home <span>›</span></a>
-        <a href="agreements">Agreements <span>›</span></a>
-        <a href="/templates">Templates <span>›</span></a>
-        <a href="/submission-checklist">Submission Checklist <span>›</span></a>
-        <a href="/kiosk">In-Person Signing <span>›</span></a>
-        <a href="/proof-packet">Signature Evidence Pack <span>›</span></a>
-        <a href="/certificate-demo">Certificate of Completion <span>›</span></a>
-        <a href="/#verify">Verify a Document <span>›</span></a>
-        <a href="/data-map">Data Map &amp; Records <span>›</span></a>
-        <a href="/access-log">Access Log <span>›</span></a>
-        <a href="/vault">Encrypted Vault <span>›</span></a>
-        <a href="/webhooks">Webhooks <span>›</span></a>
-        <a href="/plans">Plans <span>›</span></a>
-        <a href="https://buy.stripe.com/cNi00ieLedtedDL24vafS02" id="mobilePayLink" class="mobile-pay-link">Upgrade for €15/month</a>
-        <button type="button" id="mobileSignout">Sign out <span>›</span></button>
-      </div>
-      <div class="mobile-nav-note">Document editing is locked on mobile so your files do not open in the browser editor by accident. Use desktop to create and edit DOCX, XLSX, and PPTX files.</div>
+<!-- ══ APP ══ -->
+<div class="app hide" id="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="mark">C2</div>
+      <div><div class="nm">Connexion Two</div><div class="sub">GOVERNMENT CONTRACTING</div></div>
+    </div>
+    <nav class="nav" id="nav">
+      <a data-view="dashboard" class="active"><span class="ic">▚</span>Dashboard</a>
+      <a data-view="rfps"><span class="ic">▤</span>RFP Discovery</a>
+      <a data-view="autopilot"><span class="ic">✈</span>Autopilot</a>
+      <a data-view="sources"><span class="ic">◎</span>Custom Sources</a>
+      <a data-view="ai"><span class="ic">✦</span>AI Tools</a>
+      <a data-view="pipeline"><span class="ic">▦</span>Pipeline</a>
+      <a data-view="awards"><span class="ic">◆</span>Awards Research</a>
+      <a data-view="partners"><span class="ic">◈</span>Partner Network</a>
+      <a data-view="analytics"><span class="ic">▲</span>Analytics</a>
+      <div class="sec">Documents</div>
+      <a data-view="editor"><span class="ic">✎</span>Document Editor</a>
+      <a data-view="createdoc"><span class="ic">▤</span>Create &amp; Send</a>
+      <div class="sec">Account</div>
+      <a data-view="profile"><span class="ic">◐</span>Profile &amp; Settings</a>
+      <a id="btnSignOut"><span class="ic">⏻</span>Sign out</a>
     </nav>
+  </aside>
 
-    <div class="system-strip">
-      <span class="info-dot">i</span>
-      <span>Your document workspace is ready. Create DOCX, XLSX, and presentation files, upload, store, and manage them inside Connexion Two.</span>
+  <main class="main">
+    <div class="topbar">
+      <h1 id="viewTitle">Dashboard</h1>
+      <div class="who">Signed in as <b id="whoEmail"></b></div>
     </div>
+    <div id="views"></div>
+  </main>
+  <div id="modalRoot"></div>
+</div>
 
-    <main>
-      <section class="hero-panel">
-        <div class="hero-inner">
-          <div class="welcome-label"><span class="status-light"></span> Private document workspace</div>
-          <h1 id="welcomeHeading">Welcome back</h1>
-          <p class="hero-sub">Create documents, spreadsheets, and presentations, upload files, and open them in the browser without leaving your private Connexion Two workspace.</p>
-
-          <div class="main-actions">
-            <a class="primary-action" href="/templates">Use a Template</a>
-            <a class="outline-action" href="/document-creation">Get Signatures</a>
-          </div>
-        </div>
-      </section>
-
-      <section class="workspace">
-        <div class="panel" id="libraryPanel">
-          <div class="panel-header">
-            <div class="panel-title">Document Library</div>
-            <a href="#" class="view-all" id="refreshFiles">Refresh</a>
-          </div>
-          <div class="docs-body">
-            <div class="cmdbar">
-              <div class="menu-anchor">
-                <button class="btn btn-primary" id="newBtn" type="button"><span class="ic">＋</span> New</button>
-                <div class="menu" id="newMenu">
-                  <div class="menu-item" data-type="docx"><div class="mi-icon" style="background:var(--word)">W</div><div>Document<small>Word-style document</small></div></div>
-                  <div class="menu-item" data-type="xlsx"><div class="mi-icon" style="background:var(--cell)">X</div><div>Spreadsheet<small>Excel-style sheet</small></div></div>
-                  <div class="menu-item" data-type="pptx"><div class="mi-icon" style="background:var(--slide)">P</div><div>Presentation<small>PowerPoint-style deck</small></div></div>
-                </div>
-              </div>
-              <button class="btn" id="uploadBtn" type="button"><span class="ic">⬆</span> Upload</button>
-              <input type="file" id="fileInput" style="display:none" accept=".docx,.xlsx,.pptx,.doc,.xls,.ppt,.odt,.ods,.odp,.txt,.csv,.pdf">
-              <div class="spacer"></div>
-              <div class="search"><input type="text" id="search" placeholder="Search documents"></div>
-            </div>
-
-            <div class="mobile-locked-note">Mobile view is read-only for the document library. To open, edit, or create files in the browser editor, use desktop.</div>
-
-            <div class="sec-head"><h2>Files</h2><span class="count" id="count"></span></div>
-            <div id="fileList"><div class="loading">Loading…</div></div>
-          </div>
-        </div>
-
-        <aside class="side-stack">
-          <div class="panel side-card">
-            <div class="panel-title">Trial & Usage</div>
-            <div class="usage-row"><span>Trial status</span><strong id="trialStatus">7 days left</strong></div>
-            <div class="usage-row"><span>Documents</span><strong id="docCount">0</strong></div>
-            <div class="usage-row"><span>Storage</span><strong id="storageTotal">0 MB</strong></div>
-            <div class="progress-track"><div class="progress-fill"></div></div>
-          </div>
-        </aside>
-      </section>
-    </main>
-  </div>
-
-  <div class="editor-screen" id="editorScreen">
-    <div id="placeholder"></div>
-    <div id="logoBlock"></div>
-  </div>
-
-  <div class="billing-overlay" id="billingOverlay" aria-hidden="true">
-    <div class="billing-modal" role="dialog" aria-modal="true" aria-labelledby="billingTitle">
-      <button class="billing-close" type="button" id="billingClose" aria-label="Close billing plan modal">×</button>
-      <div class="billing-modal-head">
-        <div>
-          <h2 id="billingTitle">Your trial ends in 7 days</h2>
-          <div class="billing-subtitle">Choose your Connexion Two plan</div>
-        </div>
-
-        <div class="billing-save-card">
-          <div class="billing-save-top">Start for €15/month</div>
-          <div class="billing-select-box">
-            <div>
-              <div class="billing-select-label">Subscription type</div>
-              <div class="billing-select-value">Monthly subscription</div>
-            </div>
-            <span class="billing-chevron" aria-hidden="true"></span>
-          </div>
-        </div>
-      </div>
-
-      <div class="billing-modal-body">
-        <div class="billing-plan-card">
-          <div class="billing-radio" aria-hidden="true"></div>
-          <div class="billing-recommended">Recommended</div>
-          <div class="billing-plan-title">Standard</div>
-          <div class="billing-price"><strong>€15</strong><span>/month</span></div>
-          <div class="billing-billing-line">Monthly subscription</div>
-          <div class="billing-small">Start with your trial, then continue for €15/month.</div>
-          <div class="billing-small">Cancel anytime from your account settings.</div>
-
-          <div class="billing-feature-title">Key features:</div>
-          <ul class="billing-features">
-            <li>Send a total of 100 envelopes per user per year</li>
-            <li>Share templates easily with your team members</li>
-            <li>Add comments in real time with collaborative commenting</li>
-            <li>Use your own branding to build trust and brand awareness</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="billing-modal-footer">
-        <button class="billing-secondary-btn" type="button" id="viewPlansBtn">View All Plans</button>
-        <button class="billing-next-btn" type="button" id="billingNextBtn">Next</button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    const SB_URL = 'https://xbwuvaxtnylqvagdvpxp.supabase.co';
-    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhid3V2YXh0bnlscXZhZ2R2cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Njk1NjMsImV4cCI6MjA5NDM0NTU2M30.WnCOew6w9HtQ2eAM1vpSJCb_AjAvv9x7Mev-k2IxSpc';
-    const BUCKET = 'documents';
-    const LOGIN_URL = 'https://www.connexiontwo.com/';
-    const WELCOME_URL = 'https://www.connexiontwo.com/welcome';
-    const PAY_LINK = (function(){
-      const US='https://buy.stripe.com/cNi6oGeLebl6eHPdNdafS05', EU='https://buy.stripe.com/cNi00ieLedtedDL24vafS02';
-      try{ let us=false;
-        const langs=(navigator.languages&&navigator.languages.length)?navigator.languages:[navigator.language||''];
-        for(const l of langs){ if(/-US$/i.test(l||'')) us=true; }
-        try{ if(new Intl.Locale(navigator.language).region==='US') us=true; }catch(e){}
-        const US_TZ=['America/New_York','America/Detroit','America/Chicago','America/Denver','America/Phoenix','America/Los_Angeles','America/Anchorage','America/Adak','America/Boise','America/Juneau','America/Sitka','America/Menominee','America/Indiana/Indianapolis','America/Indiana/Knox','America/Kentucky/Louisville','Pacific/Honolulu'];
-        if(US_TZ.indexOf(Intl.DateTimeFormat().resolvedOptions().timeZone||'')>=0) us=true;
-        return us?US:EU;
-      }catch(e){ return EU; }
-    })();
-    const TEMPLATES = { docx: 'blank.docx', xlsx: 'blank.xlsx', pptx: 'blank.pptx' };
-    const sb = supabase.createClient(SB_URL, SB_KEY);
-    let editor = null;
-    let userId = null;
-    let allFiles = [];
-    const screen = document.getElementById('editorScreen');
-
-    const buyNowBtn = document.getElementById('buyNowBtn');
-    const billingOverlay = document.getElementById('billingOverlay');
-    const billingClose = document.getElementById('billingClose');
-    const billingNextBtn = document.getElementById('billingNextBtn');
-    const viewPlansBtn = document.getElementById('viewPlansBtn');
-
-    function openBillingModal(){
-      if(!billingOverlay) return;
-      billingOverlay.classList.add('open');
-      billingOverlay.setAttribute('aria-hidden', 'false');
-      document.body.style.overflow = 'hidden';
-    }
-    function closeBillingModal(){
-      if(!billingOverlay) return;
-      billingOverlay.classList.remove('open');
-      billingOverlay.setAttribute('aria-hidden', 'true');
-      document.body.style.overflow = '';
-    }
-    buyNowBtn?.addEventListener('click', openBillingModal);
-    billingClose?.addEventListener('click', closeBillingModal);
-    billingOverlay?.addEventListener('click', (event) => { if(event.target === billingOverlay) closeBillingModal(); });
-    billingNextBtn?.addEventListener('click', () => { window.location.href = PAY_LINK; });
-    { const _mpl = document.getElementById('mobilePayLink'); if(_mpl) _mpl.href = PAY_LINK; }
-    viewPlansBtn?.addEventListener('click', () => { window.location.href = '/plans'; });
-    document.addEventListener('keydown', (event) => { if(event.key === 'Escape') { closeBillingModal(); if(typeof hideMobileNav === 'function') hideMobileNav(); } });
-
-    function userPath(name){ return userId + '/' + name; }
-
-    const WORD=['doc','docx','docm','dot','dotx','odt','ott','rtf','txt','html','htm'];
-    const CELL=['xls','xlsx','xlsm','xlt','xltx','ods','ots','csv'];
-    const SLIDE=['ppt','pptx','pptm','pps','ppsx','pot','potx','odp','otp'];
-
-    function fileStyle(ext){
-      ext=(ext||'').toLowerCase();
-      if(CELL.includes(ext))  return {c:'var(--cell)',  t:'XLS'};
-      if(SLIDE.includes(ext)) return {c:'var(--slide)', t:'PPT'};
-      if(ext==='pdf')         return {c:'var(--pdf)',   t:'PDF'};
-      if(WORD.includes(ext))  return {c:'var(--word)',  t:'DOC'};
-      return {c:'var(--gray)', t:(ext||'?').slice(0,3).toUpperCase()};
-    }
-
-    function fmtSize(b){
-      if(b==null) return '';
-      if(b<1024) return b+' B';
-      if(b<1048576) return (b/1024).toFixed(0)+' KB';
-      return (b/1048576).toFixed(1)+' MB';
-    }
-
-    function fmtDate(iso){
-      if(!iso) return '';
-      const d=new Date(iso);
-      return d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
-    }
-
-    function updateUsage(){
-      document.getElementById('docCount').textContent = String(allFiles.length);
-      const total = allFiles.reduce((sum, f) => sum + ((f.metadata && f.metadata.size) || 0), 0);
-      document.getElementById('storageTotal').textContent = fmtSize(total) || '0 MB';
-    }
-
-    async function requireSession(){
-      const { data:{ session } } = await sb.auth.getSession();
-      if(!session){
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const { data:{ session: retrySession } } = await sb.auth.getSession();
-        if(!retrySession){ window.location.replace(LOGIN_URL); return null; }
-        userId = retrySession.user.id;
-        return retrySession;
-      }
-      userId = session.user.id;
-      return session;
-    }
-
-    async function loadFiles(){
-      const list = document.getElementById('fileList');
-      const { data, error } = await sb.storage.from(BUCKET).list(userId, { sortBy:{ column:'updated_at', order:'desc' } });
-      if(error){ list.innerHTML = '<div class="loading">Could not load files.</div>'; return; }
-      allFiles = (data||[]).filter(f => f.id && !f.name.startsWith('.'));
-      updateUsage();
-      render();
-    }
-
-    function render(){
-      const list = document.getElementById('fileList');
-      const q = (document.getElementById('search').value||'').trim().toLowerCase();
-      const files = q ? allFiles.filter(f => f.name.toLowerCase().includes(q)) : allFiles;
-      document.getElementById('count').textContent = allFiles.length ? allFiles.length + (allFiles.length===1?' item':' items') : '';
-
-      if(!files.length){
-        list.innerHTML = q
-          ? '<div class="empty"><div class="big">No matches</div><div class="t">No matches</div><div class="s">Nothing matches that search.</div></div>'
-          : '<div class="empty"><div class="big">Files</div><div class="t">No documents yet</div><div class="s">Use <b>+ New</b> or <b>Upload</b> to add your first file.</div></div>';
-        return;
-      }
-
-      const grid = document.createElement('div');
-      grid.className = 'grid';
-      files.forEach(f => {
-        const ext = (f.name.split('.').pop()||'');
-        const st = fileStyle(ext);
-        const size = fmtSize(f.metadata && f.metadata.size);
-        const date = fmtDate(f.updated_at || f.created_at);
-        const meta = [date, size].filter(Boolean).join(' · ');
-        const card = document.createElement('div');
-        card.className = 'file';
-        card.innerHTML =
-          '<button class="fdel" title="Delete">Delete</button>' +
-          '<div class="ftop">' +
-            '<div class="ficon" style="background:'+st.c+'">'+st.t+'</div>' +
-            '<div class="fmeta"><div class="fname"></div><div class="fsub">'+meta+'</div></div>' +
-          '</div>';
-        card.querySelector('.fname').textContent = f.name;
-        card.addEventListener('click', () => openDoc(f.name));
-        card.querySelector('.fdel').addEventListener('click', (e) => { e.stopPropagation(); deleteFile(f.name); });
-        grid.appendChild(card);
-      });
-      list.innerHTML = '';
-      list.appendChild(grid);
-    }
-
-    async function deleteFile(name){
-      if(!confirm('Delete "'+name+'"?\n\nThis permanently removes the file and cannot be undone.')) return;
-      const { error } = await sb.storage.from(BUCKET).remove([userPath(name)]);
-      if(error){ alert('Could not delete: '+error.message); return; }
-      allFiles = allFiles.filter(f => f.name !== name);
-      updateUsage();
-      render();
-    }
-
-    // Open a file in the in-browser editor (OnlyOffice via docs.bisondoc.com).
-    async function openDoc(name){
-      if(window.innerWidth <= 780){
-        alert('Document editing is locked on mobile. Please use desktop to open and edit files.');
-        return;
-      }
-      screen.classList.add('open');
-      const { data:{ session } } = await sb.auth.getSession();
-      if(!session){ window.location.replace(LOGIN_URL); return; }
-      const res = await fetch('/api/onlyoffice-config?file=' + encodeURIComponent(userPath(name)), {
-        headers:{ Authorization:'Bearer ' + session.access_token }
-      });
-      if(!res.ok){ alert('Could not open document.'); closeEditor(); return; }
-      const config = await res.json();
-      config.width='100%'; config.height='100%';
-      config.type = (window.innerWidth<=768) ? 'mobile' : 'desktop';
-      config.events = { onRequestClose: closeEditor };
-      if(editor){ editor.destroyEditor(); editor=null; }
-      editor = new DocsAPI.DocEditor('placeholder', config);
-    }
-
-    function closeEditor(){
-      if(editor){ editor.destroyEditor(); editor=null; }
-      screen.classList.remove('open');
-      loadFiles();
-    }
-
-    function uniqueName(fileName){
-      const taken = new Set(allFiles.map(f => f.name.toLowerCase()));
-      if(!taken.has(fileName.toLowerCase())) return fileName;
-      const dot = fileName.lastIndexOf('.');
-      const base = dot > 0 ? fileName.slice(0, dot) : fileName;
-      const ext  = dot > 0 ? fileName.slice(dot) : '';
-      let i = 1, candidate;
-      do { candidate = base + ' (' + i + ')' + ext; i++; } while(taken.has(candidate.toLowerCase()));
-      return candidate;
-    }
-
-    // Create a new DOCX / XLSX / PPTX: copies a blank template into the user's
-    // private storage (saved to the database) then opens it in the editor.
-    async function createNew(type){
-      if(window.innerWidth <= 780){ alert('Document creation is locked on mobile. Please use desktop to create DOCX, XLSX, or PPTX files.'); return; }
-      let name = prompt('Name your new file:', 'Untitled');
-      if(!name) return;
-      name = name.replace(/[^a-zA-Z0-9 _-]/g,'').trim();
-      if(!name) return;
-      const fileName = uniqueName(name + '.' + type);
-      const { error } = await sb.storage.from(BUCKET).copy(TEMPLATES[type], userPath(fileName));
-      if(error){ alert('Could not create file: '+error.message); return; }
-      openDoc(fileName);
-    }
-
-    const newBtn = document.getElementById('newBtn');
-    const newMenu = document.getElementById('newMenu');
-    newBtn.addEventListener('click', (e)=>{ e.stopPropagation(); newMenu.classList.toggle('open'); });
-    document.addEventListener('click', ()=> newMenu.classList.remove('open'));
-    newMenu.querySelectorAll('.menu-item').forEach(mi=>{
-      mi.addEventListener('click', ()=>{ newMenu.classList.remove('open'); createNew(mi.dataset.type); });
-    });
-
-    function triggerUpload(){ if(window.innerWidth <= 780){ alert('Uploading and opening files is locked on mobile. Please use desktop.'); return; } document.getElementById('fileInput').click(); }
-    document.getElementById('uploadBtn').addEventListener('click', triggerUpload);
-
-    document.getElementById('fileInput').addEventListener('change', async (e)=>{
-      const file = e.target.files[0];
-      if(!file) return;
-      const finalName = uniqueName(file.name);
-      const { error } = await sb.storage.from(BUCKET).upload(userPath(finalName), file, { upsert:false });
-      e.target.value = '';
-      if(error){ alert('Upload failed: '+error.message); return; }
-      openDoc(finalName);
-    });
-
-    document.getElementById('search').addEventListener('input', render);
-    document.getElementById('refreshFiles').addEventListener('click', (e)=>{ e.preventDefault(); loadFiles(); });
-
-    document.getElementById('signout').addEventListener('click', async (e)=>{
-      e.preventDefault();
-      await sb.auth.signOut();
-      window.location.replace(LOGIN_URL);
-    });
-
-    const leftSidebar = document.getElementById('leftSidebar');
-    const sidebarOverlay = document.getElementById('sidebarOverlay');
-    const openSidebar = document.getElementById('openSidebar');
-    const closeSidebar = document.getElementById('closeSidebar');
-    const openMobileNav = document.getElementById('openMobileNav');
-    const mobileNavDrawer = document.getElementById('mobileNavDrawer');
-    const mobileNavOverlay = document.getElementById('mobileNavOverlay');
-    const closeMobileNav = document.getElementById('closeMobileNav');
-    const mobileSignout = document.getElementById('mobileSignout');
-
-    function showSidebar(){
-      if(window.innerWidth <= 780){ return; }
-      leftSidebar.classList.add('open'); sidebarOverlay.classList.add('open');
-    }
-    function hideSidebar(){ leftSidebar.classList.remove('open'); sidebarOverlay.classList.remove('open'); }
-
-    function showMobileNav(){
-      mobileNavDrawer.classList.add('open');
-      mobileNavOverlay.classList.add('open');
-      mobileNavDrawer.setAttribute('aria-hidden', 'false');
-      openMobileNav.classList.add('active');
-      openMobileNav.setAttribute('aria-expanded', 'true');
-      document.body.style.overflow = 'hidden';
-    }
-    function hideMobileNav(){
-      mobileNavDrawer.classList.remove('open');
-      mobileNavOverlay.classList.remove('open');
-      mobileNavDrawer.setAttribute('aria-hidden', 'true');
-      openMobileNav.classList.remove('active');
-      openMobileNav.setAttribute('aria-expanded', 'false');
-      document.body.style.overflow = '';
-    }
-
-    openSidebar.addEventListener('click', showSidebar);
-    closeSidebar.addEventListener('click', hideSidebar);
-    sidebarOverlay.addEventListener('click', hideSidebar);
-    openMobileNav.addEventListener('click', () => mobileNavDrawer.classList.contains('open') ? hideMobileNav() : showMobileNav());
-    closeMobileNav.addEventListener('click', hideMobileNav);
-    mobileNavOverlay.addEventListener('click', hideMobileNav);
-    mobileNavDrawer.querySelectorAll('a').forEach(link => link.addEventListener('click', hideMobileNav));
-    mobileSignout.addEventListener('click', async () => { await sb.auth.signOut(); window.location.replace(LOGIN_URL); });
-
-    document.querySelectorAll('[data-sidebar-tab]').forEach(tab => {
-      tab.addEventListener('click', () => {
-        const target = tab.dataset.sidebarTab;
-        document.querySelectorAll('[data-sidebar-tab]').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.sidebar-panel').forEach(panel => panel.classList.remove('active'));
-        tab.classList.add('active');
-        document.getElementById('sidebar-' + target).classList.add('active');
-      });
-    });
-
-    (async ()=>{
-      const session = await requireSession();
-      if(session) loadFiles();
-    })();
-  </script>
-  <!-- Invite a friend modal -->
-  <div class="billing-overlay" id="inviteOverlay" aria-hidden="true">
-    <div class="billing-modal" style="max-width:480px;display:block;">
-      <button class="billing-close" type="button" id="inviteClose" aria-label="Close">×</button>
-      <div style="padding:40px 34px;">
-        <h2 style="font-size:1.6rem;margin-bottom:8px;letter-spacing:-0.04em;color:var(--blue-900);">Invite a friend, get 7 days</h2>
-        <p style="color:var(--muted);margin-bottom:20px;line-height:1.5;">Share your personal link. When a friend joins, your trial extends by another 7 days.</p>
-        <div style="display:flex;gap:8px;">
-          <input id="inviteLinkInput" readonly style="flex:1;height:46px;border:1px solid var(--line);border-radius:10px;padding:0 12px;font-size:0.9rem;background:var(--blue-050);color:var(--blue-900);">
-          <button id="inviteCopy" class="btn btn-primary" type="button" style="min-height:46px;">Copy</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Trial-ended forced modal -->
-  <div class="billing-overlay" id="trialEndedOverlay" aria-hidden="true">
-    <div class="billing-modal" style="max-width:520px;display:block;">
-      <div style="padding:44px 36px;text-align:center;">
-        <h2 style="font-size:1.8rem;margin-bottom:10px;letter-spacing:-0.04em;color:var(--blue-900);">Your free trial has ended</h2>
-        <p style="color:var(--muted);margin-bottom:24px;line-height:1.55;">Continue with Connexion Two by upgrading — or extend free for 7 more days by inviting a friend.</p>
-        <button id="endedPay" class="btn btn-primary" type="button" style="width:100%;min-height:52px;margin-bottom:16px;">Upgrade for €15/month</button>
-        <div style="color:var(--muted);font-size:0.85rem;margin-bottom:10px;">— or invite a friend for +7 days —</div>
-        <div style="display:flex;gap:8px;">
-          <input id="endedLinkInput" readonly style="flex:1;height:46px;border:1px solid var(--line);border-radius:10px;padding:0 12px;font-size:0.9rem;background:var(--blue-050);color:var(--blue-900);">
-          <button id="endedCopy" class="btn" type="button" style="min-height:46px;">Copy</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // Tools dropdown in the top nav
-    (function(){
-      var trigger=document.getElementById('toolsTrigger');
-      var menu=document.getElementById('toolsMenu');
-      if(!trigger||!menu) return;
-      trigger.addEventListener('click',function(e){
-        e.preventDefault();
-        var open=menu.classList.toggle('open');
-        trigger.setAttribute('aria-expanded', open?'true':'false');
-      });
-      document.addEventListener('click',function(e){
-        if(!menu.contains(e.target)&&e.target!==trigger){ menu.classList.remove('open'); trigger.setAttribute('aria-expanded','false'); }
-      });
-    })();
-  </script>
-
-</body>
 <script>
-(function(){
-  const RFD_URL='https://rfdvogakvyodixgpvqvz.supabase.co';
-  const RFD_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
-  const sbRfd = supabase.createClient(RFD_URL, RFD_KEY);
-  const SHARE_BASE='https://www.connexiontwo.com/?ref=';
-  let myShareCode=null;
+/* ═══════════════ CONFIG ═══════════════
+   Same project as intake.html. On replication, the Replicator's find/replace
+   swaps these for the customer's own Supabase project + anon key. */
+const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
+const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
+const sb = supabase.createClient(SB_URL, SB_KEY);
+const FN = (name) => `${SB_URL}/functions/v1/${name}`;
 
-  function firstName(u){
-    const fn=u?.user_metadata?.full_name||u?.user_metadata?.name||'';
-    if(fn) return fn.trim().split(/\s+/)[0];
-    const e=u?.email||''; return e?e.split('@')[0]:'there';
+let SESSION = null, PROFILE = null;
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString() : '—';
+
+/* REST + function helpers (authenticated as the user).
+   Always pull a FRESH token from supabase-js — it auto-refreshes sessions,
+   so this never sends an expired JWT. If the session is truly gone
+   (signed out elsewhere / refresh token revoked), bounce to sign-in. */
+async function freshToken() {
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session) { toast('Session expired — please sign in again'); setTimeout(()=>location.reload(), 1200); throw new Error('Signed out'); }
+  SESSION = session;
+  return session.access_token;
+}
+async function api(path, opts={}) {
+  const token = await freshToken();
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${token}`,
+      'Content-Type':'application/json', Prefer: opts.prefer || 'return=representation', ...(opts.headers||{}) },
+  });
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  return res.status === 204 ? null : res.json();
+}
+async function callFn(name, body) {
+  const token = await freshToken();
+  const res = await fetch(FN(name), {
+    method:'POST', headers:{ apikey:SB_KEY, Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(()=>({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+/* ═══════════════ AUTH ═══════════════ */
+$('#btnSignIn').onclick = () => auth('in');
+$('#btnSignUp').onclick = () => auth('up');
+async function auth(mode) {
+  const email = $('#authEmail').value.trim(), password = $('#authPass').value;
+  const err = $('#authErr'); err.classList.add('hide');
+  const fn = mode==='in' ? sb.auth.signInWithPassword({email,password}) : sb.auth.signUp({email,password});
+  const { data, error } = await fn;
+  if (error) { err.textContent = error.message; err.classList.remove('hide'); return; }
+  if (mode==='up' && !data.session) { err.textContent='Check your email to confirm, then sign in.'; err.classList.remove('hide'); return; }
+  boot(data.session);
+}
+$('#btnSignOut').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+async function boot(session) {
+  SESSION = session;
+  sb.auth.onAuthStateChange((_evt, s) => { if (s) SESSION = s; });   // keep token fresh
+  $('#auth').classList.add('hide'); $('#app').classList.remove('hide');
+  $('#whoEmail').textContent = session.user.email;
+  const rows = await api(`govcon_profiles?user_id=eq.${session.user.id}&select=*`);
+  PROFILE = rows[0] || null;
+  if (!PROFILE) { // first login → create a profile row + default autopilot settings
+    PROFILE = (await api('govcon_profiles', {method:'POST', body:JSON.stringify({user_id:session.user.id})}))[0];
+    await api('govcon_autopilot_settings', {method:'POST', prefer:'resolution=ignore-duplicates',
+      body:JSON.stringify({owner:session.user.id})}).catch(()=>{});
   }
-  function setWelcomeName(u){ const h=document.getElementById('welcomeHeading'); if(h) h.textContent='Welcome back, '+firstName(u); }
+  route('dashboard');
+}
 
-  async function loadSidebarTemplates(){
-    const box=document.getElementById('sidebarTemplates'); if(!box) return;
-    try{
-      const { data, error } = await sbRfd.from('document_templates').select('id,name,category').eq('status','active').order('updated_at',{ascending:false});
-      if(error) throw error;
-      if(!data||!data.length){ box.innerHTML='<div class="sidebar-empty-state">No templates yet. Create one on the Templates page.</div>'; return; }
-      const esc=v=>String(v||'').replace(/[<>&]/g,'');
-      box.innerHTML=data.map(t=>'<button class="template-row-lite" type="button" data-tpl="'+t.id+'"><span class="radio-dot"></span><span class="template-row-main">'+esc(t.name||'Untitled')+'</span><span class="template-row-cat">'+esc(t.category||'')+'</span></button>').join('');
-      box.querySelectorAll('[data-tpl]').forEach(b=>b.addEventListener('click',()=>{ window.location.href='/document-creation?template='+encodeURIComponent(b.dataset.tpl); }));
-    }catch(_){ box.innerHTML='<div class="sidebar-empty-state">Could not load templates.</div>'; }
+/* ═══════════════ ROUTER ═══════════════ */
+$('#nav').addEventListener('click', e => {
+  const a = e.target.closest('a[data-view]'); if (a) route(a.dataset.view);
+});
+const TITLES = {dashboard:'Dashboard',rfps:'RFP Discovery',autopilot:'Autopilot',sources:'Custom Sources',
+  ai:'AI Tools',pipeline:'Pipeline',awards:'Awards Research',partners:'Partner Network',analytics:'Analytics',
+  editor:'Document Editor',createdoc:'Create & Send',profile:'Profile & Settings'};
+function route(view) {
+  $$('#nav a[data-view]').forEach(a => a.classList.toggle('active', a.dataset.view===view));
+  $('#viewTitle').textContent = TITLES[view] || view;
+  ({dashboard:renderDashboard,rfps:renderRfps,autopilot:renderAutopilot,sources:renderSources,
+    ai:renderAi,pipeline:renderPipeline,awards:renderAwards,partners:renderPartners,analytics:renderAnalytics,
+    editor:renderEditor,createdoc:renderCreateDoc,profile:renderProfile}[view]||renderDashboard)();
+}
+const V = () => $('#views');
+const loading = () => V().innerHTML = '<div class="card center muted">Loading…</div>';
+
+/* ═══════════════ DASHBOARD ═══════════════ */
+async function renderDashboard() {
+  loading();
+  const uid = SESSION.user.id;
+  const [rfps, pipeline, proposals, runs] = await Promise.all([
+    api(`govcon_rfps?owner=eq.${uid}&select=id,status,priority,win_probability`),
+    api(`govcon_pipeline_items?owner=eq.${uid}&select=id,stage`),
+    api(`govcon_proposals?owner=eq.${uid}&select=id,status`),
+    api(`govcon_autopilot_runs?owner=eq.${uid}&select=*&order=started_at.desc&limit=5`),
+  ]);
+  const awarded = pipeline.filter(p=>p.stage==='awarded').length;
+  const closed = pipeline.filter(p=>p.stage==='awarded'||p.stage==='lost').length;
+  const winRate = closed ? Math.round(awarded/closed*100) : 0;
+  V().innerHTML = `
+    <div class="cards kpis">
+      ${kpi('Total RFPs', rfps.length, 'all opportunities')}
+      ${kpi('Pipeline', pipeline.length, 'actively pursuing')}
+      ${kpi('Proposals', proposals.length, 'drafts & submissions')}
+      ${kpi('Win Rate', winRate+'%', `${awarded} of ${closed} closed`)}
+    </div>
+    <h2 class="section">Quick actions</h2>
+    <div class="card"><div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn primary" onclick="route('rfps')">Discover RFPs</button>
+      <button class="btn" onclick="route('ai')">Create Proposal</button>
+      <button class="btn" onclick="route('pipeline')">View Pipeline</button>
+      <button class="btn" onclick="runAutopilotNow()">✈ Run Autopilot</button>
+    </div></div>
+    <h2 class="section">Recent Autopilot runs</h2>
+    <div class="card">${runs.length ? runs.map(r=>`
+      <div class="rfp" style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between">
+          <b>${fmtDate(r.started_at)}</b>
+          <span class="pill ${r.status==='error'?'high':'low'}">${r.status}</span>
+        </div>
+        <div class="m">Found ${r.rfps_found} · New ${r.new_rfps} · High-priority ${r.high_priority} · Proposals ${r.proposals_generated} · Pipeline +${r.added_to_pipeline}</div>
+        ${r.error?`<div class="m" style="color:var(--bad)">${esc(r.error)}</div>`:''}
+      </div>`).join('') : '<p class="muted">No runs yet. Configure Autopilot and run it.</p>'}
+    </div>`;
+}
+const kpi = (l,v,s) => `<div class="card kpi"><div class="lbl">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
+
+/* ═══════════════ RFP DISCOVERY ═══════════════ */
+let RFP_FILTER = '', RFP_DUE_FROM = '', RFP_DUE_TO = '';
+const RFP_SEL = new Set();
+async function renderRfps() {
+  loading();
+  const uid = SESSION.user.id;
+  const rfps = await api(`govcon_rfps?owner=eq.${uid}&select=*&order=deadline.asc.nullslast&limit=500`);
+  const q = RFP_FILTER.toLowerCase();
+  const shown = rfps.filter(r => {
+    if (q && !`${r.title} ${r.agency} ${r.category} ${r.description||''}`.toLowerCase().includes(q)) return false;
+    if (RFP_DUE_FROM && (!r.deadline || r.deadline < RFP_DUE_FROM)) return false;
+    if (RFP_DUE_TO && (!r.deadline || r.deadline > RFP_DUE_TO)) return false;
+    return true;
+  });
+  const shownIds = new Set(shown.map(r=>r.id));
+  for (const id of [...RFP_SEL]) if (!rfps.some(r=>r.id===id)) RFP_SEL.delete(id); // prune stale
+  const allShownSelected = shown.length>0 && shown.every(r=>RFP_SEL.has(r.id));
+  V().innerHTML = `
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <input id="rfpSearch" placeholder="Filter by keyword (title, agency, description)…" value="${esc(RFP_FILTER)}" style="flex:1;min-width:200px">
+        <label style="margin:0">Due from</label><input id="rfpDueFrom" type="date" value="${RFP_DUE_FROM}" style="width:auto">
+        <label style="margin:0">to</label><input id="rfpDueTo" type="date" value="${RFP_DUE_TO}" style="width:auto">
+        <button class="btn sm" id="rfpClear">Clear filters</button>
+        <button class="btn primary" onclick="runAutopilotNow()">✈ Run Autopilot</button>
+        <button class="btn" onclick="showAddRfp()">+ Add RFP</button>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+        <label class="toggle" style="margin:0"><input type="checkbox" id="selAllRfps" ${allShownSelected?'checked':''}> Select all shown (${shown.length})</label>
+        <b id="rfpSelCount" class="muted">${RFP_SEL.size} selected</b>
+        <span style="flex:1"></span>
+        <button class="btn sm" id="bulkPipe" ${RFP_SEL.size?'':'disabled'}>+ Pipeline selected</button>
+        <button class="btn sm" id="bulkDel" style="color:var(--bad)" ${RFP_SEL.size?'':'disabled'}>Delete selected</button>
+        <button class="btn sm" id="bulkClear" ${RFP_SEL.size?'':'disabled'}>Clear selection</button>
+      </div>
+    </div>
+    <div id="addRfpBox"></div>
+    <div class="muted" style="margin-bottom:10px">${shown.length} of ${rfps.length} opportunities · sorted by due date</div>
+    <div id="rfpList">${shown.map(rfpCard).join('') || '<div class="card center muted">Nothing matches these filters.</div>'}</div>`;
+  $('#rfpSearch').oninput = (e) => { RFP_FILTER = e.target.value; clearTimeout(window._rt); window._rt = setTimeout(renderRfps, 250); };
+  $('#rfpDueFrom').onchange = (e) => { RFP_DUE_FROM = e.target.value; renderRfps(); };
+  $('#rfpDueTo').onchange = (e) => { RFP_DUE_TO = e.target.value; renderRfps(); };
+  $('#rfpClear').onclick = () => { RFP_FILTER=RFP_DUE_FROM=RFP_DUE_TO=''; renderRfps(); };
+  $('#selAllRfps').onchange = (e) => {
+    if (e.target.checked) shownIds.forEach(id=>RFP_SEL.add(id)); else shownIds.forEach(id=>RFP_SEL.delete(id));
+    renderRfps();
+  };
+  $('#rfpList').addEventListener('change', (e) => {
+    const cb = e.target.closest('.selrfp'); if (!cb) return;
+    if (cb.checked) RFP_SEL.add(cb.dataset.id); else RFP_SEL.delete(cb.dataset.id);
+    $('#rfpSelCount').textContent = `${RFP_SEL.size} selected`;
+    ['bulkPipe','bulkDel','bulkClear'].forEach(b=>$('#'+b).disabled = !RFP_SEL.size);
+  });
+  $('#bulkClear').onclick = () => { RFP_SEL.clear(); renderRfps(); };
+  $('#bulkDel').onclick = bulkDeleteRfps;
+  $('#bulkPipe').onclick = bulkPipelineRfps;
+}
+async function bulkDeleteRfps() {
+  const ids = [...RFP_SEL];
+  if (!ids.length || !confirm(`Delete ${ids.length} RFP(s)? Their pipeline entries are removed too.`)) return;
+  for (let i=0; i<ids.length; i+=50)                      // batch: keep URLs short
+    await api(`govcon_rfps?id=in.(${ids.slice(i,i+50).join(',')})`, {method:'DELETE', prefer:'return=minimal'});
+  RFP_SEL.clear();
+  toast(`Deleted ${ids.length} RFP(s)`);
+  renderRfps();
+}
+async function bulkPipelineRfps() {
+  const ids = [...RFP_SEL]; if (!ids.length) return;
+  const items = ids.map(id=>({owner:SESSION.user.id, rfp_id:id, stage:'lead'}));
+  await api('govcon_pipeline_items?on_conflict=owner,rfp_id', {method:'POST',
+    prefer:'resolution=ignore-duplicates,return=minimal', body:JSON.stringify(items)});
+  toast(`Added ${ids.length} to pipeline`);
+  RFP_SEL.clear();
+  renderRfps();
+}
+function rfpCard(r) {
+  return `<div class="rfp">
+    <div style="display:flex;align-items:flex-start;gap:9px">
+      <input type="checkbox" class="selrfp" data-id="${r.id}" ${RFP_SEL.has(r.id)?'checked':''} style="width:auto;margin-top:4px">
+      <div class="t" style="cursor:pointer;flex:1" onclick="openRfp('${r.id}')" title="Click to view / edit">${esc(r.title)}</div>
+    </div>
+    <div class="m">${esc(r.agency||'—')} · ${esc(r.source)} · deadline ${fmtDate(r.deadline)}${r.set_aside?` · ${esc(r.set_aside)}`:''}</div>
+    ${r.description?`<div class="m">${esc(String(r.description).slice(0,200))}${r.description.length>200?'…':''}</div>`:''}
+    <div class="scores">
+      ${r.relevance_score!=null?`<span class="pill">Relevance ${r.relevance_score}%</span>`:''}
+      ${r.win_probability!=null?`<span class="pill">Win ${r.win_probability}%</span>`:''}
+      ${r.priority?`<span class="pill ${r.priority}">${r.priority}</span>`:''}
+    </div>
+    <div class="acts">
+      <button class="btn sm" onclick="openRfp('${r.id}')">View / Edit</button>
+      <button class="btn sm" onclick="addToPipeline('${r.id}')">+ Pipeline</button>
+      <button class="btn sm" onclick="aiFor('${r.id}','analyzer')">Analyze</button>
+      <button class="btn sm primary" onclick="aiFor('${r.id}','writer')">Generate proposal</button>
+      ${r.url?`<a class="btn sm" href="${esc(r.url)}" target="_blank">Source ↗</a>`:''}
+      <button class="btn sm" style="color:var(--bad)" onclick="deleteRfp('${r.id}')">Delete</button>
+    </div></div>`;
+}
+
+/* view / edit / delete a single RFP */
+async function openRfp(id) {
+  const rows = await api(`govcon_rfps?id=eq.${id}&select=*`);
+  const r = rows[0]; if (!r) return toast('RFP not found');
+  $('#addRfpBox').innerHTML = `<div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 style="margin:0">Edit RFP</h3>
+      <span class="muted" style="font-size:12px">${esc(r.source)} · added ${fmtDate(r.created_at)}</span>
+    </div>
+    <div class="field" style="margin-top:12px"><label>Title *</label><input id="er_title" value="${esc(r.title)}"></div>
+    <div class="row3">
+      <div class="field"><label>Agency</label><input id="er_agency" value="${esc(r.agency||'')}"></div>
+      <div class="field"><label>Category / NAICS</label><input id="er_category" value="${esc(r.category||'')}"></div>
+      <div class="field"><label>Deadline</label><input id="er_deadline" type="date" value="${r.deadline||''}"></div>
+    </div>
+    <div class="row3">
+      <div class="field"><label>Set-aside</label><input id="er_setaside" value="${esc(r.set_aside||'')}"></div>
+      <div class="field"><label>Budget min ($)</label><input id="er_bmin" type="number" value="${r.budget_min??''}"></div>
+      <div class="field"><label>Budget max ($)</label><input id="er_bmax" type="number" value="${r.budget_max??''}"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Location</label><input id="er_loc" value="${esc(r.location||'')}"></div>
+      <div class="field"><label>Source URL</label><input id="er_url" value="${esc(r.url||'')}"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Status</label>
+        <select id="er_status">${['new','reviewed','archived'].map(s=>`<option ${s===r.status?'selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="field"><label>Priority</label>
+        <select id="er_prio"><option value="">—</option>${['low','medium','high'].map(s=>`<option ${s===r.priority?'selected':''}>${s}</option>`).join('')}</select></div>
+    </div>
+    <div class="field"><label>Description / requirements</label><textarea id="er_desc" style="min-height:120px">${esc(r.description||'')}</textarea></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" onclick="updateRfp('${r.id}')">Save changes</button>
+      <button class="btn" onclick="addToPipeline('${r.id}')">+ Pipeline</button>
+      <button class="btn" onclick="aiFor('${r.id}','analyzer')">Analyze</button>
+      <button class="btn" onclick="aiFor('${r.id}','writer')">Generate proposal</button>
+      <span style="flex:1"></span>
+      <button class="btn" style="color:var(--bad)" onclick="deleteRfp('${r.id}')">Delete</button>
+      <button class="btn" onclick="$('#addRfpBox').innerHTML=''">Close</button>
+    </div>
+  </div>`;
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+async function updateRfp(id) {
+  const title = $('#er_title').value.trim(); if (!title) return alert('Title is required');
+  await api(`govcon_rfps?id=eq.${id}`, {method:'PATCH', body:JSON.stringify({
+    title, agency:$('#er_agency').value.trim()||null, category:$('#er_category').value.trim()||null,
+    deadline:$('#er_deadline').value||null, set_aside:$('#er_setaside').value.trim()||null,
+    budget_min:$('#er_bmin').value===''?null:+$('#er_bmin').value,
+    budget_max:$('#er_bmax').value===''?null:+$('#er_bmax').value,
+    location:$('#er_loc').value.trim()||null, url:$('#er_url').value.trim()||null,
+    status:$('#er_status').value, priority:$('#er_prio').value||null,
+    description:$('#er_desc').value.trim()||null,
+  })});
+  toast('RFP saved');
+  renderRfps();
+}
+async function deleteRfp(id) {
+  if (!confirm('Delete this RFP? Its pipeline entry is removed too.')) return;
+  await api(`govcon_rfps?id=eq.${id}`, {method:'DELETE', prefer:'return=minimal'});
+  toast('RFP deleted');
+  renderRfps();
+}
+function showAddRfp() {
+  $('#addRfpBox').innerHTML = `<div class="card" style="margin-bottom:16px">
+    <h3 style="margin-top:0">Add RFP manually</h3>
+    <div class="field"><label>Title *</label><input id="ar_title"></div>
+    <div class="row2"><div class="field"><label>Agency</label><input id="ar_agency"></div>
+      <div class="field"><label>Deadline</label><input id="ar_deadline" type="date"></div></div>
+    <div class="row2"><div class="field"><label>Set-aside</label><input id="ar_setaside" placeholder="8(a), WOSB…"></div>
+      <div class="field"><label>Source URL</label><input id="ar_url"></div></div>
+    <div class="field"><label>Requirements / description</label><textarea id="ar_desc"></textarea></div>
+    <button class="btn primary" onclick="saveRfp()">Save</button>
+    <button class="btn" onclick="$('#addRfpBox').innerHTML=''">Cancel</button>
+  </div>`;
+}
+async function saveRfp() {
+  const title = $('#ar_title').value.trim(); if (!title) return alert('Title is required');
+  await api('govcon_rfps', {method:'POST', body:JSON.stringify({
+    owner:SESSION.user.id, title, agency:$('#ar_agency').value.trim()||null,
+    deadline:$('#ar_deadline').value||null, set_aside:$('#ar_setaside').value.trim()||null,
+    url:$('#ar_url').value.trim()||null, description:$('#ar_desc').value.trim()||null, source:'manual',
+  })});
+  renderRfps();
+}
+async function addToPipeline(rfpId) {
+  try {
+    await api('govcon_pipeline_items', {method:'POST', prefer:'resolution=ignore-duplicates',
+      body:JSON.stringify({owner:SESSION.user.id, rfp_id:rfpId, stage:'lead'})});
+    toast('Added to pipeline');
+  } catch(e){ alert(e.message); }
+}
+async function runAutopilotNow() {
+  toast('Running Autopilot…', true);
+  try { const r = await callFn('autopilot-run', {action:'run'});
+    let msg = `Autopilot: ${r.new_rfps} new, ${r.added_to_pipeline} to pipeline, ${r.proposals_generated} drafts`;
+    if (r.errors?.length) msg += ` · ⚠ ${r.errors[0]}`;
+    toast(msg);
+    if (r.errors?.length) console.warn('Autopilot source errors:', r.errors);
+    if ($('#rfpList')) renderRfps();
+  } catch(e){ toast('Autopilot failed: '+e.message); }
+}
+
+/* ═══════════════ AUTOPILOT SETTINGS ═══════════════ */
+async function renderAutopilot() {
+  loading();
+  const uid = SESSION.user.id;
+  const rows = await api(`govcon_autopilot_settings?owner=eq.${uid}&select=*`);
+  const s = rows[0] || {owner:uid};
+  const srcChecked = (v) => (s.sources||[]).includes(v) ? 'checked' : '';
+  V().innerHTML = `
+    <div class="banner info">Autopilot discovers, scores, and (optionally) drafts proposals for RFPs matching your profile and keywords. Configure it once, then run manually or on a schedule.</div>
+    <div class="card">
+      <label class="toggle"><input type="checkbox" id="ap_enabled" ${s.enabled?'checked':''}> Enable Autopilot</label>
+      <div class="row2">
+        <div class="field"><label>Run every (hours) — 24 = once a day</label><input id="ap_interval" type="number" min="1" max="24" value="${s.interval_hours||6}"></div>
+        <div class="field"><label>Max RFPs per run</label><input id="ap_max" type="number" value="${s.max_per_run||50}"></div>
+      </div>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Scheduled runs honor this interval once the pg_cron job is enabled (bottom of govcon_backend.sql). "Run now" works any time.</div>
+      <div class="field"><label>Sources</label>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;font-weight:600">
+          <label class="toggle"><input type="checkbox" class="ap_src" value="sam.gov" ${srcChecked('sam.gov')}> SAM.gov</label>
+          <label class="toggle"><input type="checkbox" class="ap_src" value="grants.gov" ${srcChecked('grants.gov')}> Grants.gov</label>
+          <label class="toggle"><input type="checkbox" class="ap_src" value="custom" ${srcChecked('custom')}> Custom Sources</label>
+        </div>
+      </div>
+      <div class="field"><label>Keywords (comma-separated — match your NAICS &amp; capabilities)</label>
+        <input id="ap_keywords" value="${esc((s.keywords||[]).join(', '))}" placeholder="cybersecurity, staffing, IT services"></div>
+
+      <h2 class="section" style="margin-top:8px">Bid window — only keep opportunities due within…</h2>
+      <div class="row2">
+        <div class="field"><label>Earliest (days from today)</label><input id="ap_dmin" type="number" min="0" max="365" value="${s.deadline_min_days??5}"></div>
+        <div class="field"><label>Latest (days from today)</label><input id="ap_dmax" type="number" min="1" max="365" value="${s.deadline_max_days??90}"></div>
+      </div>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Anything with no due date, or due outside this window, is skipped — you only see solicitations you can actually bid.</div>
+
+      <h2 class="section" style="margin-top:8px">Analysis thresholds</h2>
+      <label class="toggle"><input type="checkbox" id="ap_analyze" ${s.auto_analyze!==false?'checked':''}> Auto-analyze relevance &amp; win probability</label>
+      <div class="row2">
+        <div class="field"><label>Min relevance %</label><input id="ap_minrel" type="number" min="0" max="100" value="${s.min_relevance??70}"></div>
+        <div class="field"><label>Min win probability %</label><input id="ap_minwin" type="number" min="0" max="100" value="${s.min_win_probability??60}"></div>
+      </div>
+      <h2 class="section">Proposal generation</h2>
+      <label class="toggle"><input type="checkbox" id="ap_gen" ${s.auto_generate?'checked':''}> Auto-generate drafts when threshold met</label>
+      <div class="row2">
+        <div class="field"><label>Generation threshold (win %)</label><input id="ap_genth" type="number" min="0" max="100" value="${s.generation_threshold??70}"></div>
+        <div class="field"><label>Mode</label><select id="ap_genmode"><option value="draft" ${s.generation_mode!=='comprehensive'?'selected':''}>Draft (faster)</option><option value="comprehensive" ${s.generation_mode==='comprehensive'?'selected':''}>Comprehensive</option></select></div>
+      </div>
+      <h2 class="section">Pipeline</h2>
+      <label class="toggle"><input type="checkbox" id="ap_addpipe" ${s.auto_add_pipeline!==false?'checked':''}> Auto-add qualifying RFPs to Pipeline</label>
+      <label class="toggle"><input type="checkbox" id="ap_prio" ${s.auto_prioritize!==false?'checked':''}> Auto-prioritize by win probability &amp; deadline</label>
+
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn primary" onclick="saveAutopilot()">Save settings</button>
+        <button class="btn" onclick="runAutopilotNow()">✈ Run now</button>
+      </div>
+    </div>`;
+}
+async function saveAutopilot() {
+  const body = {
+    owner: SESSION.user.id,
+    enabled: $('#ap_enabled').checked,
+    interval_hours: +$('#ap_interval').value || 6,
+    max_per_run: +$('#ap_max').value || 50,
+    sources: $$('.ap_src').filter(c=>c.checked).map(c=>c.value),
+    keywords: $('#ap_keywords').value.split(',').map(s=>s.trim()).filter(Boolean),
+    auto_analyze: $('#ap_analyze').checked,
+    deadline_min_days: Math.max(0, +$('#ap_dmin').value||0),
+    deadline_max_days: Math.max(1, +$('#ap_dmax').value||90),
+    min_relevance: +$('#ap_minrel').value, min_win_probability: +$('#ap_minwin').value,
+    auto_generate: $('#ap_gen').checked, generation_threshold: +$('#ap_genth').value,
+    generation_mode: $('#ap_genmode').value,
+    auto_add_pipeline: $('#ap_addpipe').checked, auto_prioritize: $('#ap_prio').checked,
+    updated_at: new Date().toISOString(),
+  };
+  await api('govcon_autopilot_settings', {method:'POST', prefer:'resolution=merge-duplicates', body:JSON.stringify(body)});
+  toast('Autopilot settings saved');
+}
+
+/* ═══════════════ CUSTOM SOURCES ═══════════════ */
+async function renderSources() {
+  loading();
+  const rows = await api(`govcon_custom_sources?owner=eq.${SESSION.user.id}&select=*&order=created_at.desc`);
+  V().innerHTML = `
+    <div class="banner info">Add public opportunity sites for Autopilot to search using CSS selectors. Right-click an element on the site → Inspect → Copy selector. <b>Do not enter site logins here</b> — v1 supports public pages only.</div>
+    <button class="btn primary" onclick="showAddSource()" style="margin-bottom:14px">+ Add source</button>
+    <div id="addSrcBox"></div>
+    ${rows.map(s=>`<div class="rfp">
+      <div class="t">${esc(s.name)} ${s.last_status?`<span class="pill ${s.last_status==='error'?'high':'low'}">${s.last_status}</span>`:''}</div>
+      <div class="m">${esc(s.url)}</div>
+      ${s.last_error?`<div class="m" style="color:var(--bad)">${esc(s.last_error)}</div>`:''}
+      <div class="acts">
+        <button class="btn sm" onclick="testSource('${s.id}')">Test</button>
+        <button class="btn sm" onclick="delSource('${s.id}')">Delete</button>
+      </div></div>`).join('') || '<div class="card center muted">No custom sources yet.</div>'}
+    <div id="srcTest"></div>`;
+}
+function showAddSource() {
+  $('#addSrcBox').innerHTML = `<div class="card" style="margin-bottom:14px">
+    <div class="row2"><div class="field"><label>Name *</label><input id="s_name"></div>
+      <div class="field"><label>Website URL *</label><input id="s_url" placeholder="https://…"></div></div>
+    <div class="field"><label>Search URL (use {query} for keywords)</label><input id="s_search" placeholder="https://site/search?q={query}"></div>
+    <h2 class="section" style="margin-top:4px">CSS selectors</h2>
+    <div class="row3">
+      <div class="field"><label>Results (each item)</label><input id="s_results" placeholder=".result-row"></div>
+      <div class="field"><label>Title</label><input id="s_title" placeholder="h3 a"></div>
+      <div class="field"><label>Link</label><input id="s_link" placeholder="a"></div>
+    </div>
+    <div class="row3">
+      <div class="field"><label>Description</label><input id="s_desc"></div>
+      <div class="field"><label>Deadline</label><input id="s_deadline"></div>
+      <div class="field"><label>Agency</label><input id="s_agency"></div>
+    </div>
+    <button class="btn primary" onclick="saveSource()">Add source</button>
+    <button class="btn" onclick="$('#addSrcBox').innerHTML=''">Cancel</button>
+  </div>`;
+}
+async function saveSource() {
+  const name=$('#s_name').value.trim(), url=$('#s_url').value.trim();
+  if(!name||!url) return alert('Name and URL are required');
+  await api('govcon_custom_sources',{method:'POST',body:JSON.stringify({
+    owner:SESSION.user.id, name, url, search_url:$('#s_search').value.trim()||null,
+    selectors:{results:$('#s_results').value.trim(),title:$('#s_title').value.trim(),link:$('#s_link').value.trim(),
+      description:$('#s_desc').value.trim(),deadline:$('#s_deadline').value.trim(),agency:$('#s_agency').value.trim()},
+  })});
+  renderSources();
+}
+async function testSource(id) {
+  $('#srcTest').innerHTML = '<div class="card muted">Testing…</div>';
+  try { const r = await callFn('autopilot-run',{action:'test-source',source_id:id});
+    $('#srcTest').innerHTML = `<div class="card"><h3 style="margin-top:0">Sample (${r.sample.length})</h3>${
+      r.sample.map(x=>`<div class="rfp"><div class="t">${esc(x.title)}</div><div class="m">${esc(x.agency||'')} · ${esc(x.deadline||'')}</div></div>`).join('')||'<p class="muted">No rows matched — check your selectors.</p>'}</div>`;
+  } catch(e){ $('#srcTest').innerHTML = `<div class="banner bad">${esc(e.message)}</div>`; }
+}
+async function delSource(id){ if(!confirm('Delete this source?'))return; await api(`govcon_custom_sources?id=eq.${id}`,{method:'DELETE'}); renderSources(); }
+
+/* ═══════════════ AI TOOLS ═══════════════ */
+const AI_TOOLS = [
+  {id:'writer',ic:'✍️',nm:'Proposal Writer',d:'Generate a structured proposal draft aligned to RFP requirements.'},
+  {id:'compliance',ic:'✅',nm:'Compliance Checker',d:'Confirm required sections and identify gaps before submission.'},
+  {id:'analyzer',ic:'🔍',nm:'RFP Analyzer',d:'Extract requirements, evaluation factors, and recommended strategy.'},
+  {id:'win-predictor',ic:'📊',nm:'Win Predictor',d:'Estimate win probability based on fit and profile.'},
+  {id:'cost-estimator',ic:'💰',nm:'Cost Estimator',d:'Build a starting cost model from the requirements.'},
+  {id:'team-matcher',ic:'🤝',nm:'Team Matcher',d:'Find partners who fill capability gaps.'},
+];
+let AI_RFPS = [];
+async function renderAi(preselectRfp, preselectTool) {
+  loading();
+  AI_RFPS = await api(`govcon_rfps?owner=eq.${SESSION.user.id}&select=id,title&order=created_at.desc&limit=200`);
+  V().innerHTML = `
+    <div class="tools" id="toolGrid">${AI_TOOLS.map(t=>`
+      <div class="tool" data-tool="${t.id}"><div class="ic">${t.ic}</div><div class="nm">${t.nm}</div><div class="d">${t.d}</div></div>`).join('')}</div>
+    <div id="aiPanel"></div>`;
+  $$('#toolGrid .tool').forEach(el => el.onclick = () => openTool(el.dataset.tool));
+  if (preselectTool) openTool(preselectTool, preselectRfp);
+}
+function openTool(toolId, rfpId) {
+  const t = AI_TOOLS.find(x=>x.id===toolId);
+  $('#aiPanel').innerHTML = `<div class="card" style="margin-top:16px">
+    <h3 style="margin-top:0">${t.ic} ${t.nm}</h3>
+    <div class="field"><label>Choose an RFP</label>
+      <select id="ai_rfp"><option value="">— paste requirements instead —</option>
+        ${AI_RFPS.map(r=>`<option value="${r.id}" ${r.id===rfpId?'selected':''}>${esc(r.title)}</option>`).join('')}</select></div>
+    <div class="field" id="ai_textbox"><label>Or paste RFP requirements</label><textarea id="ai_text" placeholder="Paste key requirements here if not selecting a stored RFP…"></textarea></div>
+    ${toolId==='writer'?`<div class="row2">
+      <div class="field"><label>Mode</label><select id="ai_mode"><option value="draft">Draft (faster)</option><option value="comprehensive">Comprehensive</option></select></div>
+      <div class="field"><label>Tone (optional)</label><input id="ai_tone" placeholder="formal, technical…"></div></div>`:''}
+    <button class="btn primary" id="ai_run">Generate</button>
+    <div id="ai_out"></div>
+  </div>`;
+  $('#ai_run').onclick = () => runAi(toolId);
+}
+function aiFor(rfpId, toolId){ route('ai'); setTimeout(()=>openTool(toolId, rfpId), 60); }
+async function runAi(toolId) {
+  const rfp_id = $('#ai_rfp').value || undefined;
+  const text = $('#ai_text')?.value.trim() || undefined;
+  if (!rfp_id && !text) return alert('Select an RFP or paste requirements.');
+  const btn = $('#ai_run'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Generating…';
+  $('#ai_out').innerHTML = '<div class="muted" style="margin-top:12px">Working — this can take up to a minute for comprehensive output…</div>';
+  try {
+    const options = toolId==='writer' ? {mode:$('#ai_mode').value, tone:$('#ai_tone').value.trim()||undefined} : {};
+    const r = await callFn('govcon-ai', {tool:toolId, rfp_id, text, options});
+    $('#ai_out').innerHTML = `<div class="out">${esc(r.content)}</div>
+      <div class="muted" style="margin-top:8px">Saved to Proposals · ${r.usage?.output_tokens||0} tokens</div>`;
+  } catch(e){ $('#ai_out').innerHTML = `<div class="banner bad" style="margin-top:12px">${esc(e.message)}</div>`; }
+  btn.disabled = false; btn.textContent = 'Generate';
+}
+
+/* ═══════════════ PIPELINE ═══════════════ */
+const STAGES = [['lead','Lead'],['qualified','Qualified'],['in_development','In Development'],['submitted','Submitted'],['awarded','Awarded'],['lost','Lost']];
+let PIPE_VIEW = 'board';   // 'board' | 'grid'
+let PIPE_ITEMS = [];
+async function renderPipeline() {
+  loading();
+  PIPE_ITEMS = await api(`govcon_pipeline_items?owner=eq.${SESSION.user.id}&select=*,govcon_rfps(id,title,agency,deadline,win_probability,url,description)&order=stage_updated_at.desc`);
+  const toggle = `<div class="card" style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <b class="muted">${PIPE_ITEMS.length} opportunities</b><span style="flex:1"></span>
+    <button class="btn sm ${PIPE_VIEW==='board'?'primary':''}" onclick="setPipeView('board')">▦ Board</button>
+    <button class="btn sm ${PIPE_VIEW==='grid'?'primary':''}" onclick="setPipeView('grid')">▤ Grid</button>
+  </div>`;
+  V().innerHTML = toggle + (PIPE_VIEW==='board' ? pipeBoard() : pipeGrid()) + `<div id="leadBox"></div>`;
+  if (PIPE_VIEW==='board') wireDnd();
+}
+function setPipeView(v){ PIPE_VIEW=v; renderPipeline(); }
+
+function pipeBoard() {
+  return `<div class="board">${STAGES.map(([key,label])=>{
+    const col = PIPE_ITEMS.filter(i=>i.stage===key);
+    return `<div class="col" data-stage="${key}" ondragover="event.preventDefault()">
+      <h4>${label}<span class="n">${col.length}</span></h4>
+      ${col.map(pipeCard).join('')}</div>`;
+  }).join('')}</div>
+  <div class="muted" style="font-size:12px;margin-top:8px">Drag a card between columns to change its stage, or click it to view / edit the full lead.</div>`;
+}
+function pipeCard(i) {
+  const r = i.govcon_rfps || {};
+  return `<div class="pcard" draggable="true" data-id="${i.id}">
+    <div class="pt" style="cursor:pointer" onclick="openLead('${i.id}')">${esc(r.title||'RFP')}</div>
+    <div class="muted" style="font-size:11px">${esc(r.agency||'')} · ${fmtDate(r.deadline)}</div>
+    <span class="pill ${i.priority}">${i.priority}</span>
+    ${r.win_probability!=null?`<span class="pill">Win ${r.win_probability}%</span>`:''}
+  </div>`;
+}
+function pipeGrid() {
+  const rows = PIPE_ITEMS.map(i=>{
+    const r = i.govcon_rfps || {};
+    return `<tr style="cursor:pointer" onclick="openLead('${i.id}')">
+      <td style="font-weight:600;color:var(--blue-900)">${esc(r.title||'RFP')}</td>
+      <td>${esc(r.agency||'—')}</td>
+      <td>${fmtDate(r.deadline)}</td>
+      <td><span class="pill ${i.priority}">${i.priority}</span></td>
+      <td>${r.win_probability!=null?r.win_probability+'%':'—'}</td>
+      <td>${esc(STAGES.find(s=>s[0]===i.stage)?.[1]||i.stage)}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="card" style="padding:0;overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:13.5px">
+      <thead><tr style="text-align:left;background:var(--blue-050)">
+        ${['Title','Agency','Deadline','Priority','Win %','Stage'].map(h=>`<th style="padding:10px 12px;border-bottom:1px solid var(--line);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">${h}</th>`).join('')}
+      </tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted)">Pipeline is empty.</td></tr>'}</tbody>
+    </table></div>`;
+}
+// HTML5 drag-and-drop between stage columns
+let DRAG_ID = null;
+function wireDnd() {
+  $$('.pcard[draggable]').forEach(card=>{
+    card.addEventListener('dragstart', e=>{ DRAG_ID=card.dataset.id; card.style.opacity='.4'; e.dataTransfer.effectAllowed='move'; });
+    card.addEventListener('dragend', ()=>{ card.style.opacity='1'; });
+  });
+  $$('.col[data-stage]').forEach(col=>{
+    col.addEventListener('dragover', e=>{ e.preventDefault(); col.style.background='var(--blue-100)'; });
+    col.addEventListener('dragleave', ()=>{ col.style.background=''; });
+    col.addEventListener('drop', async e=>{
+      e.preventDefault(); col.style.background='';
+      const id=DRAG_ID, stage=col.dataset.stage; DRAG_ID=null;
+      if(!id) return;
+      const it = PIPE_ITEMS.find(x=>x.id===id); if(it) it.stage=stage;  // optimistic
+      await moveStage(id, stage);
+    });
+  });
+}
+async function moveStage(id, stage) {
+  await api(`govcon_pipeline_items?id=eq.${id}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({stage, stage_updated_at:new Date().toISOString()})});
+  renderPipeline();
+}
+/* view / edit the full lead (pipeline item + its RFP) */
+/* ── generic scrollable modal ── */
+function openModal(html) {
+  $('#modalRoot').innerHTML = `<div class="ovl" onclick="if(event.target===this)closeModal()"><div class="sheet">${html}</div></div>`;
+  document.body.style.overflow = 'hidden';
+}
+function closeModal() { $('#modalRoot').innerHTML=''; document.body.style.overflow=''; }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+/* ── customizable capability matrix ── */
+const DEFAULT_MATRIX = () => ({
+  columns: ['Requirement','Our Capability','Status','Owner','Notes'],
+  rows: [['','','Partial','','']],
+});
+let MATRIX = DEFAULT_MATRIX();
+function normalizeMatrix(m) {
+  if (!m || !Array.isArray(m.columns) || !m.columns.length) return DEFAULT_MATRIX();
+  return { columns: m.columns.slice(), rows: (m.rows||[]).map(row => m.columns.map((_,i)=>row[i]??'')) };
+}
+const STATUS_OPTS = ['Met','Partial','Gap','N/A'];
+function matrixHtml() {
+  const isStatus = (c) => /status/i.test(c);
+  const head = MATRIX.columns.map((c,ci)=>`<th>
+      <input value="${esc(c)}" data-col="${ci}" style="width:calc(100% - 18px);font:inherit;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);background:transparent;border:none">
+      <button class="colx" title="Delete column" onclick="delMatrixCol(${ci})">×</button></th>`).join('') + '<th style="width:34px"></th>';
+  const body = MATRIX.rows.map((row,ri)=>`<tr>${row.map((cell,ci)=>{
+      if (isStatus(MATRIX.columns[ci])) {
+        return `<td class="stat-${esc(String(cell||'N/A').replace(/[^A-Za-z]/g,'')||'NA')}">
+          <select data-r="${ri}" data-c="${ci}" style="width:100%;border:none;background:transparent;padding:7px 8px;font:inherit">
+            ${STATUS_OPTS.map(o=>`<option ${o===cell?'selected':''}>${o}</option>`).join('')}</select></td>`;
+      }
+      return `<td><textarea data-r="${ri}" data-c="${ci}" rows="1">${esc(cell||'')}</textarea></td>`;
+    }).join('')}<td style="text-align:center"><button class="rowx" title="Delete row" onclick="delMatrixRow(${ri})">×</button></td></tr>`).join('');
+  return `<table class="matx"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn sm" onclick="addMatrixRow()">+ Requirement (row)</button>
+      <button class="btn sm" onclick="addMatrixCol()">+ Column</button>
+      <button class="btn sm" onclick="resetMatrix()">Reset template</button>
+    </div>`;
+}
+function syncMatrixFromDom() {
+  const host = $('#matrixHost'); if(!host) return;
+  host.querySelectorAll('[data-col]').forEach(inp=>{ MATRIX.columns[+inp.dataset.col] = inp.value; });
+  host.querySelectorAll('[data-r]').forEach(el=>{ MATRIX.rows[+el.dataset.r][+el.dataset.c] = el.value; });
+}
+function renderMatrix(){ const h=$('#matrixHost'); if(h) h.innerHTML = matrixHtml(); }
+function addMatrixRow(){ syncMatrixFromDom(); MATRIX.rows.push(MATRIX.columns.map(c=>/status/i.test(c)?'Partial':'')); renderMatrix(); }
+function delMatrixRow(i){ syncMatrixFromDom(); MATRIX.rows.splice(i,1); if(!MATRIX.rows.length) MATRIX.rows.push(MATRIX.columns.map(()=>'')); renderMatrix(); }
+function addMatrixCol(){ syncMatrixFromDom(); const name=prompt('Column name:','Column'); if(name===null)return; MATRIX.columns.push(name||'Column'); MATRIX.rows.forEach(r=>r.push('')); renderMatrix(); }
+function delMatrixCol(i){ if(MATRIX.columns.length<=1) return; syncMatrixFromDom(); MATRIX.columns.splice(i,1); MATRIX.rows.forEach(r=>r.splice(i,1)); renderMatrix(); }
+function resetMatrix(){ if(!confirm('Reset the matrix to the default template? Current rows are cleared.'))return; MATRIX=DEFAULT_MATRIX(); renderMatrix(); }
+
+async function openLead(itemId) {
+  const item = PIPE_ITEMS.find(i=>i.id===itemId) ||
+    (await api(`govcon_pipeline_items?id=eq.${itemId}&select=*,govcon_rfps(*)`))[0];
+  if (!item) return;
+  const rfpRows = await api(`govcon_rfps?id=eq.${item.rfp_id}&select=*`);
+  const r = rfpRows[0] || item.govcon_rfps || {};
+  MATRIX = normalizeMatrix(r.capability_matrix);
+  openModal(`
+    <div class="shd">
+      <h3>${esc(r.title||'Lead')}</h3>
+      <button class="sclose" onclick="closeModal()" title="Close (Esc)">×</button>
+    </div>
+    <div class="sbd">
+      <div class="muted" style="font-size:12px;margin-bottom:12px">${esc(r.source||'')} · ${esc(r.agency||'')} · added ${fmtDate(r.created_at)}${r.url?` · <a href="${esc(r.url)}" target="_blank">Source ↗</a>`:''}</div>
+      <div class="field"><label>Title *</label><input id="ld_title" value="${esc(r.title||'')}"></div>
+      <div class="row3">
+        <div class="field"><label>Stage</label><select id="ld_stage">${STAGES.map(([k,l])=>`<option value="${k}" ${k===item.stage?'selected':''}>${l}</option>`).join('')}</select></div>
+        <div class="field"><label>Priority</label><select id="ld_prio">${['low','medium','high'].map(p=>`<option ${p===item.priority?'selected':''}>${p}</option>`).join('')}</select></div>
+        <div class="field"><label>Deadline</label><input id="ld_deadline" type="date" value="${r.deadline||''}"></div>
+      </div>
+      <div class="row3">
+        <div class="field"><label>Agency</label><input id="ld_agency" value="${esc(r.agency||'')}"></div>
+        <div class="field"><label>Category / NAICS</label><input id="ld_category" value="${esc(r.category||'')}"></div>
+        <div class="field"><label>Set-aside</label><input id="ld_setaside" value="${esc(r.set_aside||'')}"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Budget min ($)</label><input id="ld_bmin" type="number" value="${r.budget_min??''}"></div>
+        <div class="field"><label>Budget max ($)</label><input id="ld_bmax" type="number" value="${r.budget_max??''}"></div>
+      </div>
+      <div class="field"><label>Source URL</label><input id="ld_url" value="${esc(r.url||'')}"></div>
+      <div class="field"><label>Requirements / description</label><textarea id="ld_desc" style="min-height:120px">${esc(r.description||'')}</textarea></div>
+      <div class="field"><label>Stage notes (risks, owners, next actions)</label><textarea id="ld_notes">${esc(item.notes||'')}</textarea></div>
+
+      <h2 class="section">Capability matrix</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Map each requirement to your capability and status. Edit any cell; add or delete rows and columns; the whole matrix saves with the lead.</div>
+      <div id="matrixHost" style="overflow-x:auto"></div>
+
+      <h2 class="section">Generate proposal document</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Fill the template's {{placeholders}} and generate a finished .docx — it's saved to your Document Editor and downloaded.</div>
+      <div id="tplSection"><div class="muted" style="font-size:13px">Loading templates…</div></div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;position:sticky;bottom:0;background:var(--panel);padding-top:12px;border-top:1px solid var(--line)">
+        <button class="btn primary" onclick="saveLead('${item.id}','${item.rfp_id}')">Save lead</button>
+        <button class="btn" onclick="aiFor('${item.rfp_id}','writer')">Generate proposal</button>
+        <button class="btn" onclick="aiFor('${item.rfp_id}','compliance')">Compliance check</button>
+        <span style="flex:1"></span>
+        <button class="btn" style="color:var(--bad)" onclick="removeLead('${item.id}')">Remove</button>
+        <button class="btn" onclick="closeModal()">Close</button>
+      </div>
+    </div>`);
+  renderMatrix();
+  // recolor status cells live
+  $('#matrixHost').addEventListener('change', e=>{ if(e.target.matches('select[data-c]')){ syncMatrixFromDom(); renderMatrix(); } });
+  // template generator (async — fill after the modal is up)
+  tplSectionHtml(r).then(html=>{ const host=$('#tplSection'); if(!host) return; host.innerHTML=html;
+    if($('#tpl_pick')){ tplRenderFields(); $('#tpl_pick').onchange=tplRenderFields; $('#tpl_gen').onclick=tplGenerate; }
+  });
+}
+async function saveLead(itemId, rfpId) {
+  const title = $('#ld_title').value.trim(); if(!title) return alert('Title is required');
+  syncMatrixFromDom();
+  await api(`govcon_rfps?id=eq.${rfpId}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({
+    title, agency:$('#ld_agency').value.trim()||null, category:$('#ld_category').value.trim()||null,
+    set_aside:$('#ld_setaside').value.trim()||null, deadline:$('#ld_deadline').value||null,
+    budget_min:$('#ld_bmin').value===''?null:+$('#ld_bmin').value,
+    budget_max:$('#ld_bmax').value===''?null:+$('#ld_bmax').value,
+    url:$('#ld_url').value.trim()||null, description:$('#ld_desc').value.trim()||null,
+    capability_matrix: MATRIX,
+  })});
+  await api(`govcon_pipeline_items?id=eq.${itemId}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({
+    stage:$('#ld_stage').value, priority:$('#ld_prio').value, notes:$('#ld_notes').value.trim()||null,
+    stage_updated_at:new Date().toISOString(),
+  })});
+  toast('Lead saved');
+  closeModal();
+  renderPipeline();
+}
+async function removeLead(itemId) {
+  if(!confirm('Remove this opportunity from the pipeline? (The RFP stays in Discovery.)')) return;
+  await api(`govcon_pipeline_items?id=eq.${itemId}`, {method:'DELETE', prefer:'return=minimal'});
+  toast('Removed from pipeline');
+  closeModal();
+  renderPipeline();
+}
+
+/* ═══════════════ AWARDS RESEARCH ═══════════════ */
+let AWARD_SORT = 'amount';
+async function renderAwards() {
+  loading();
+  const order = AWARD_SORT==='amount' ? 'amount.desc.nullslast' : 'award_date.desc.nullslast';
+  const rows = await api(`govcon_awards?owner=eq.${SESSION.user.id}&select=*&order=${order}&limit=300`);
+  const money = (v) => v==null ? '—' : '$'+Number(v).toLocaleString();
+  V().innerHTML = `
+    <div class="banner info">Previously <b>won</b> contracts from SAM.gov award notices matching your keywords and NAICS codes — with the awarded amount, so you can see what this work actually pays. Uses your saved Autopilot keywords.</div>
+    <div class="card" style="margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn primary" id="awSearch">◆ Search awarded contracts</button>
+      <label style="margin:0">Look back</label>
+      <select id="awLookback" style="width:auto">
+        <option value="90">90 days</option><option value="180">180 days</option><option value="365" selected>1 year</option>
+      </select>
+      <label style="margin:0">Sort by</label>
+      <select id="awSort" style="width:auto">
+        <option value="amount" ${AWARD_SORT==='amount'?'selected':''}>Amount (high → low)</option>
+        <option value="date" ${AWARD_SORT==='date'?'selected':''}>Award date (newest)</option>
+      </select>
+      <span class="muted">${rows.length} stored</span>
+    </div>
+    <div id="awList">${rows.map(a=>`<div class="rfp">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div class="t">${esc(a.title)}</div>
+        <div class="t" style="color:var(--good);white-space:nowrap">${money(a.amount)}</div>
+      </div>
+      <div class="m">${esc(a.agency||'—')} · awarded ${fmtDate(a.award_date)} · NAICS ${esc(a.naics||'—')}${a.set_aside?` · ${esc(a.set_aside)}`:''}</div>
+      ${a.awardee?`<div class="m">Won by: <b>${esc(a.awardee)}</b></div>`:''}
+      <div class="acts">${a.url?`<a class="btn sm" href="${esc(a.url)}" target="_blank">View notice ↗</a>`:''}
+        <button class="btn sm" style="color:var(--bad)" onclick="delAward('${a.id}')">Remove</button></div>
+    </div>`).join('') || '<div class="card center muted">No awards stored yet — click "Search awarded contracts".</div>'}</div>`;
+  $('#awSort').onchange = (e)=>{ AWARD_SORT=e.target.value; renderAwards(); };
+  $('#awSearch').onclick = async () => {
+    const b=$('#awSearch'); b.disabled=true; b.textContent='Searching…';
+    try {
+      const r = await callFn('autopilot-run', {action:'awards', lookback_days:+$('#awLookback').value});
+      toast(`Awards: ${r.found} found, ${r.new_awards} new`);
+      renderAwards();
+    } catch(e){ toast('Award search failed: '+e.message); b.disabled=false; b.textContent='◆ Search awarded contracts'; }
+  };
+}
+async function delAward(id){ await api(`govcon_awards?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); renderAwards(); }
+
+/* ═══════════════ PARTNERS ═══════════════ */
+async function renderPartners() {
+  loading();
+  const [all, mine] = await Promise.all([
+    api(`govcon_partners?select=*&order=created_at.desc&limit=200`),
+    api(`govcon_partners?owner=eq.${SESSION.user.id}&select=id`),
+  ]);
+  const mineIds = new Set(mine.map(m=>m.id));
+  V().innerHTML = `
+    <div class="banner info">Find teaming partners to fill capability gaps and strengthen bids. List your own company so others can find you.</div>
+    <button class="btn primary" onclick="showAddPartner()" style="margin-bottom:14px">+ List my company</button>
+    <div id="addPartnerBox"></div>
+    ${all.map(p=>`<div class="rfp">
+      <div class="t">${esc(p.company_name)} ${mineIds.has(p.id)?'<span class="pill">you</span>':''}</div>
+      <div class="m">${esc(p.location||'')} ${p.contact_email?'· '+esc(p.contact_email):''}</div>
+      ${p.description?`<div class="m">${esc(p.description)}</div>`:''}
+      <div class="chips" style="margin-top:6px">${(p.capabilities||[]).map(c=>`<span class="chip">${esc(c)}</span>`).join('')}${(p.certifications||[]).map(c=>`<span class="chip">${esc(c)}</span>`).join('')}</div>
+      ${!mineIds.has(p.id)?`<div class="acts"><button class="btn sm primary" onclick="requestPartner('${p.id}','${esc(p.company_name)}')">Request to team</button></div>`:''}
+    </div>`).join('') || '<div class="card center muted">No partners listed yet.</div>'}`;
+}
+function showAddPartner() {
+  $('#addPartnerBox').innerHTML = `<div class="card" style="margin-bottom:14px">
+    <div class="field"><label>Company name *</label><input id="p_name" value="${esc(PROFILE?.company_name||'')}"></div>
+    <div class="field"><label>Description</label><textarea id="p_desc"></textarea></div>
+    <div class="row2"><div class="field"><label>Capabilities (comma-separated)</label><input id="p_caps"></div>
+      <div class="field"><label>Certifications</label><input id="p_certs" value="${esc((PROFILE?.certifications||[]).join(', '))}"></div></div>
+    <div class="row2"><div class="field"><label>Location</label><input id="p_loc"></div>
+      <div class="field"><label>Contact email</label><input id="p_email" value="${esc(SESSION.user.email)}"></div></div>
+    <button class="btn primary" onclick="savePartner()">Publish listing</button>
+  </div>`;
+}
+async function savePartner() {
+  const company_name=$('#p_name').value.trim(); if(!company_name) return alert('Company name required');
+  await api('govcon_partners',{method:'POST',body:JSON.stringify({
+    owner:SESSION.user.id, company_name, description:$('#p_desc').value.trim()||null,
+    capabilities:$('#p_caps').value.split(',').map(s=>s.trim()).filter(Boolean),
+    certifications:$('#p_certs').value.split(',').map(s=>s.trim()).filter(Boolean),
+    location:$('#p_loc').value.trim()||null, contact_email:$('#p_email').value.trim()||null,
+  })});
+  renderPartners();
+}
+async function requestPartner(id, name) {
+  const message = prompt(`Message to ${name}:`, 'We would like to explore teaming on an upcoming opportunity.');
+  if (message===null) return;
+  await api('govcon_partner_requests',{method:'POST',body:JSON.stringify({from_owner:SESSION.user.id,to_partner:id,message})});
+  toast('Teaming request sent');
+}
+
+/* ═══════════════ ANALYTICS ═══════════════ */
+async function renderAnalytics() {
+  loading();
+  const uid = SESSION.user.id;
+  const [pipeline, proposals] = await Promise.all([
+    api(`govcon_pipeline_items?owner=eq.${uid}&select=stage`),
+    api(`govcon_proposals?owner=eq.${uid}&select=id,status`),
+  ]);
+  const byStage = Object.fromEntries(STAGES.map(([k])=>[k, pipeline.filter(p=>p.stage===k).length]));
+  const awarded = byStage.awarded||0, lost = byStage.lost||0, closed = awarded+lost;
+  const winRate = closed ? Math.round(awarded/closed*100) : 0;
+  const leads = pipeline.length;
+  const conv = leads ? Math.round(awarded/leads*100) : 0;
+  V().innerHTML = `
+    <div class="cards kpis">
+      ${kpi('Win Rate', winRate+'%', `${awarded}/${closed} closed`)}
+      ${kpi('Conversion', conv+'%', 'lead → award')}
+      ${kpi('Proposals', proposals.length, 'total generated')}
+      ${kpi('Active', (leads-closed), 'in pipeline')}
+    </div>
+    <h2 class="section">Pipeline by stage</h2>
+    <div class="card">${STAGES.map(([k,l])=>{
+      const n = byStage[k]||0; const pct = leads ? Math.round(n/leads*100) : 0;
+      return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px"><b>${l}</b><span class="muted">${n}</span></div>
+        <div style="background:var(--blue-050);border-radius:8px;height:12px;overflow:hidden;margin-top:3px"><div style="width:${pct}%;height:100%;background:var(--blue-600)"></div></div></div>`;
+    }).join('')}</div>`;
+}
+
+/* ═══════════════ PROFILE & SETTINGS ═══════════════ */
+async function renderProfile() {
+  loading();
+  const p = PROFILE || {};
+  const pref = p.preferences || {};
+  V().innerHTML = `<div class="card">
+    <h2 class="section" style="margin-top:0">Company profile</h2>
+    <div class="row2">
+      <div class="field"><label>Company name</label><input id="pf_company" value="${esc(p.company_name||'')}"></div>
+      <div class="field"><label>Legal business name</label><input id="pf_legal" value="${esc(p.legal_name||'')}"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>UEI</label><input id="pf_uei" value="${esc(p.uei||'')}"></div>
+      <div class="field"><label>CAGE code</label><input id="pf_cage" value="${esc(p.cage||'')}"></div>
+    </div>
+    <div class="field"><label>NAICS codes (comma-separated, up to 5)</label><input id="pf_naics" value="${esc((p.naics||[]).join(', '))}"></div>
+    <div class="row2">
+      <div class="field"><label>Business size</label><input id="pf_size" value="${esc(p.business_size||'')}" placeholder="Small / Large"></div>
+      <div class="field"><label>Certifications (comma-separated)</label><input id="pf_certs" value="${esc((p.certifications||[]).join(', '))}" placeholder="8(a), WOSB, HUBZone, SDVOSB"></div>
+    </div>
+    <div class="field"><label>Capabilities statement</label><textarea id="pf_caps">${esc(p.capabilities||'')}</textarea></div>
+
+    <h2 class="section">Preferences</h2>
+    <div class="row2">
+      <div class="field"><label>Categories of interest</label><input id="pf_cats" value="${esc((pref.categories||[]).join(', '))}" placeholder="IT, Construction, Professional Services"></div>
+      <div class="field"><label>Geographic preference</label><input id="pf_geo" value="${esc(pref.geo||'')}"></div>
+    </div>
+    <button class="btn primary" onclick="saveProfile()">Save profile</button>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h2 class="section" style="margin-top:0">API keys</h2>
+    <div class="muted" style="font-size:12.5px;margin-bottom:12px">
+      Add as many labeled keys as you want. Autopilot and Awards Research use your newest
+      <b>sam.gov</b> key automatically. Keys for other portals (eMMA, Ohio, …) are stored for
+      those sources as they come online — pair them with a Custom Source for now.
+    </div>
+    <div id="keyList" class="muted">Loading…</div>
+    <h2 class="section">Add a key</h2>
+    <div class="row3">
+      <div class="field"><label>Label</label><input id="k_label" placeholder="My SAM key"></div>
+      <div class="field"><label>Provider</label>
+        <select id="k_provider">
+          <option value="sam.gov">sam.gov</option>
+          <option value="emma">eMMA (Maryland)</option>
+          <option value="ohio">Ohio</option>
+          <option value="other">other…</option>
+        </select></div>
+      <div class="field"><label>Key</label><input id="k_value" placeholder="paste key"></div>
+    </div>
+    <div class="field hide" id="k_otherBox"><label>Provider name</label><input id="k_other" placeholder="e.g. texas-smartbuy"></div>
+    <button class="btn primary" onclick="addKey()">Add key</button>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h2 class="section" style="margin-top:0">Scraping &amp; weekly schedule</h2>
+    <div class="muted" style="font-size:12.5px;margin-bottom:12px">
+      Pull opportunities from portals with no API (OhioBuys, Maryland eMMA) on a schedule.
+      The Playwright scrapers run headless (GitHub Actions or your own machine) and use the
+      ingest token below — see <b>scrapers/README.md</b>.
+    </div>
+    <div id="scrapeBox" class="muted">Loading…</div>
+  </div>`;
+  $('#k_provider').onchange = (e)=>$('#k_otherBox').classList.toggle('hide', e.target.value!=='other');
+  loadKeys();
+  loadScraping();
+}
+
+/* Scraping settings: portals, weekly schedule, ingest token */
+async function loadScraping() {
+  const uid = SESSION.user.id;
+  const [sRows, sources] = await Promise.all([
+    api(`govcon_autopilot_settings?owner=eq.${uid}&select=schedule_days,schedule_time,schedule_tz,scrape_last_run`),
+    api(`govcon_scrape_sources?owner=eq.${uid}&select=*`),
+  ]);
+  const s = sRows[0] || {};
+  const on = (portal) => (sources.find(x=>x.portal===portal)||{}).enabled ? 'checked' : '';
+  const status = (portal) => { const x=sources.find(v=>v.portal===portal); return x?.last_status ? ` · <span class="pill ${x.last_status==='error'?'high':'low'}">${x.last_status}</span>${x.last_error?` <span class="muted" style="font-size:11px">${esc(x.last_error)}</span>`:''}` : ''; };
+  const days = s.schedule_days || [];
+  const DOW = [['0','Sun'],['1','Mon'],['2','Tue'],['3','Wed'],['4','Thu'],['5','Fri'],['6','Sat']];
+  const token = PROFILE?.ingest_token || '(run migration 3, then reload)';
+  $('#scrapeBox').innerHTML = `
+    <div class="field"><label>Portals</label>
+      <label class="toggle"><input type="checkbox" id="sc_ohiobuys" ${on('ohiobuys')}> OhioBuys (Ohio)${status('ohiobuys')}</label>
+      <label class="toggle"><input type="checkbox" id="sc_emma" ${on('emma')}> Maryland eMMA${status('emma')}</label>
+    </div>
+    <div class="field"><label>Run on these days</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${DOW.map(([v,l])=>`
+        <label class="chip" style="cursor:pointer"><input type="checkbox" class="sc_day" value="${v}" ${days.map(String).includes(v)?'checked':''} style="width:auto"> ${l}</label>`).join('')}</div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>At time (24h, local)</label><input id="sc_time" type="time" value="${esc(s.schedule_time||'17:00')}"></div>
+      <div class="field"><label>Timezone</label><input id="sc_tz" value="${esc(s.schedule_tz||'America/New_York')}" placeholder="America/New_York"></div>
+    </div>
+    <div class="muted" style="font-size:12px;margin:-4px 0 10px">Example: check <b>Fri</b>, set <b>17:00</b>, tz <b>America/New_York</b> → runs every Friday at 5pm.
+      ${s.scrape_last_run?`Last scrape: ${new Date(s.scrape_last_run).toLocaleString()}.`:''}</div>
+    <button class="btn primary" onclick="saveScraping()">Save schedule &amp; portals</button>
+
+    <h2 class="section">Ingest token</h2>
+    <div class="muted" style="font-size:12.5px;margin-bottom:8px">The scraper authenticates with this (not your login). Put it in the GitHub Actions secret <code>C2_INGEST_TOKEN</code>.</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input id="sc_token" readonly value="${esc(token)}" style="flex:1;min-width:260px;font-family:monospace;font-size:12px">
+      <button class="btn sm" onclick="copyToken()">Copy</button>
+      <button class="btn sm" style="color:var(--bad)" onclick="regenToken()">Regenerate</button>
+    </div>`;
+}
+async function saveScraping() {
+  const uid = SESSION.user.id;
+  const days = $$('.sc_day').filter(c=>c.checked).map(c=>+c.value);
+  await api('govcon_autopilot_settings', {method:'POST', prefer:'resolution=merge-duplicates', body:JSON.stringify({
+    owner:uid, schedule_days:days, schedule_time:$('#sc_time').value||'17:00',
+    schedule_tz:$('#sc_tz').value.trim()||'America/New_York', updated_at:new Date().toISOString(),
+  })});
+  // upsert each portal's enabled flag
+  for (const portal of ['ohiobuys','emma']) {
+    await api('govcon_scrape_sources?on_conflict=owner,portal', {method:'POST',
+      prefer:'resolution=merge-duplicates,return=minimal',
+      body:JSON.stringify({owner:uid, portal, enabled: $('#sc_'+portal).checked})});
   }
+  toast('Schedule & portals saved');
+  loadScraping();
+}
+function copyToken(){ navigator.clipboard.writeText($('#sc_token').value).then(()=>toast('Token copied')); }
+async function regenToken() {
+  if(!confirm('Regenerate the ingest token? Any scraper using the old one will stop working until updated.')) return;
+  const rows = await api(`govcon_profiles?user_id=eq.${SESSION.user.id}`, {method:'PATCH',
+    body:JSON.stringify({ingest_token: crypto.randomUUID()})});
+  PROFILE = rows[0] || PROFILE;
+  toast('New token generated'); loadScraping();
+}
+async function loadKeys() {
+  const rows = await api(`govcon_api_keys?owner=eq.${SESSION.user.id}&select=id,label,provider,key_value,created_at&order=created_at.desc`);
+  const mask = (v)=> v.length>10 ? v.slice(0,6)+'…'+v.slice(-4) : '••••';
+  $('#keyList').innerHTML = rows.length ? rows.map(k=>`
+    <div class="rfp" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div><b>${esc(k.label)}</b> <span class="pill">${esc(k.provider)}</span>
+        <span class="muted" style="font-family:monospace;font-size:12px">${esc(mask(k.key_value))}</span></div>
+      <button class="btn sm" style="color:var(--bad)" onclick="delKey('${k.id}')">Delete</button>
+    </div>`).join('') : '<p class="muted">No keys yet.</p>';
+}
+async function addKey() {
+  const label=$('#k_label').value.trim(), value=$('#k_value').value.trim();
+  let provider=$('#k_provider').value;
+  if (provider==='other') provider = $('#k_other').value.trim().toLowerCase();
+  if (!label||!value||!provider) return alert('Label, provider, and key are all required.');
+  await api('govcon_api_keys',{method:'POST',body:JSON.stringify({owner:SESSION.user.id,label,provider,key_value:value})});
+  $('#k_label').value=$('#k_value').value='';
+  toast('Key saved'); loadKeys();
+}
+async function delKey(id){ if(!confirm('Delete this key?'))return; await api(`govcon_api_keys?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); loadKeys(); }
+async function saveProfile() {
+  const body = {
+    company_name:$('#pf_company').value.trim()||null, legal_name:$('#pf_legal').value.trim()||null,
+    uei:$('#pf_uei').value.trim()||null, cage:$('#pf_cage').value.trim()||null,
+    naics:$('#pf_naics').value.split(',').map(s=>s.trim()).filter(Boolean),
+    business_size:$('#pf_size').value.trim()||null,
+    certifications:$('#pf_certs').value.split(',').map(s=>s.trim()).filter(Boolean),
+    capabilities:$('#pf_caps').value.trim()||null,
+    preferences:{categories:$('#pf_cats').value.split(',').map(s=>s.trim()).filter(Boolean), geo:$('#pf_geo').value.trim()},
+    updated_at:new Date().toISOString(),
+  };
+  const rows = await api(`govcon_profiles?user_id=eq.${SESSION.user.id}`, {method:'PATCH', body:JSON.stringify(body)});
+  PROFILE = rows[0] || {...PROFILE, ...body};
+  toast('Profile saved');
+}
 
-  async function ensureTrial(u){
-    let { data } = await sb.from('trials').select('*').eq('user_id',u.id).maybeSingle();
-    if(!data){
-      const created=u.created_at?new Date(u.created_at):new Date();
-      const ends=new Date(created.getTime()+7*86400000).toISOString();
-      const ins=await sb.from('trials').insert({ user_id:u.id, email:u.email, full_name:u.user_metadata?.full_name||'', trial_started_at:created.toISOString(), trial_ends_at:ends }).select().single();
-      data=ins.data;
-    }
-    return data;
+/* ═══════════════ DOCUMENT TOOLS (embed existing pages) ═══════════════ */
+function embed(src, label) {
+  V().innerHTML = `
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)">
+        <b>${label}</b><span class="muted" style="font-size:12px">— embedded from ${esc(src)}</span>
+        <span style="flex:1"></span>
+        <a class="btn sm" href="${esc(src)}" target="_blank">Open full screen ↗</a>
+      </div>
+      <iframe src="${esc(src)}" title="${esc(label)}"
+        style="width:100%;height:calc(100vh - 160px);border:0;display:block"
+        allow="clipboard-read; clipboard-write"></iframe>
+    </div>`;
+}
+function renderCreateDoc(){ embed('document-creation.html', 'Create & Send'); }
+
+/* ═══════════════ DOCUMENT EDITOR (real OnlyOffice · your GovCon login) ═══════
+   Library backed by this project's private "documents" bucket. Files open in
+   the real OnlyOffice editor via the oo-config edge function — no second login.
+   Plus a {{token}} template engine (docxtemplater) that fills proposals from a
+   lead's data. */
+const DOCS_BUCKET = 'documents';
+const OO_API = 'https://docs.connexiontwo.com/web-apps/apps/api/documents/api.js';
+const PIZZIP_CDN = 'https://cdn.jsdelivr.net/npm/pizzip@3.1.7/dist/pizzip.min.js';
+const DOCXT_CDN  = 'https://cdn.jsdelivr.net/npm/docxtemplater@3.50.0/build/docxtemplater.js';
+let ooEditor = null;
+function loadScript(src){ return new Promise((res,rej)=>{ if([...document.scripts].some(s=>s.src===src)) return res();
+  const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('load '+src)); document.head.appendChild(s); }); }
+function edDownload(blob, filename){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); }
+const edDir = () => SESSION.user.id;
+function fileGlyph(ext){ ext=(ext||'').toLowerCase();
+  if(['xls','xlsx','xlsm','csv','ods'].includes(ext)) return {c:'#217346',t:'XLS'};
+  if(['ppt','pptx','odp'].includes(ext)) return {c:'#c43e1c',t:'PPT'};
+  if(ext==='pdf') return {c:'#d93025',t:'PDF'};
+  if(['doc','docx','odt','rtf','txt'].includes(ext)) return {c:'#2b579a',t:'DOC'};
+  return {c:'#6b7785',t:(ext||'?').slice(0,3).toUpperCase()}; }
+
+async function renderEditor() {
+  loading();
+  let files=[], templates=[], bucketErr=null;
+  try { const { data, error } = await sb.storage.from(DOCS_BUCKET).list(edDir(), {sortBy:{column:'updated_at',order:'desc'}});
+    if(error) bucketErr=error.message; else files=(data||[]).filter(f=>f.id && !f.name.startsWith('.')); }
+  catch(e){ bucketErr=e.message; }
+  try { templates = await api(`govcon_templates?owner=eq.${SESSION.user.id}&select=id,name,tokens,created_at&order=created_at.desc`); } catch(e){}
+  V().innerHTML = `
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <label class="btn primary" style="cursor:pointer">⬆ Upload document
+          <input type="file" id="edFile" accept=".docx,.xlsx,.pptx,.doc,.xls,.ppt,.odt,.ods,.odp,.txt,.csv,.pdf" hidden></label>
+        <button class="btn" id="edRefresh">Refresh</button>
+        <span style="flex:1"></span>
+        <input id="edSearch" placeholder="Search documents…" style="width:220px;max-width:50vw">
+      </div>
+      ${bucketErr?`<div class="banner warn" style="margin:12px 0 0">Document storage isn't set up yet: ${esc(bucketErr)}. Run <b>govcon_migration_5.sql</b> and deploy the <b>oo-config</b> / <b>oo-callback</b> functions.</div>`:''}
+    </div>
+    <h2 class="section" style="margin-top:0">Documents</h2>
+    <div class="tools" id="edGrid">${files.length ? files.map(f=>{
+      const ext=(f.name.split('.').pop()||''); const g=fileGlyph(ext);
+      return `<div class="tool" data-open="${esc(f.name)}" style="position:relative">
+        <button class="btn sm" style="position:absolute;top:8px;right:8px;color:var(--bad)" data-del="${esc(f.name)}">✕</button>
+        <div class="ic" style="width:42px;height:42px;border-radius:10px;background:${g.c};color:#fff;display:grid;place-items:center;font-weight:800;font-size:12px">${g.t}</div>
+        <div class="nm" style="word-break:break-word">${esc(f.name)}</div>
+        <div class="d muted" style="font-size:12px">${f.updated_at?new Date(f.updated_at).toLocaleDateString():''} · ${f.metadata?.size?(f.metadata.size/1024).toFixed(0)+' KB':''}</div>
+      </div>`;
+    }).join('') : `<div class="card center muted" style="grid-column:1/-1">No documents yet. Upload one, or generate a proposal from a template inside a Pipeline lead.</div>`}</div>
+
+    <h2 class="section">Proposal templates</h2>
+    <div class="banner info">Upload a <b>.docx</b> that contains <kbd>{{PLACEHOLDERS}}</kbd> (e.g. your Technical Proposal Template). Each placeholder becomes a fillable field inside a Pipeline lead, and generates a finished document.</div>
+    <div class="card">
+      <label class="btn primary" style="cursor:pointer;margin-bottom:12px;display:inline-flex">⬆ Upload template (.docx)
+        <input type="file" id="tplFile" accept=".docx" hidden></label>
+      <div id="tplList">${templates.length ? templates.map(t=>`
+        <div class="rfp" style="margin-bottom:8px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+          <div><b>${esc(t.name)}</b> <span class="muted" style="font-size:12px">· ${(t.tokens||[]).length} field(s)</span>
+            <div class="chips" style="margin-top:6px">${(t.tokens||[]).slice(0,12).map(tk=>`<span class="chip">${esc(tk)}</span>`).join('')}${(t.tokens||[]).length>12?'<span class="chip">…</span>':''}</div></div>
+          <button class="btn sm" style="color:var(--bad)" data-tpldel="${t.id}">Delete</button>
+        </div>`).join('') : '<p class="muted">No templates yet.</p>'}</div>
+    </div>`;
+
+  // documents
+  $('#edFile').onchange = e=>{ if(e.target.files[0]) edUploadDoc(e.target.files[0]); };
+  $('#edRefresh').onclick = renderEditor;
+  $('#edSearch').oninput = e=>{ const q=e.target.value.toLowerCase(); $$('#edGrid .tool').forEach(el=>{ el.style.display = el.dataset.open.toLowerCase().includes(q)?'':'none'; }); };
+  $('#edGrid').addEventListener('click', e=>{
+    const del=e.target.closest('[data-del]'); if(del){ e.stopPropagation(); edDeleteDoc(del.dataset.del); return; }
+    const open=e.target.closest('[data-open]'); if(open) edOpenDoc(open.dataset.open);
+  });
+  // templates
+  $('#tplFile').onchange = e=>{ if(e.target.files[0]) tplUpload(e.target.files[0]); };
+  $('#tplList').addEventListener('click', e=>{ const d=e.target.closest('[data-tpldel]'); if(d) tplDelete(d.dataset.tpldel); });
+}
+async function edUploadDoc(file) {
+  try {
+    const { error } = await sb.storage.from(DOCS_BUCKET).upload(`${edDir()}/${file.name}`, file, {upsert:false});
+    if(error) throw error;
+    toast('Uploaded '+file.name); edOpenDoc(file.name);
+  } catch(e){ alert('Upload failed: '+e.message); }
+}
+async function edDeleteDoc(name){
+  if(!confirm('Delete "'+name+'"?')) return;
+  const { error } = await sb.storage.from(DOCS_BUCKET).remove([`${edDir()}/${name}`]);
+  if(error){ alert('Delete failed: '+error.message); return; }
+  toast('Deleted'); renderEditor();
+}
+async function edOpenDoc(name) {
+  // full-screen OnlyOffice editor
+  let scr = $('#ooScreen');
+  if(!scr){ scr=document.createElement('div'); scr.id='ooScreen';
+    scr.style.cssText='position:fixed;inset:0;z-index:1000;background:#fff;display:none';
+    scr.innerHTML='<div id="ooPlaceholder" style="width:100%;height:100%"></div>'+
+      '<button id="ooClose" style="position:absolute;top:10px;right:12px;z-index:1001;border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer">Close</button>';
+    document.body.appendChild(scr); $('#ooClose').onclick=edCloseEditor; }
+  scr.style.display='block';
+  try {
+    await loadScript(OO_API);
+    const token = await freshToken();
+    const res = await fetch(`${SB_URL}/functions/v1/oo-config?file=${encodeURIComponent(edDir()+'/'+name)}`,
+      { headers:{ Authorization:`Bearer ${token}` } });
+    const cfg = await res.json();
+    if(!res.ok || cfg.error) throw new Error(cfg.error||('HTTP '+res.status));
+    cfg.width='100%'; cfg.height='100%';
+    cfg.type = (window.innerWidth<=768)?'mobile':'desktop';
+    cfg.events = { onRequestClose: edCloseEditor };
+    if(ooEditor){ ooEditor.destroyEditor(); ooEditor=null; }
+    if(!window.DocsAPI) throw new Error('OnlyOffice script did not load (check docs.connexiontwo.com)');
+    ooEditor = new window.DocsAPI.DocEditor('ooPlaceholder', cfg);
+  } catch(e){ alert('Could not open document: '+e.message); edCloseEditor(); }
+}
+function edCloseEditor(){ if(ooEditor){ try{ooEditor.destroyEditor();}catch(_){} ooEditor=null; }
+  const scr=$('#ooScreen'); if(scr) scr.style.display='none'; renderEditor(); }
+
+/* ── {{token}} template engine (docxtemplater) ── */
+function abToB64(buf){ const bytes=new Uint8Array(buf); let bin=''; const chunk=0x8000;
+  for(let i=0;i<bytes.length;i+=chunk) bin+=String.fromCharCode.apply(null, bytes.subarray(i,i+chunk)); return btoa(bin); }
+async function tplEnsureLibs(){ await loadScript(PIZZIP_CDN); await loadScript(DOCXT_CDN); }
+function tplDelimOpts(extra){ return Object.assign({paragraphLoop:true, linebreaks:true, delimiters:{start:'{{',end:'}}'}}, extra||{}); }
+async function tplExtractTokens(binaryString){
+  await tplEnsureLibs();
+  const zip = new window.PizZip(binaryString);
+  const doc = new window.docxtemplater(zip, tplDelimOpts());
+  const text = doc.getFullText();                 // template text incl. {{tokens}}
+  const set = new Set();
+  (text.match(/\{\{\s*[^{}]+?\s*\}\}/g)||[]).forEach(m=>{ const t=m.replace(/^\{\{\s*|\s*\}\}$/g,'').trim(); if(t) set.add(t); });
+  return [...set];
+}
+async function tplUpload(file){
+  if(!/\.docx$/i.test(file.name)) return alert('Please upload a .docx template.');
+  try {
+    const buf = await file.arrayBuffer();
+    const b64 = abToB64(buf);
+    const tokens = await tplExtractTokens(atob(b64));
+    await api('govcon_templates', {method:'POST', prefer:'return=minimal', body:JSON.stringify({
+      owner:SESSION.user.id, name:file.name.replace(/\.docx$/i,''), tokens, docx_b64:b64,
+    })});
+    toast(`Template saved — ${tokens.length} field(s) found`); renderEditor();
+  } catch(e){ alert('Could not read that template: '+e.message); }
+}
+async function tplDelete(id){ if(!confirm('Delete this template?'))return; await api(`govcon_templates?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); renderEditor(); }
+
+// map a placeholder to a sensible default from the lead + company profile
+function tplGuess(token, r){
+  const t = token.toLowerCase(), today = new Date().toISOString().slice(0,10);
+  if (/due|deadline|close/.test(t)) return r.deadline || '';
+  if (/submission|today|date/.test(t)) return today;
+  if (/solicit|rf[qp].?(num|no|#|number)|notice/.test(t)) return (r.notice_id||'').replace(/^[a-z.]+:/,'') || r.title || '';
+  if (/department|agency|customer/.test(t)) return r.agency || '';
+  if (/set.?aside/.test(t)) return r.set_aside || '';
+  if (/company|offeror|contractor(?!ing)/.test(t)) return PROFILE?.company_name || '';
+  return '';
+}
+// build the fields UI + generate handler for a lead's pop-up
+async function tplSectionHtml(r){
+  const tpls = await api(`govcon_templates?owner=eq.${SESSION.user.id}&select=id,name,tokens&order=created_at.desc`);
+  if(!tpls.length) return `<div class="muted" style="font-size:13px">No templates yet — upload one under <b>Documents → Proposal templates</b> to generate proposals here.</div>`;
+  const opts = tpls.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  window._LEAD_TPLS = tpls; window._LEAD_RFP = r;
+  return `<div class="field"><label>Template</label><select id="tpl_pick">${opts}</select></div>
+    <div id="tpl_fields"></div>
+    <button class="btn primary" id="tpl_gen">Generate document</button>
+    <div id="tpl_out"></div>`;
+}
+function tplRenderFields(){
+  const t = (window._LEAD_TPLS||[]).find(x=>x.id===$('#tpl_pick').value); if(!t) return;
+  const r = window._LEAD_RFP||{};
+  $('#tpl_fields').innerHTML = (t.tokens||[]).length
+    ? `<div class="row2">${t.tokens.map((tk,i)=>`<div class="field"><label>${esc(tk)}</label><input class="tplv" data-k="${esc(tk)}" value="${esc(tplGuess(tk,r))}"></div>`).join('')}</div>`
+    : '<div class="muted" style="font-size:13px">This template has no {{placeholders}} — generating will just copy it.</div>';
+}
+async function tplGenerate(){
+  const t = (window._LEAD_TPLS||[]).find(x=>x.id===$('#tpl_pick').value); if(!t) return;
+  const out = $('#tpl_out'); const btn=$('#tpl_gen'); btn.disabled=true; btn.textContent='Generating…';
+  try {
+    const rows = await api(`govcon_templates?id=eq.${t.id}&select=docx_b64`);
+    const b64 = rows[0]?.docx_b64; if(!b64) throw new Error('template file missing');
+    await tplEnsureLibs();
+    const data = {}; $$('.tplv').forEach(i=>{ data[i.dataset.k] = i.value; });
+    const zip = new window.PizZip(atob(b64));
+    const doc = new window.docxtemplater(zip, tplDelimOpts({nullGetter:()=> ''}));
+    doc.render(data);
+    const blob = doc.getZip().generate({type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+    const fname = `${(window._LEAD_RFP?.title||'Proposal').replace(/[^\w \-]+/g,'').slice(0,60)} — ${t.name}.docx`;
+    // save to the document library (so it opens in the editor) + offer download
+    let saved=false;
+    try { const {error}=await sb.storage.from(DOCS_BUCKET).upload(`${edDir()}/${fname}`, blob, {upsert:true, contentType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}); if(!error) saved=true; } catch(_){}
+    edDownload(blob, fname);
+    out.innerHTML = `<div class="banner info" style="margin-top:10px">✓ Generated <b>${esc(fname)}</b>. ${saved?'Saved to your Document Editor library — ':''}downloaded to your device.${saved?` <a href="#" onclick="closeModal();route('editor');return false">Open the editor →</a>`:''}</div>`;
+  } catch(e){
+    const msg = /unclosed|unopened|tag/i.test(e.message) ? `Template syntax problem: ${e.message}. Check for a mistyped placeholder (e.g. a missing "}}").` : e.message;
+    out.innerHTML = `<div class="banner bad" style="margin-top:10px">${esc(msg)}</div>`;
   }
-  function daysLeft(t){ if(t?.paid) return 999; return Math.ceil((new Date(t.trial_ends_at).getTime()-Date.now())/86400000); }
-  function applyTrialUI(t){
-    myShareCode=t.share_code;
-    const d=daysLeft(t);
-    const tl=document.getElementById('trialLeft'); if(tl) tl.textContent=t.paid?'Active':(d>0?d+' Day'+(d===1?'':'s')+' Left':'Trial ended');
-    const ts=document.getElementById('trialStatus'); if(ts) ts.textContent=t.paid?'Active':(d>0?d+' day'+(d===1?'':'s')+' left':'Ended');
-    if(!t.paid && d<=0) openTrialEnded();
-  }
-  async function maybeCredit(){
-    const url=new URLSearchParams(location.search);
-    let ref=url.get('ref'); if(ref) localStorage.setItem('c2_pending_ref',ref);
-    ref=ref||localStorage.getItem('c2_pending_ref');
-    if(!ref) return;
-    if(ref===myShareCode){ localStorage.removeItem('c2_pending_ref'); return; }
-    if(localStorage.getItem('c2_credited_'+ref)) return;
-    try{ await sb.rpc('credit_referral',{ code: ref }); localStorage.setItem('c2_credited_'+ref,'1'); localStorage.removeItem('c2_pending_ref'); }catch(_){}
-  }
+  btn.disabled=false; btn.textContent='Generate document';
+}
 
-  function shareLink(){ return SHARE_BASE+(myShareCode||''); }
-  function openInvite(){ const i=document.getElementById('inviteLinkInput'); if(i) i.value=shareLink(); document.getElementById('inviteOverlay').classList.add('open'); document.body.style.overflow='hidden'; }
-  function closeInvite(){ document.getElementById('inviteOverlay').classList.remove('open'); document.body.style.overflow=''; }
-  function openTrialEnded(){ const i=document.getElementById('endedLinkInput'); if(i) i.value=shareLink(); document.getElementById('trialEndedOverlay').classList.add('open'); document.body.style.overflow='hidden'; }
-  function copyVal(id,btn){ const el=document.getElementById(id); el.select(); el.setSelectionRange(0,99999); const done=()=>{ const o=btn.textContent; btn.textContent='Copied!'; setTimeout(()=>btn.textContent=o,1500); }; if(navigator.clipboard){ navigator.clipboard.writeText(el.value).then(done).catch(()=>{document.execCommand('copy');done();}); } else { document.execCommand('copy'); done(); } }
+/* ═══════════════ TOAST ═══════════════ */
+function toast(msg, sticky) {
+  let t = $('#toast'); if(!t){ t=document.createElement('div'); t.id='toast';
+    t.style.cssText='position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--blue-900);color:#fff;padding:11px 18px;border-radius:10px;font-size:13.5px;font-weight:600;z-index:60;box-shadow:0 12px 30px rgba(0,0,0,.25)';
+    document.body.appendChild(t); }
+  t.textContent = msg; t.style.opacity='1';
+  clearTimeout(window._tt); if(!sticky) window._tt = setTimeout(()=>t.style.opacity='0', 3200);
+}
 
-  document.getElementById('inviteFriendBtn')?.addEventListener('click',openInvite);
-  document.getElementById('inviteClose')?.addEventListener('click',closeInvite);
-  document.getElementById('inviteOverlay')?.addEventListener('click',e=>{ if(e.target.id==='inviteOverlay') closeInvite(); });
-  document.getElementById('inviteCopy')?.addEventListener('click',e=>copyVal('inviteLinkInput',e.target));
-  document.getElementById('endedCopy')?.addEventListener('click',e=>copyVal('endedLinkInput',e.target));
-  document.getElementById('endedPay')?.addEventListener('click',()=>{ window.location.href=PAY_LINK; });
-
-  (async ()=>{
-    const { data:{ session } } = await sb.auth.getSession();
-    if(!session) return;
-    setWelcomeName(session.user);
-    loadSidebarTemplates();
-    let t=await ensureTrial(session.user);
-    if(t){ applyTrialUI(t); await maybeCredit();
-      const { data:t2 } = await sb.from('trials').select('*').eq('user_id',session.user.id).maybeSingle();
-      if(t2) applyTrialUI(t2);
-    }
-  })();
+/* ═══════════════ INIT ═══════════════ */
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data.session) boot(data.session);
 })();
 </script>
-<script>
-  /* Currency: show $ for visitors in the United States, € for everyone else.
-     Symbol-only swap (numbers unchanged). No network call — uses the browser's
-     own locale + timezone. Defaults to € when it can't confirm US. */
-  (function () {
-    function isUS() {
-      try {
-        const langs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language];
-        for (const l of langs) {
-          const m = /[-_]([A-Za-z]{2})$/.exec(l || '');
-          if (m && m[1].toUpperCase() === 'US') return true;
-        }
-        try { const r = new Intl.Locale(navigator.language).region; if (r === 'US') return true; } catch (e) {}
-        const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || '');
-        const US_TZ = ['America/New_York','America/Detroit','America/Chicago','America/Denver','America/Phoenix','America/Los_Angeles','America/Anchorage','America/Adak','America/Boise','America/Juneau','America/Sitka','America/Menominee','America/Indiana/Indianapolis','America/Indiana/Knox','America/Kentucky/Louisville','Pacific/Honolulu'];
-        if (US_TZ.indexOf(tz) !== -1) return true;
-      } catch (e) {}
-      return false;
-    }
-    function swap() {
-      const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
-      let n;
-      while ((n = walk.nextNode())) {
-        if (n.nodeValue.indexOf('€') !== -1) n.nodeValue = n.nodeValue.replace(/€/g, '$');
-      }
-    }
-    if (!isUS()) return; // outside the US → keep € (default)
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', swap);
-    else swap();
-  })();
-</script>
+</body>
 </html>
