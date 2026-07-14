@@ -1332,25 +1332,34 @@ function abToB64(buf){ const bytes=new Uint8Array(buf); let bin=''; const chunk=
   for(let i=0;i<bytes.length;i+=chunk) bin+=String.fromCharCode.apply(null, bytes.subarray(i,i+chunk)); return btoa(bin); }
 async function tplEnsureLibs(){ await loadScript(PIZZIP_CDN); await loadScript(DOCXT_CDN); }
 function tplDelimOpts(extra){ return Object.assign({paragraphLoop:true, linebreaks:true, delimiters:{start:'{{',end:'}}'}}, extra||{}); }
+// Tolerant token scan — reads the docx XML directly (document + headers/footers),
+// strips tags to reunite tokens split across runs, and regexes {{tokens}}.
+// Does NOT compile the template, so a malformed tag (e.g. a missing "}}") does
+// not block upload — it's surfaced later, at generation time.
 async function tplExtractTokens(binaryString){
-  await tplEnsureLibs();
+  await loadScript(PIZZIP_CDN);
   const zip = new window.PizZip(binaryString);
-  const doc = new window.docxtemplater(zip, tplDelimOpts());
-  const text = doc.getFullText();                 // template text incl. {{tokens}}
+  let text = '';
+  Object.keys(zip.files).forEach(fn=>{
+    if(/word\/(document|header\d*|footer\d*)\.xml$/.test(fn)) text += ' ' + zip.files[fn].asText().replace(/<[^>]+>/g, '');
+  });
   const set = new Set();
   (text.match(/\{\{\s*[^{}]+?\s*\}\}/g)||[]).forEach(m=>{ const t=m.replace(/^\{\{\s*|\s*\}\}$/g,'').trim(); if(t) set.add(t); });
-  return [...set];
+  // detect an unbalanced {{ … }} so we can warn
+  const opens = (text.match(/\{\{/g)||[]).length, closes = (text.match(/\}\}/g)||[]).length;
+  return { tokens:[...set], unbalanced: opens!==closes };
 }
 async function tplUpload(file){
   if(!/\.docx$/i.test(file.name)) return alert('Please upload a .docx template.');
   try {
     const buf = await file.arrayBuffer();
     const b64 = abToB64(buf);
-    const tokens = await tplExtractTokens(atob(b64));
+    const { tokens, unbalanced } = await tplExtractTokens(atob(b64));
     await api('govcon_templates', {method:'POST', prefer:'return=minimal', body:JSON.stringify({
       owner:SESSION.user.id, name:file.name.replace(/\.docx$/i,''), tokens, docx_b64:b64,
     })});
-    toast(`Template saved — ${tokens.length} field(s) found`); renderEditor();
+    toast(`Template saved — ${tokens.length} field(s) found` + (unbalanced?' · ⚠ a {{placeholder}} looks unclosed — fix it before generating':''));
+    renderEditor();
   } catch(e){ alert('Could not read that template: '+e.message); }
 }
 async function tplDelete(id){ if(!confirm('Delete this template?'))return; await api(`govcon_templates?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); renderEditor(); }
@@ -1403,8 +1412,11 @@ async function tplGenerate(){
     edDownload(blob, fname);
     out.innerHTML = `<div class="banner info" style="margin-top:10px">✓ Generated <b>${esc(fname)}</b>. ${saved?'Saved to your Document Editor library — ':''}downloaded to your device.${saved?` <a href="#" onclick="closeModal();route('editor');return false">Open the editor →</a>`:''}</div>`;
   } catch(e){
-    const msg = /unclosed|unopened|tag/i.test(e.message) ? `Template syntax problem: ${e.message}. Check for a mistyped placeholder (e.g. a missing "}}").` : e.message;
-    out.innerHTML = `<div class="banner bad" style="margin-top:10px">${esc(msg)}</div>`;
+    // docxtemplater packs details in e.properties.errors — surface the exact tag
+    let detail = e.message;
+    const errs = e.properties && e.properties.errors;
+    if (Array.isArray(errs) && errs.length) detail = errs.map(x=>(x.properties&&x.properties.explanation)||x.message).join(' · ');
+    out.innerHTML = `<div class="banner bad" style="margin-top:10px">Template problem: ${esc(detail)}<br><span style="font-size:12px">Fix the placeholder in Word (a missing "}}" is the usual cause), re-upload the template, and try again.</span></div>`;
   }
   btn.disabled=false; btn.textContent='Generate document';
 }
