@@ -80,6 +80,29 @@
   .tool .ic{font-size:24px} .tool .nm{font-weight:800;margin:8px 0 3px;color:var(--blue-900)} .tool .d{font-size:12.5px;color:var(--muted)}
   .out{white-space:pre-wrap;font-size:13.5px;background:var(--blue-050);border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:12px;max-height:460px;overflow:auto}
   .toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);font-weight:600;margin-bottom:10px}
+  /* scrollable pop-up */
+  .ovl{position:fixed;inset:0;background:rgba(4,17,36,.55);display:grid;place-items:start center;
+    z-index:80;padding:24px 16px;overflow-y:auto}
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:100%;max-width:920px;
+    max-height:calc(100vh - 48px);overflow-y:auto;box-shadow:0 30px 80px rgba(4,17,36,.4);margin:auto}
+  .sheet .shd{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);
+    padding:15px 20px;display:flex;align-items:center;gap:10px;z-index:2}
+  .sheet .shd h3{margin:0;font-size:17px;color:var(--blue-950)}
+  .sheet .sbd{padding:20px}
+  .sheet .sclose{margin-left:auto;background:transparent;border:none;font-size:22px;line-height:1;
+    color:var(--muted);cursor:pointer;padding:0 4px}
+  .sheet .sclose:hover{color:var(--bad)}
+  /* capability matrix */
+  .matx{width:100%;border-collapse:collapse;font-size:13px}
+  .matx th,.matx td{border:1px solid var(--line);padding:0;vertical-align:top}
+  .matx th{background:var(--blue-050);padding:6px 8px;font-size:11.5px;text-transform:uppercase;
+    letter-spacing:.4px;color:var(--muted);position:relative}
+  .matx td textarea,.matx td input{width:100%;border:none;background:transparent;padding:7px 8px;
+    font-size:13px;font-family:inherit;resize:vertical;min-height:34px;color:var(--ink)}
+  .matx td textarea:focus,.matx td input:focus{outline:2px solid var(--blue-500);outline-offset:-2px;background:#fff}
+  .matx .stat-Met{background:#e8f5ee}.matx .stat-Partial{background:#fff3e0}.matx .stat-Gap{background:#fdeaea}.matx .stat-NA{background:transparent}
+  .matx .colx,.matx .rowx{cursor:pointer;color:var(--muted);font-weight:800;border:none;background:transparent;padding:2px 6px}
+  .matx .colx:hover,.matx .rowx:hover{color:var(--bad)}
   .toggle input{width:auto}
   .banner{border-radius:10px;padding:11px 14px;font-size:13px;margin-bottom:16px;border:1px solid}
   .banner.info{background:var(--blue-100);border-color:#bcd8ff}
@@ -151,6 +174,7 @@
     </div>
     <div id="views"></div>
   </main>
+  <div id="modalRoot"></div>
 </div>
 
 <script>
@@ -751,66 +775,131 @@ async function moveStage(id, stage) {
   renderPipeline();
 }
 /* view / edit the full lead (pipeline item + its RFP) */
+/* ── generic scrollable modal ── */
+function openModal(html) {
+  $('#modalRoot').innerHTML = `<div class="ovl" onclick="if(event.target===this)closeModal()"><div class="sheet">${html}</div></div>`;
+  document.body.style.overflow = 'hidden';
+}
+function closeModal() { $('#modalRoot').innerHTML=''; document.body.style.overflow=''; }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+/* ── customizable capability matrix ── */
+const DEFAULT_MATRIX = () => ({
+  columns: ['Requirement','Our Capability','Status','Owner','Notes'],
+  rows: [['','','Partial','','']],
+});
+let MATRIX = DEFAULT_MATRIX();
+function normalizeMatrix(m) {
+  if (!m || !Array.isArray(m.columns) || !m.columns.length) return DEFAULT_MATRIX();
+  return { columns: m.columns.slice(), rows: (m.rows||[]).map(row => m.columns.map((_,i)=>row[i]??'')) };
+}
+const STATUS_OPTS = ['Met','Partial','Gap','N/A'];
+function matrixHtml() {
+  const isStatus = (c) => /status/i.test(c);
+  const head = MATRIX.columns.map((c,ci)=>`<th>
+      <input value="${esc(c)}" data-col="${ci}" style="width:calc(100% - 18px);font:inherit;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);background:transparent;border:none">
+      <button class="colx" title="Delete column" onclick="delMatrixCol(${ci})">×</button></th>`).join('') + '<th style="width:34px"></th>';
+  const body = MATRIX.rows.map((row,ri)=>`<tr>${row.map((cell,ci)=>{
+      if (isStatus(MATRIX.columns[ci])) {
+        return `<td class="stat-${esc(String(cell||'N/A').replace(/[^A-Za-z]/g,'')||'NA')}">
+          <select data-r="${ri}" data-c="${ci}" style="width:100%;border:none;background:transparent;padding:7px 8px;font:inherit">
+            ${STATUS_OPTS.map(o=>`<option ${o===cell?'selected':''}>${o}</option>`).join('')}</select></td>`;
+      }
+      return `<td><textarea data-r="${ri}" data-c="${ci}" rows="1">${esc(cell||'')}</textarea></td>`;
+    }).join('')}<td style="text-align:center"><button class="rowx" title="Delete row" onclick="delMatrixRow(${ri})">×</button></td></tr>`).join('');
+  return `<table class="matx"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn sm" onclick="addMatrixRow()">+ Requirement (row)</button>
+      <button class="btn sm" onclick="addMatrixCol()">+ Column</button>
+      <button class="btn sm" onclick="resetMatrix()">Reset template</button>
+    </div>`;
+}
+function syncMatrixFromDom() {
+  const host = $('#matrixHost'); if(!host) return;
+  host.querySelectorAll('[data-col]').forEach(inp=>{ MATRIX.columns[+inp.dataset.col] = inp.value; });
+  host.querySelectorAll('[data-r]').forEach(el=>{ MATRIX.rows[+el.dataset.r][+el.dataset.c] = el.value; });
+}
+function renderMatrix(){ const h=$('#matrixHost'); if(h) h.innerHTML = matrixHtml(); }
+function addMatrixRow(){ syncMatrixFromDom(); MATRIX.rows.push(MATRIX.columns.map(c=>/status/i.test(c)?'Partial':'')); renderMatrix(); }
+function delMatrixRow(i){ syncMatrixFromDom(); MATRIX.rows.splice(i,1); if(!MATRIX.rows.length) MATRIX.rows.push(MATRIX.columns.map(()=>'')); renderMatrix(); }
+function addMatrixCol(){ syncMatrixFromDom(); const name=prompt('Column name:','Column'); if(name===null)return; MATRIX.columns.push(name||'Column'); MATRIX.rows.forEach(r=>r.push('')); renderMatrix(); }
+function delMatrixCol(i){ if(MATRIX.columns.length<=1) return; syncMatrixFromDom(); MATRIX.columns.splice(i,1); MATRIX.rows.forEach(r=>r.splice(i,1)); renderMatrix(); }
+function resetMatrix(){ if(!confirm('Reset the matrix to the default template? Current rows are cleared.'))return; MATRIX=DEFAULT_MATRIX(); renderMatrix(); }
+
 async function openLead(itemId) {
   const item = PIPE_ITEMS.find(i=>i.id===itemId) ||
     (await api(`govcon_pipeline_items?id=eq.${itemId}&select=*,govcon_rfps(*)`))[0];
   if (!item) return;
   const rfpRows = await api(`govcon_rfps?id=eq.${item.rfp_id}&select=*`);
   const r = rfpRows[0] || item.govcon_rfps || {};
-  $('#leadBox').innerHTML = `<div class="card" style="margin-top:16px">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <h3 style="margin:0">Lead — full detail</h3>
-      <span class="muted" style="font-size:12px">${esc(r.source||'')} · added ${fmtDate(r.created_at)}</span>
+  MATRIX = normalizeMatrix(r.capability_matrix);
+  openModal(`
+    <div class="shd">
+      <h3>${esc(r.title||'Lead')}</h3>
+      <button class="sclose" onclick="closeModal()" title="Close (Esc)">×</button>
     </div>
-    <div class="field" style="margin-top:12px"><label>Title *</label><input id="ld_title" value="${esc(r.title||'')}"></div>
-    <div class="row3">
-      <div class="field"><label>Stage</label><select id="ld_stage">${STAGES.map(([k,l])=>`<option value="${k}" ${k===item.stage?'selected':''}>${l}</option>`).join('')}</select></div>
-      <div class="field"><label>Priority</label><select id="ld_prio">${['low','medium','high'].map(p=>`<option ${p===item.priority?'selected':''}>${p}</option>`).join('')}</select></div>
-      <div class="field"><label>Deadline</label><input id="ld_deadline" type="date" value="${r.deadline||''}"></div>
-    </div>
-    <div class="row3">
-      <div class="field"><label>Agency</label><input id="ld_agency" value="${esc(r.agency||'')}"></div>
-      <div class="field"><label>Category / NAICS</label><input id="ld_category" value="${esc(r.category||'')}"></div>
-      <div class="field"><label>Set-aside</label><input id="ld_setaside" value="${esc(r.set_aside||'')}"></div>
-    </div>
-    <div class="row2">
-      <div class="field"><label>Budget min ($)</label><input id="ld_bmin" type="number" value="${r.budget_min??''}"></div>
-      <div class="field"><label>Budget max ($)</label><input id="ld_bmax" type="number" value="${r.budget_max??''}"></div>
-    </div>
-    <div class="field"><label>Source URL</label><input id="ld_url" value="${esc(r.url||'')}"></div>
-    <div class="field"><label>Requirements / description</label><textarea id="ld_desc" style="min-height:120px">${esc(r.description||'')}</textarea></div>
-    <div class="field"><label>Stage notes (risks, owners, next actions)</label><textarea id="ld_notes">${esc(item.notes||'')}</textarea></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn primary" onclick="saveLead('${item.id}','${item.rfp_id}')">Save lead</button>
-      <button class="btn" onclick="aiFor('${item.rfp_id}','writer')">Generate proposal</button>
-      <button class="btn" onclick="aiFor('${item.rfp_id}','compliance')">Compliance check</button>
-      <span style="flex:1"></span>
-      <button class="btn" style="color:var(--bad)" onclick="removeLead('${item.id}')">Remove from pipeline</button>
-      <button class="btn" onclick="$('#leadBox').innerHTML=''">Close</button>
-    </div>
-  </div>`;
-  $('#leadBox').scrollIntoView({behavior:'smooth', block:'start'});
+    <div class="sbd">
+      <div class="muted" style="font-size:12px;margin-bottom:12px">${esc(r.source||'')} · ${esc(r.agency||'')} · added ${fmtDate(r.created_at)}${r.url?` · <a href="${esc(r.url)}" target="_blank">Source ↗</a>`:''}</div>
+      <div class="field"><label>Title *</label><input id="ld_title" value="${esc(r.title||'')}"></div>
+      <div class="row3">
+        <div class="field"><label>Stage</label><select id="ld_stage">${STAGES.map(([k,l])=>`<option value="${k}" ${k===item.stage?'selected':''}>${l}</option>`).join('')}</select></div>
+        <div class="field"><label>Priority</label><select id="ld_prio">${['low','medium','high'].map(p=>`<option ${p===item.priority?'selected':''}>${p}</option>`).join('')}</select></div>
+        <div class="field"><label>Deadline</label><input id="ld_deadline" type="date" value="${r.deadline||''}"></div>
+      </div>
+      <div class="row3">
+        <div class="field"><label>Agency</label><input id="ld_agency" value="${esc(r.agency||'')}"></div>
+        <div class="field"><label>Category / NAICS</label><input id="ld_category" value="${esc(r.category||'')}"></div>
+        <div class="field"><label>Set-aside</label><input id="ld_setaside" value="${esc(r.set_aside||'')}"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Budget min ($)</label><input id="ld_bmin" type="number" value="${r.budget_min??''}"></div>
+        <div class="field"><label>Budget max ($)</label><input id="ld_bmax" type="number" value="${r.budget_max??''}"></div>
+      </div>
+      <div class="field"><label>Source URL</label><input id="ld_url" value="${esc(r.url||'')}"></div>
+      <div class="field"><label>Requirements / description</label><textarea id="ld_desc" style="min-height:120px">${esc(r.description||'')}</textarea></div>
+      <div class="field"><label>Stage notes (risks, owners, next actions)</label><textarea id="ld_notes">${esc(item.notes||'')}</textarea></div>
+
+      <h2 class="section">Capability matrix</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Map each requirement to your capability and status. Edit any cell; add or delete rows and columns; the whole matrix saves with the lead.</div>
+      <div id="matrixHost" style="overflow-x:auto"></div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;position:sticky;bottom:0;background:var(--panel);padding-top:12px;border-top:1px solid var(--line)">
+        <button class="btn primary" onclick="saveLead('${item.id}','${item.rfp_id}')">Save lead</button>
+        <button class="btn" onclick="aiFor('${item.rfp_id}','writer')">Generate proposal</button>
+        <button class="btn" onclick="aiFor('${item.rfp_id}','compliance')">Compliance check</button>
+        <span style="flex:1"></span>
+        <button class="btn" style="color:var(--bad)" onclick="removeLead('${item.id}')">Remove</button>
+        <button class="btn" onclick="closeModal()">Close</button>
+      </div>
+    </div>`);
+  renderMatrix();
+  // recolor status cells live
+  $('#matrixHost').addEventListener('change', e=>{ if(e.target.matches('select[data-c]')){ syncMatrixFromDom(); renderMatrix(); } });
 }
 async function saveLead(itemId, rfpId) {
   const title = $('#ld_title').value.trim(); if(!title) return alert('Title is required');
+  syncMatrixFromDom();
   await api(`govcon_rfps?id=eq.${rfpId}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({
     title, agency:$('#ld_agency').value.trim()||null, category:$('#ld_category').value.trim()||null,
     set_aside:$('#ld_setaside').value.trim()||null, deadline:$('#ld_deadline').value||null,
     budget_min:$('#ld_bmin').value===''?null:+$('#ld_bmin').value,
     budget_max:$('#ld_bmax').value===''?null:+$('#ld_bmax').value,
     url:$('#ld_url').value.trim()||null, description:$('#ld_desc').value.trim()||null,
+    capability_matrix: MATRIX,
   })});
   await api(`govcon_pipeline_items?id=eq.${itemId}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({
     stage:$('#ld_stage').value, priority:$('#ld_prio').value, notes:$('#ld_notes').value.trim()||null,
     stage_updated_at:new Date().toISOString(),
   })});
   toast('Lead saved');
+  closeModal();
   renderPipeline();
 }
 async function removeLead(itemId) {
   if(!confirm('Remove this opportunity from the pipeline? (The RFP stays in Discovery.)')) return;
   await api(`govcon_pipeline_items?id=eq.${itemId}`, {method:'DELETE', prefer:'return=minimal'});
   toast('Removed from pipeline');
+  closeModal();
   renderPipeline();
 }
 
