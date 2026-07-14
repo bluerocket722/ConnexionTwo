@@ -135,6 +135,9 @@
       <a data-view="awards"><span class="ic">◆</span>Awards Research</a>
       <a data-view="partners"><span class="ic">◈</span>Partner Network</a>
       <a data-view="analytics"><span class="ic">▲</span>Analytics</a>
+      <div class="sec">Documents</div>
+      <a data-view="editor"><span class="ic">✎</span>Document Editor</a>
+      <a data-view="createdoc"><span class="ic">▤</span>Create &amp; Send</a>
       <div class="sec">Account</div>
       <a data-view="profile"><span class="ic">◐</span>Profile &amp; Settings</a>
       <a id="btnSignOut"><span class="ic">⏻</span>Sign out</a>
@@ -230,12 +233,14 @@ $('#nav').addEventListener('click', e => {
   const a = e.target.closest('a[data-view]'); if (a) route(a.dataset.view);
 });
 const TITLES = {dashboard:'Dashboard',rfps:'RFP Discovery',autopilot:'Autopilot',sources:'Custom Sources',
-  ai:'AI Tools',pipeline:'Pipeline',awards:'Awards Research',partners:'Partner Network',analytics:'Analytics',profile:'Profile & Settings'};
+  ai:'AI Tools',pipeline:'Pipeline',awards:'Awards Research',partners:'Partner Network',analytics:'Analytics',
+  editor:'Document Editor',createdoc:'Create & Send',profile:'Profile & Settings'};
 function route(view) {
   $$('#nav a[data-view]').forEach(a => a.classList.toggle('active', a.dataset.view===view));
   $('#viewTitle').textContent = TITLES[view] || view;
   ({dashboard:renderDashboard,rfps:renderRfps,autopilot:renderAutopilot,sources:renderSources,
-    ai:renderAi,pipeline:renderPipeline,awards:renderAwards,partners:renderPartners,analytics:renderAnalytics,profile:renderProfile}[view]||renderDashboard)();
+    ai:renderAi,pipeline:renderPipeline,awards:renderAwards,partners:renderPartners,analytics:renderAnalytics,
+    editor:renderEditor,createdoc:renderCreateDoc,profile:renderProfile}[view]||renderDashboard)();
 }
 const V = () => $('#views');
 const loading = () => V().innerHTML = '<div class="card center muted">Loading…</div>';
@@ -669,25 +674,143 @@ async function runAi(toolId) {
 
 /* ═══════════════ PIPELINE ═══════════════ */
 const STAGES = [['lead','Lead'],['qualified','Qualified'],['in_development','In Development'],['submitted','Submitted'],['awarded','Awarded'],['lost','Lost']];
+let PIPE_VIEW = 'board';   // 'board' | 'grid'
+let PIPE_ITEMS = [];
 async function renderPipeline() {
   loading();
-  const items = await api(`govcon_pipeline_items?owner=eq.${SESSION.user.id}&select=*,govcon_rfps(title,agency,deadline)&order=stage_updated_at.desc`);
-  V().innerHTML = `<div class="board">${STAGES.map(([key,label])=>{
-    const col = items.filter(i=>i.stage===key);
-    return `<div class="col"><h4>${label}<span class="n">${col.length}</span></h4>${col.map(pipeCard).join('')}</div>`;
-  }).join('')}</div>`;
+  PIPE_ITEMS = await api(`govcon_pipeline_items?owner=eq.${SESSION.user.id}&select=*,govcon_rfps(id,title,agency,deadline,win_probability,url,description)&order=stage_updated_at.desc`);
+  const toggle = `<div class="card" style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <b class="muted">${PIPE_ITEMS.length} opportunities</b><span style="flex:1"></span>
+    <button class="btn sm ${PIPE_VIEW==='board'?'primary':''}" onclick="setPipeView('board')">▦ Board</button>
+    <button class="btn sm ${PIPE_VIEW==='grid'?'primary':''}" onclick="setPipeView('grid')">▤ Grid</button>
+  </div>`;
+  V().innerHTML = toggle + (PIPE_VIEW==='board' ? pipeBoard() : pipeGrid()) + `<div id="leadBox"></div>`;
+  if (PIPE_VIEW==='board') wireDnd();
+}
+function setPipeView(v){ PIPE_VIEW=v; renderPipeline(); }
+
+function pipeBoard() {
+  return `<div class="board">${STAGES.map(([key,label])=>{
+    const col = PIPE_ITEMS.filter(i=>i.stage===key);
+    return `<div class="col" data-stage="${key}" ondragover="event.preventDefault()">
+      <h4>${label}<span class="n">${col.length}</span></h4>
+      ${col.map(pipeCard).join('')}</div>`;
+  }).join('')}</div>
+  <div class="muted" style="font-size:12px;margin-top:8px">Drag a card between columns to change its stage, or click it to view / edit the full lead.</div>`;
 }
 function pipeCard(i) {
   const r = i.govcon_rfps || {};
-  return `<div class="pcard">
-    <div class="pt">${esc(r.title||'RFP')}</div>
+  return `<div class="pcard" draggable="true" data-id="${i.id}">
+    <div class="pt" style="cursor:pointer" onclick="openLead('${i.id}')">${esc(r.title||'RFP')}</div>
     <div class="muted" style="font-size:11px">${esc(r.agency||'')} · ${fmtDate(r.deadline)}</div>
     <span class="pill ${i.priority}">${i.priority}</span>
-    <select onchange="moveStage('${i.id}',this.value)">${STAGES.map(([k,l])=>`<option value="${k}" ${k===i.stage?'selected':''}>${l}</option>`).join('')}</select>
+    ${r.win_probability!=null?`<span class="pill">Win ${r.win_probability}%</span>`:''}
   </div>`;
 }
+function pipeGrid() {
+  const rows = PIPE_ITEMS.map(i=>{
+    const r = i.govcon_rfps || {};
+    return `<tr style="cursor:pointer" onclick="openLead('${i.id}')">
+      <td style="font-weight:600;color:var(--blue-900)">${esc(r.title||'RFP')}</td>
+      <td>${esc(r.agency||'—')}</td>
+      <td>${fmtDate(r.deadline)}</td>
+      <td><span class="pill ${i.priority}">${i.priority}</span></td>
+      <td>${r.win_probability!=null?r.win_probability+'%':'—'}</td>
+      <td>${esc(STAGES.find(s=>s[0]===i.stage)?.[1]||i.stage)}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="card" style="padding:0;overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:13.5px">
+      <thead><tr style="text-align:left;background:var(--blue-050)">
+        ${['Title','Agency','Deadline','Priority','Win %','Stage'].map(h=>`<th style="padding:10px 12px;border-bottom:1px solid var(--line);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">${h}</th>`).join('')}
+      </tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted)">Pipeline is empty.</td></tr>'}</tbody>
+    </table></div>`;
+}
+// HTML5 drag-and-drop between stage columns
+let DRAG_ID = null;
+function wireDnd() {
+  $$('.pcard[draggable]').forEach(card=>{
+    card.addEventListener('dragstart', e=>{ DRAG_ID=card.dataset.id; card.style.opacity='.4'; e.dataTransfer.effectAllowed='move'; });
+    card.addEventListener('dragend', ()=>{ card.style.opacity='1'; });
+  });
+  $$('.col[data-stage]').forEach(col=>{
+    col.addEventListener('dragover', e=>{ e.preventDefault(); col.style.background='var(--blue-100)'; });
+    col.addEventListener('dragleave', ()=>{ col.style.background=''; });
+    col.addEventListener('drop', async e=>{
+      e.preventDefault(); col.style.background='';
+      const id=DRAG_ID, stage=col.dataset.stage; DRAG_ID=null;
+      if(!id) return;
+      const it = PIPE_ITEMS.find(x=>x.id===id); if(it) it.stage=stage;  // optimistic
+      await moveStage(id, stage);
+    });
+  });
+}
 async function moveStage(id, stage) {
-  await api(`govcon_pipeline_items?id=eq.${id}`, {method:'PATCH', body:JSON.stringify({stage, stage_updated_at:new Date().toISOString()})});
+  await api(`govcon_pipeline_items?id=eq.${id}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({stage, stage_updated_at:new Date().toISOString()})});
+  renderPipeline();
+}
+/* view / edit the full lead (pipeline item + its RFP) */
+async function openLead(itemId) {
+  const item = PIPE_ITEMS.find(i=>i.id===itemId) ||
+    (await api(`govcon_pipeline_items?id=eq.${itemId}&select=*,govcon_rfps(*)`))[0];
+  if (!item) return;
+  const rfpRows = await api(`govcon_rfps?id=eq.${item.rfp_id}&select=*`);
+  const r = rfpRows[0] || item.govcon_rfps || {};
+  $('#leadBox').innerHTML = `<div class="card" style="margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 style="margin:0">Lead — full detail</h3>
+      <span class="muted" style="font-size:12px">${esc(r.source||'')} · added ${fmtDate(r.created_at)}</span>
+    </div>
+    <div class="field" style="margin-top:12px"><label>Title *</label><input id="ld_title" value="${esc(r.title||'')}"></div>
+    <div class="row3">
+      <div class="field"><label>Stage</label><select id="ld_stage">${STAGES.map(([k,l])=>`<option value="${k}" ${k===item.stage?'selected':''}>${l}</option>`).join('')}</select></div>
+      <div class="field"><label>Priority</label><select id="ld_prio">${['low','medium','high'].map(p=>`<option ${p===item.priority?'selected':''}>${p}</option>`).join('')}</select></div>
+      <div class="field"><label>Deadline</label><input id="ld_deadline" type="date" value="${r.deadline||''}"></div>
+    </div>
+    <div class="row3">
+      <div class="field"><label>Agency</label><input id="ld_agency" value="${esc(r.agency||'')}"></div>
+      <div class="field"><label>Category / NAICS</label><input id="ld_category" value="${esc(r.category||'')}"></div>
+      <div class="field"><label>Set-aside</label><input id="ld_setaside" value="${esc(r.set_aside||'')}"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Budget min ($)</label><input id="ld_bmin" type="number" value="${r.budget_min??''}"></div>
+      <div class="field"><label>Budget max ($)</label><input id="ld_bmax" type="number" value="${r.budget_max??''}"></div>
+    </div>
+    <div class="field"><label>Source URL</label><input id="ld_url" value="${esc(r.url||'')}"></div>
+    <div class="field"><label>Requirements / description</label><textarea id="ld_desc" style="min-height:120px">${esc(r.description||'')}</textarea></div>
+    <div class="field"><label>Stage notes (risks, owners, next actions)</label><textarea id="ld_notes">${esc(item.notes||'')}</textarea></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" onclick="saveLead('${item.id}','${item.rfp_id}')">Save lead</button>
+      <button class="btn" onclick="aiFor('${item.rfp_id}','writer')">Generate proposal</button>
+      <button class="btn" onclick="aiFor('${item.rfp_id}','compliance')">Compliance check</button>
+      <span style="flex:1"></span>
+      <button class="btn" style="color:var(--bad)" onclick="removeLead('${item.id}')">Remove from pipeline</button>
+      <button class="btn" onclick="$('#leadBox').innerHTML=''">Close</button>
+    </div>
+  </div>`;
+  $('#leadBox').scrollIntoView({behavior:'smooth', block:'start'});
+}
+async function saveLead(itemId, rfpId) {
+  const title = $('#ld_title').value.trim(); if(!title) return alert('Title is required');
+  await api(`govcon_rfps?id=eq.${rfpId}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({
+    title, agency:$('#ld_agency').value.trim()||null, category:$('#ld_category').value.trim()||null,
+    set_aside:$('#ld_setaside').value.trim()||null, deadline:$('#ld_deadline').value||null,
+    budget_min:$('#ld_bmin').value===''?null:+$('#ld_bmin').value,
+    budget_max:$('#ld_bmax').value===''?null:+$('#ld_bmax').value,
+    url:$('#ld_url').value.trim()||null, description:$('#ld_desc').value.trim()||null,
+  })});
+  await api(`govcon_pipeline_items?id=eq.${itemId}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({
+    stage:$('#ld_stage').value, priority:$('#ld_prio').value, notes:$('#ld_notes').value.trim()||null,
+    stage_updated_at:new Date().toISOString(),
+  })});
+  toast('Lead saved');
+  renderPipeline();
+}
+async function removeLead(itemId) {
+  if(!confirm('Remove this opportunity from the pipeline? (The RFP stays in Discovery.)')) return;
+  await api(`govcon_pipeline_items?id=eq.${itemId}`, {method:'DELETE', prefer:'return=minimal'});
+  toast('Removed from pipeline');
   renderPipeline();
 }
 
@@ -862,9 +985,82 @@ async function renderProfile() {
     </div>
     <div class="field hide" id="k_otherBox"><label>Provider name</label><input id="k_other" placeholder="e.g. texas-smartbuy"></div>
     <button class="btn primary" onclick="addKey()">Add key</button>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h2 class="section" style="margin-top:0">Scraping &amp; weekly schedule</h2>
+    <div class="muted" style="font-size:12.5px;margin-bottom:12px">
+      Pull opportunities from portals with no API (OhioBuys, Maryland eMMA) on a schedule.
+      The Playwright scrapers run headless (GitHub Actions or your own machine) and use the
+      ingest token below — see <b>scrapers/README.md</b>.
+    </div>
+    <div id="scrapeBox" class="muted">Loading…</div>
   </div>`;
   $('#k_provider').onchange = (e)=>$('#k_otherBox').classList.toggle('hide', e.target.value!=='other');
   loadKeys();
+  loadScraping();
+}
+
+/* Scraping settings: portals, weekly schedule, ingest token */
+async function loadScraping() {
+  const uid = SESSION.user.id;
+  const [sRows, sources] = await Promise.all([
+    api(`govcon_autopilot_settings?owner=eq.${uid}&select=schedule_days,schedule_time,schedule_tz,scrape_last_run`),
+    api(`govcon_scrape_sources?owner=eq.${uid}&select=*`),
+  ]);
+  const s = sRows[0] || {};
+  const on = (portal) => (sources.find(x=>x.portal===portal)||{}).enabled ? 'checked' : '';
+  const status = (portal) => { const x=sources.find(v=>v.portal===portal); return x?.last_status ? ` · <span class="pill ${x.last_status==='error'?'high':'low'}">${x.last_status}</span>${x.last_error?` <span class="muted" style="font-size:11px">${esc(x.last_error)}</span>`:''}` : ''; };
+  const days = s.schedule_days || [];
+  const DOW = [['0','Sun'],['1','Mon'],['2','Tue'],['3','Wed'],['4','Thu'],['5','Fri'],['6','Sat']];
+  const token = PROFILE?.ingest_token || '(run migration 3, then reload)';
+  $('#scrapeBox').innerHTML = `
+    <div class="field"><label>Portals</label>
+      <label class="toggle"><input type="checkbox" id="sc_ohiobuys" ${on('ohiobuys')}> OhioBuys (Ohio)${status('ohiobuys')}</label>
+      <label class="toggle"><input type="checkbox" id="sc_emma" ${on('emma')}> Maryland eMMA${status('emma')}</label>
+    </div>
+    <div class="field"><label>Run on these days</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${DOW.map(([v,l])=>`
+        <label class="chip" style="cursor:pointer"><input type="checkbox" class="sc_day" value="${v}" ${days.map(String).includes(v)?'checked':''} style="width:auto"> ${l}</label>`).join('')}</div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>At time (24h, local)</label><input id="sc_time" type="time" value="${esc(s.schedule_time||'17:00')}"></div>
+      <div class="field"><label>Timezone</label><input id="sc_tz" value="${esc(s.schedule_tz||'America/New_York')}" placeholder="America/New_York"></div>
+    </div>
+    <div class="muted" style="font-size:12px;margin:-4px 0 10px">Example: check <b>Fri</b>, set <b>17:00</b>, tz <b>America/New_York</b> → runs every Friday at 5pm.
+      ${s.scrape_last_run?`Last scrape: ${new Date(s.scrape_last_run).toLocaleString()}.`:''}</div>
+    <button class="btn primary" onclick="saveScraping()">Save schedule &amp; portals</button>
+
+    <h2 class="section">Ingest token</h2>
+    <div class="muted" style="font-size:12.5px;margin-bottom:8px">The scraper authenticates with this (not your login). Put it in the GitHub Actions secret <code>C2_INGEST_TOKEN</code>.</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input id="sc_token" readonly value="${esc(token)}" style="flex:1;min-width:260px;font-family:monospace;font-size:12px">
+      <button class="btn sm" onclick="copyToken()">Copy</button>
+      <button class="btn sm" style="color:var(--bad)" onclick="regenToken()">Regenerate</button>
+    </div>`;
+}
+async function saveScraping() {
+  const uid = SESSION.user.id;
+  const days = $$('.sc_day').filter(c=>c.checked).map(c=>+c.value);
+  await api('govcon_autopilot_settings', {method:'POST', prefer:'resolution=merge-duplicates', body:JSON.stringify({
+    owner:uid, schedule_days:days, schedule_time:$('#sc_time').value||'17:00',
+    schedule_tz:$('#sc_tz').value.trim()||'America/New_York', updated_at:new Date().toISOString(),
+  })});
+  // upsert each portal's enabled flag
+  for (const portal of ['ohiobuys','emma']) {
+    await api('govcon_scrape_sources?on_conflict=owner,portal', {method:'POST',
+      prefer:'resolution=merge-duplicates,return=minimal',
+      body:JSON.stringify({owner:uid, portal, enabled: $('#sc_'+portal).checked})});
+  }
+  toast('Schedule & portals saved');
+  loadScraping();
+}
+function copyToken(){ navigator.clipboard.writeText($('#sc_token').value).then(()=>toast('Token copied')); }
+async function regenToken() {
+  if(!confirm('Regenerate the ingest token? Any scraper using the old one will stop working until updated.')) return;
+  const rows = await api(`govcon_profiles?user_id=eq.${SESSION.user.id}`, {method:'PATCH',
+    body:JSON.stringify({ingest_token: crypto.randomUUID()})});
+  PROFILE = rows[0] || PROFILE;
+  toast('New token generated'); loadScraping();
 }
 async function loadKeys() {
   const rows = await api(`govcon_api_keys?owner=eq.${SESSION.user.id}&select=id,label,provider,key_value,created_at&order=created_at.desc`);
@@ -901,6 +1097,23 @@ async function saveProfile() {
   PROFILE = rows[0] || {...PROFILE, ...body};
   toast('Profile saved');
 }
+
+/* ═══════════════ DOCUMENT TOOLS (embed existing pages) ═══════════════ */
+function embed(src, label) {
+  V().innerHTML = `
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)">
+        <b>${label}</b><span class="muted" style="font-size:12px">— embedded from ${esc(src)}</span>
+        <span style="flex:1"></span>
+        <a class="btn sm" href="${esc(src)}" target="_blank">Open full screen ↗</a>
+      </div>
+      <iframe src="${esc(src)}" title="${esc(label)}"
+        style="width:100%;height:calc(100vh - 160px);border:0;display:block"
+        allow="clipboard-read; clipboard-write"></iframe>
+    </div>`;
+}
+function renderEditor(){ embed('welcome.html', 'Document Editor'); }
+function renderCreateDoc(){ embed('document-creation.html', 'Create & Send'); }
 
 /* ═══════════════ TOAST ═══════════════ */
 function toast(msg, sticky) {
