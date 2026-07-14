@@ -863,6 +863,10 @@ async function openLead(itemId) {
       <div class="muted" style="font-size:12px;margin:-6px 0 10px">Map each requirement to your capability and status. Edit any cell; add or delete rows and columns; the whole matrix saves with the lead.</div>
       <div id="matrixHost" style="overflow-x:auto"></div>
 
+      <h2 class="section">Generate proposal document</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Fill the template's {{placeholders}} and generate a finished .docx — it's saved to your Document Editor and downloaded.</div>
+      <div id="tplSection"><div class="muted" style="font-size:13px">Loading templates…</div></div>
+
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;position:sticky;bottom:0;background:var(--panel);padding-top:12px;border-top:1px solid var(--line)">
         <button class="btn primary" onclick="saveLead('${item.id}','${item.rfp_id}')">Save lead</button>
         <button class="btn" onclick="aiFor('${item.rfp_id}','writer')">Generate proposal</button>
@@ -875,6 +879,10 @@ async function openLead(itemId) {
   renderMatrix();
   // recolor status cells live
   $('#matrixHost').addEventListener('change', e=>{ if(e.target.matches('select[data-c]')){ syncMatrixFromDom(); renderMatrix(); } });
+  // template generator (async — fill after the modal is up)
+  tplSectionHtml(r).then(html=>{ const host=$('#tplSection'); if(!host) return; host.innerHTML=html;
+    if($('#tpl_pick')){ tplRenderFields(); $('#tpl_pick').onchange=tplRenderFields; $('#tpl_gen').onclick=tplGenerate; }
+  });
 }
 async function saveLead(itemId, rfpId) {
   const title = $('#ld_title').value.trim(); if(!title) return alert('Title is required');
@@ -1203,154 +1211,202 @@ function embed(src, label) {
 }
 function renderCreateDoc(){ embed('document-creation.html', 'Create & Send'); }
 
-/* ═══════════════ DOCUMENT EDITOR (self-contained, no login) ═══════════════
-   Create / upload / edit / export documents entirely in the browser. A local
-   document library is kept in this browser (localStorage). Imports .docx (via
-   mammoth), .txt, .md, .html; exports .docx (html-docx-js), .doc, .html, .txt,
-   or Print→PDF. */
-let EDOC = null;                                 // {id, name, html}
-function edLibrary(){ try { return JSON.parse(localStorage.getItem('c2_docs')||'[]'); } catch { return []; } }
-function edSaveLibrary(list){ localStorage.setItem('c2_docs', JSON.stringify(list)); }
+/* ═══════════════ DOCUMENT EDITOR (real OnlyOffice · your GovCon login) ═══════
+   Library backed by this project's private "documents" bucket. Files open in
+   the real OnlyOffice editor via the oo-config edge function — no second login.
+   Plus a {{token}} template engine (docxtemplater) that fills proposals from a
+   lead's data. */
+const DOCS_BUCKET = 'documents';
+const OO_API = 'https://docs.connexiontwo.com/web-apps/apps/api/documents/api.js';
+const PIZZIP_CDN = 'https://cdn.jsdelivr.net/npm/pizzip@3.1.7/dist/pizzip.min.js';
+const DOCXT_CDN  = 'https://cdn.jsdelivr.net/npm/docxtemplater@3.50.0/build/docxtemplater.js';
+let ooEditor = null;
 function loadScript(src){ return new Promise((res,rej)=>{ if([...document.scripts].some(s=>s.src===src)) return res();
   const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('load '+src)); document.head.appendChild(s); }); }
-
-function renderEditor() {
-  const lib = edLibrary();
-  if (!EDOC) EDOC = { id:null, name:'Untitled document', html:'<p></p>' };
-  const TB = (cmd,label,val='') => `<button class="ebtn" data-cmd="${cmd}" data-val="${esc(val)}" title="${esc(label)}">${label}</button>`;
-  V().innerHTML = `
-    <style>
-      .edwrap{display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start}
-      @media(max-width:820px){.edwrap{grid-template-columns:1fr}}
-      .edlib .li{padding:8px 10px;border:1px solid var(--line);border-radius:9px;margin-bottom:6px;cursor:pointer;font-size:13px;background:#fff}
-      .edlib .li:hover{border-color:var(--blue-500)} .edlib .li.active{border-color:var(--blue-700);background:var(--blue-050)}
-      .edlib .li .n{font-weight:600;color:var(--blue-900)} .edlib .li .d{font-size:11px;color:var(--muted)}
-      .edtoolbar{display:flex;flex-wrap:wrap;gap:4px;padding:8px;border:1px solid var(--line);border-bottom:none;border-radius:12px 12px 0 0;background:var(--blue-050)}
-      .ebtn{border:1px solid var(--line);background:#fff;border-radius:7px;padding:5px 9px;font-size:13px;cursor:pointer;min-width:30px}
-      .ebtn:hover{border-color:var(--blue-500)} .ebtn b,.ebtn i,.ebtn u{pointer-events:none}
-      .edcanvas{border:1px solid var(--line);border-radius:0 0 12px 12px;background:#fff;min-height:60vh;max-height:70vh;overflow:auto;padding:34px 42px;font-size:15px;line-height:1.6;color:#111}
-      .edcanvas:focus{outline:none} .edcanvas table{border-collapse:collapse} .edcanvas td,.edcanvas th{border:1px solid #bbb;padding:5px 9px}
-      .edsel{padding:5px 6px;border:1px solid var(--line);border-radius:7px;font-size:13px;background:#fff}
-    </style>
-    <div class="edwrap">
-      <div class="edlib">
-        <button class="btn primary" style="width:100%;justify-content:center;margin-bottom:8px" id="edNew">+ New document</button>
-        <label class="btn" style="width:100%;justify-content:center;margin-bottom:12px;cursor:pointer">⬆ Upload
-          <input type="file" id="edFile" accept=".docx,.doc,.txt,.md,.html,.htm,.rtf" hidden></label>
-        <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">My documents</div>
-        <div id="edList">${lib.length ? lib.map(d=>`
-          <div class="li ${EDOC.id===d.id?'active':''}" data-id="${d.id}">
-            <div class="n">${esc(d.name)}</div><div class="d">${new Date(d.updated).toLocaleDateString()}</div>
-          </div>`).join('') : '<div class="muted" style="font-size:12px">No saved documents yet.</div>'}</div>
-      </div>
-      <div>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
-          <input id="edName" value="${esc(EDOC.name)}" style="flex:1;min-width:200px;font-weight:600">
-          <button class="btn primary" id="edSave">Save</button>
-          <select class="edsel" id="edExport">
-            <option value="">Download as…</option>
-            <option value="docx">Word (.docx)</option>
-            <option value="doc">Word (.doc)</option>
-            <option value="html">HTML (.html)</option>
-            <option value="txt">Text (.txt)</option>
-            <option value="pdf">Print / PDF</option>
-          </select>
-          ${EDOC.id?`<button class="btn" style="color:var(--bad)" id="edDelete">Delete</button>`:''}
-        </div>
-        <div class="edtoolbar" id="edToolbar">
-          <select class="edsel" id="edBlock" title="Style">
-            <option value="P">Normal</option><option value="H1">Heading 1</option><option value="H2">Heading 2</option>
-            <option value="H3">Heading 3</option><option value="PRE">Monospace</option><option value="BLOCKQUOTE">Quote</option>
-          </select>
-          ${TB('bold','<b>B</b>')}${TB('italic','<i>I</i>')}${TB('underline','<u>U</u>')}${TB('strikeThrough','S̶')}
-          ${TB('insertUnorderedList','• List')}${TB('insertOrderedList','1. List')}
-          ${TB('justifyLeft','⟸')}${TB('justifyCenter','≡')}${TB('justifyRight','⟹')}
-          ${TB('outdent','⇤')}${TB('indent','⇥')}
-          <input type="color" id="edColor" title="Text color" style="width:32px;height:30px;border:1px solid var(--line);border-radius:7px;background:#fff;cursor:pointer">
-          <button class="ebtn" id="edLink" title="Insert link">🔗</button>
-          <button class="ebtn" id="edTable" title="Insert table">▦ Table</button>
-          ${TB('removeFormat','⌫ Clear')}
-          ${TB('undo','↶')}${TB('redo','↷')}
-        </div>
-        <div class="edcanvas" id="edCanvas" contenteditable="true">${EDOC.html}</div>
-        <div class="muted" style="font-size:12px;margin-top:8px">Everything here stays in this browser — no login, no upload to a server. Save keeps it in your document library; Download exports a file.</div>
-      </div>
-    </div>`;
-
-  // toolbar exec (preventDefault keeps the selection in the canvas)
-  $('#edToolbar').addEventListener('mousedown', e=>{ if(e.target.closest('.ebtn,select,input')) { if(e.target.closest('.ebtn')) e.preventDefault(); } });
-  $('#edToolbar').addEventListener('click', e=>{ const b=e.target.closest('.ebtn'); if(!b||!b.dataset.cmd) return;
-    document.execCommand(b.dataset.cmd, false, b.dataset.val||null); $('#edCanvas').focus(); });
-  $('#edBlock').onchange = e=>{ document.execCommand('formatBlock', false, e.target.value); $('#edCanvas').focus(); };
-  $('#edColor').oninput = e=>{ document.execCommand('foreColor', false, e.target.value); $('#edCanvas').focus(); };
-  $('#edLink').onmousedown = e=>e.preventDefault();
-  $('#edLink').onclick = ()=>{ const u=prompt('Link URL:','https://'); if(u) document.execCommand('createLink',false,u); $('#edCanvas').focus(); };
-  $('#edTable').onmousedown = e=>e.preventDefault();
-  $('#edTable').onclick = ()=>{ const r=+prompt('Rows:','3')||0, c=+prompt('Columns:','3')||0; if(!r||!c)return;
-    let t='<table><tbody>'; for(let i=0;i<r;i++){ t+='<tr>'; for(let j=0;j<c;j++) t+='<td>&nbsp;</td>'; t+='</tr>'; } t+='</tbody></table><p></p>';
-    document.execCommand('insertHTML', false, t); $('#edCanvas').focus(); };
-
-  $('#edNew').onclick = ()=>{ EDOC={id:null,name:'Untitled document',html:'<p></p>'}; renderEditor(); };
-  $('#edSave').onclick = edSaveDoc;
-  $('#edExport').onchange = e=>{ if(e.target.value){ edExport(e.target.value); e.target.value=''; } };
-  if ($('#edDelete')) $('#edDelete').onclick = edDeleteDoc;
-  $('#edList').addEventListener('click', e=>{ const li=e.target.closest('.li'); if(li) edOpenDoc(li.dataset.id); });
-  $('#edFile').onchange = e=>{ if(e.target.files[0]) edUpload(e.target.files[0]); };
-}
-function edCurrentHtml(){ return $('#edCanvas') ? $('#edCanvas').innerHTML : (EDOC?.html||''); }
-function edSaveDoc() {
-  const lib = edLibrary();
-  EDOC.name = $('#edName').value.trim() || 'Untitled document';
-  EDOC.html = edCurrentHtml();
-  if (!EDOC.id) { EDOC.id = crypto.randomUUID(); lib.unshift({id:EDOC.id, name:EDOC.name, html:EDOC.html, updated:Date.now()}); }
-  else { const i=lib.findIndex(d=>d.id===EDOC.id); if(i>=0){ lib[i]={...lib[i], name:EDOC.name, html:EDOC.html, updated:Date.now()}; } else lib.unshift({id:EDOC.id,name:EDOC.name,html:EDOC.html,updated:Date.now()}); }
-  edSaveLibrary(lib); toast('Document saved'); renderEditor();
-}
-function edOpenDoc(id){ const d=edLibrary().find(x=>x.id===id); if(!d) return; EDOC={id:d.id,name:d.name,html:d.html}; renderEditor(); }
-function edDeleteDoc(){ if(!EDOC.id||!confirm('Delete this document?'))return; edSaveLibrary(edLibrary().filter(d=>d.id!==EDOC.id)); EDOC=null; renderEditor(); }
-async function edUpload(file) {
-  const ext = (file.name.split('.').pop()||'').toLowerCase();
-  const name = file.name.replace(/\.[^.]+$/,'');
-  try {
-    if (ext==='docx' || ext==='doc') {
-      await loadScript('https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js');
-      const buf = await file.arrayBuffer();
-      const { value } = await window.mammoth.convertToHtml({arrayBuffer: buf});
-      EDOC = {id:null, name, html: value || '<p></p>'};
-    } else if (ext==='html' || ext==='htm') {
-      const text = await file.text();
-      EDOC = {id:null, name, html: text.replace(/<script[\s\S]*?<\/script>/gi,'')};
-    } else { // txt, md, rtf-as-text, anything else
-      const text = await file.text();
-      EDOC = {id:null, name, html: '<p>'+esc(text).replace(/\n{2,}/g,'</p><p>').replace(/\n/g,'<br>')+'</p>'};
-    }
-    toast('Opened '+file.name);
-    renderEditor();
-  } catch(e){ alert('Could not open that file: '+e.message); }
-}
 function edDownload(blob, filename){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); }
-async function edExport(kind) {
-  const name = ($('#edName').value.trim()||'document').replace(/[^\w\-]+/g,'_');
-  const inner = edCurrentHtml();
-  const full = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(name)}</title></head><body>${inner}</body></html>`;
-  if (kind==='docx') {
-    try { await loadScript('https://cdn.jsdelivr.net/npm/html-docx-js/dist/html-docx.js');
-      edDownload(window.htmlDocx.asBlob(full), name+'.docx'); }
-    catch(e){ alert('DOCX export unavailable ('+e.message+'). Use .doc instead.'); }
-  } else if (kind==='doc') {
-    const header = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"></head><body>';
-    edDownload(new Blob(['﻿'+header+inner+'</body></html>'], {type:'application/msword'}), name+'.doc');
-  } else if (kind==='html') {
-    edDownload(new Blob([full], {type:'text/html'}), name+'.html');
-  } else if (kind==='txt') {
-    const tmp=document.createElement('div'); tmp.innerHTML=inner;
-    edDownload(new Blob([tmp.innerText||tmp.textContent||''], {type:'text/plain'}), name+'.txt');
-  } else if (kind==='pdf') {
-    const w=window.open('','_blank');
-    w.document.write(`<html><head><title>${esc(name)}</title></head><body>${inner}</body></html>`);
-    w.document.close(); w.focus(); setTimeout(()=>{ w.print(); }, 300);
+const edDir = () => SESSION.user.id;
+function fileGlyph(ext){ ext=(ext||'').toLowerCase();
+  if(['xls','xlsx','xlsm','csv','ods'].includes(ext)) return {c:'#217346',t:'XLS'};
+  if(['ppt','pptx','odp'].includes(ext)) return {c:'#c43e1c',t:'PPT'};
+  if(ext==='pdf') return {c:'#d93025',t:'PDF'};
+  if(['doc','docx','odt','rtf','txt'].includes(ext)) return {c:'#2b579a',t:'DOC'};
+  return {c:'#6b7785',t:(ext||'?').slice(0,3).toUpperCase()}; }
+
+async function renderEditor() {
+  loading();
+  let files=[], templates=[], bucketErr=null;
+  try { const { data, error } = await sb.storage.from(DOCS_BUCKET).list(edDir(), {sortBy:{column:'updated_at',order:'desc'}});
+    if(error) bucketErr=error.message; else files=(data||[]).filter(f=>f.id && !f.name.startsWith('.')); }
+  catch(e){ bucketErr=e.message; }
+  try { templates = await api(`govcon_templates?owner=eq.${SESSION.user.id}&select=id,name,tokens,created_at&order=created_at.desc`); } catch(e){}
+  V().innerHTML = `
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <label class="btn primary" style="cursor:pointer">⬆ Upload document
+          <input type="file" id="edFile" accept=".docx,.xlsx,.pptx,.doc,.xls,.ppt,.odt,.ods,.odp,.txt,.csv,.pdf" hidden></label>
+        <button class="btn" id="edRefresh">Refresh</button>
+        <span style="flex:1"></span>
+        <input id="edSearch" placeholder="Search documents…" style="width:220px;max-width:50vw">
+      </div>
+      ${bucketErr?`<div class="banner warn" style="margin:12px 0 0">Document storage isn't set up yet: ${esc(bucketErr)}. Run <b>govcon_migration_5.sql</b> and deploy the <b>oo-config</b> / <b>oo-callback</b> functions.</div>`:''}
+    </div>
+    <h2 class="section" style="margin-top:0">Documents</h2>
+    <div class="tools" id="edGrid">${files.length ? files.map(f=>{
+      const ext=(f.name.split('.').pop()||''); const g=fileGlyph(ext);
+      return `<div class="tool" data-open="${esc(f.name)}" style="position:relative">
+        <button class="btn sm" style="position:absolute;top:8px;right:8px;color:var(--bad)" data-del="${esc(f.name)}">✕</button>
+        <div class="ic" style="width:42px;height:42px;border-radius:10px;background:${g.c};color:#fff;display:grid;place-items:center;font-weight:800;font-size:12px">${g.t}</div>
+        <div class="nm" style="word-break:break-word">${esc(f.name)}</div>
+        <div class="d muted" style="font-size:12px">${f.updated_at?new Date(f.updated_at).toLocaleDateString():''} · ${f.metadata?.size?(f.metadata.size/1024).toFixed(0)+' KB':''}</div>
+      </div>`;
+    }).join('') : `<div class="card center muted" style="grid-column:1/-1">No documents yet. Upload one, or generate a proposal from a template inside a Pipeline lead.</div>`}</div>
+
+    <h2 class="section">Proposal templates</h2>
+    <div class="banner info">Upload a <b>.docx</b> that contains <kbd>{{PLACEHOLDERS}}</kbd> (e.g. your Technical Proposal Template). Each placeholder becomes a fillable field inside a Pipeline lead, and generates a finished document.</div>
+    <div class="card">
+      <label class="btn primary" style="cursor:pointer;margin-bottom:12px;display:inline-flex">⬆ Upload template (.docx)
+        <input type="file" id="tplFile" accept=".docx" hidden></label>
+      <div id="tplList">${templates.length ? templates.map(t=>`
+        <div class="rfp" style="margin-bottom:8px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+          <div><b>${esc(t.name)}</b> <span class="muted" style="font-size:12px">· ${(t.tokens||[]).length} field(s)</span>
+            <div class="chips" style="margin-top:6px">${(t.tokens||[]).slice(0,12).map(tk=>`<span class="chip">${esc(tk)}</span>`).join('')}${(t.tokens||[]).length>12?'<span class="chip">…</span>':''}</div></div>
+          <button class="btn sm" style="color:var(--bad)" data-tpldel="${t.id}">Delete</button>
+        </div>`).join('') : '<p class="muted">No templates yet.</p>'}</div>
+    </div>`;
+
+  // documents
+  $('#edFile').onchange = e=>{ if(e.target.files[0]) edUploadDoc(e.target.files[0]); };
+  $('#edRefresh').onclick = renderEditor;
+  $('#edSearch').oninput = e=>{ const q=e.target.value.toLowerCase(); $$('#edGrid .tool').forEach(el=>{ el.style.display = el.dataset.open.toLowerCase().includes(q)?'':'none'; }); };
+  $('#edGrid').addEventListener('click', e=>{
+    const del=e.target.closest('[data-del]'); if(del){ e.stopPropagation(); edDeleteDoc(del.dataset.del); return; }
+    const open=e.target.closest('[data-open]'); if(open) edOpenDoc(open.dataset.open);
+  });
+  // templates
+  $('#tplFile').onchange = e=>{ if(e.target.files[0]) tplUpload(e.target.files[0]); };
+  $('#tplList').addEventListener('click', e=>{ const d=e.target.closest('[data-tpldel]'); if(d) tplDelete(d.dataset.tpldel); });
+}
+async function edUploadDoc(file) {
+  try {
+    const { error } = await sb.storage.from(DOCS_BUCKET).upload(`${edDir()}/${file.name}`, file, {upsert:false});
+    if(error) throw error;
+    toast('Uploaded '+file.name); edOpenDoc(file.name);
+  } catch(e){ alert('Upload failed: '+e.message); }
+}
+async function edDeleteDoc(name){
+  if(!confirm('Delete "'+name+'"?')) return;
+  const { error } = await sb.storage.from(DOCS_BUCKET).remove([`${edDir()}/${name}`]);
+  if(error){ alert('Delete failed: '+error.message); return; }
+  toast('Deleted'); renderEditor();
+}
+async function edOpenDoc(name) {
+  // full-screen OnlyOffice editor
+  let scr = $('#ooScreen');
+  if(!scr){ scr=document.createElement('div'); scr.id='ooScreen';
+    scr.style.cssText='position:fixed;inset:0;z-index:1000;background:#fff;display:none';
+    scr.innerHTML='<div id="ooPlaceholder" style="width:100%;height:100%"></div>'+
+      '<button id="ooClose" style="position:absolute;top:10px;right:12px;z-index:1001;border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer">Close</button>';
+    document.body.appendChild(scr); $('#ooClose').onclick=edCloseEditor; }
+  scr.style.display='block';
+  try {
+    await loadScript(OO_API);
+    const token = await freshToken();
+    const res = await fetch(`${SB_URL}/functions/v1/oo-config?file=${encodeURIComponent(edDir()+'/'+name)}`,
+      { headers:{ Authorization:`Bearer ${token}` } });
+    const cfg = await res.json();
+    if(!res.ok || cfg.error) throw new Error(cfg.error||('HTTP '+res.status));
+    cfg.width='100%'; cfg.height='100%';
+    cfg.type = (window.innerWidth<=768)?'mobile':'desktop';
+    cfg.events = { onRequestClose: edCloseEditor };
+    if(ooEditor){ ooEditor.destroyEditor(); ooEditor=null; }
+    if(!window.DocsAPI) throw new Error('OnlyOffice script did not load (check docs.connexiontwo.com)');
+    ooEditor = new window.DocsAPI.DocEditor('ooPlaceholder', cfg);
+  } catch(e){ alert('Could not open document: '+e.message); edCloseEditor(); }
+}
+function edCloseEditor(){ if(ooEditor){ try{ooEditor.destroyEditor();}catch(_){} ooEditor=null; }
+  const scr=$('#ooScreen'); if(scr) scr.style.display='none'; renderEditor(); }
+
+/* ── {{token}} template engine (docxtemplater) ── */
+function abToB64(buf){ const bytes=new Uint8Array(buf); let bin=''; const chunk=0x8000;
+  for(let i=0;i<bytes.length;i+=chunk) bin+=String.fromCharCode.apply(null, bytes.subarray(i,i+chunk)); return btoa(bin); }
+async function tplEnsureLibs(){ await loadScript(PIZZIP_CDN); await loadScript(DOCXT_CDN); }
+function tplDelimOpts(extra){ return Object.assign({paragraphLoop:true, linebreaks:true, delimiters:{start:'{{',end:'}}'}}, extra||{}); }
+async function tplExtractTokens(binaryString){
+  await tplEnsureLibs();
+  const zip = new window.PizZip(binaryString);
+  const doc = new window.docxtemplater(zip, tplDelimOpts());
+  const text = doc.getFullText();                 // template text incl. {{tokens}}
+  const set = new Set();
+  (text.match(/\{\{\s*[^{}]+?\s*\}\}/g)||[]).forEach(m=>{ const t=m.replace(/^\{\{\s*|\s*\}\}$/g,'').trim(); if(t) set.add(t); });
+  return [...set];
+}
+async function tplUpload(file){
+  if(!/\.docx$/i.test(file.name)) return alert('Please upload a .docx template.');
+  try {
+    const buf = await file.arrayBuffer();
+    const b64 = abToB64(buf);
+    const tokens = await tplExtractTokens(atob(b64));
+    await api('govcon_templates', {method:'POST', prefer:'return=minimal', body:JSON.stringify({
+      owner:SESSION.user.id, name:file.name.replace(/\.docx$/i,''), tokens, docx_b64:b64,
+    })});
+    toast(`Template saved — ${tokens.length} field(s) found`); renderEditor();
+  } catch(e){ alert('Could not read that template: '+e.message); }
+}
+async function tplDelete(id){ if(!confirm('Delete this template?'))return; await api(`govcon_templates?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); renderEditor(); }
+
+// map a placeholder to a sensible default from the lead + company profile
+function tplGuess(token, r){
+  const t = token.toLowerCase(), today = new Date().toISOString().slice(0,10);
+  if (/due|deadline|close/.test(t)) return r.deadline || '';
+  if (/submission|today|date/.test(t)) return today;
+  if (/solicit|rf[qp].?(num|no|#|number)|notice/.test(t)) return (r.notice_id||'').replace(/^[a-z.]+:/,'') || r.title || '';
+  if (/department|agency|customer/.test(t)) return r.agency || '';
+  if (/set.?aside/.test(t)) return r.set_aside || '';
+  if (/company|offeror|contractor(?!ing)/.test(t)) return PROFILE?.company_name || '';
+  return '';
+}
+// build the fields UI + generate handler for a lead's pop-up
+async function tplSectionHtml(r){
+  const tpls = await api(`govcon_templates?owner=eq.${SESSION.user.id}&select=id,name,tokens&order=created_at.desc`);
+  if(!tpls.length) return `<div class="muted" style="font-size:13px">No templates yet — upload one under <b>Documents → Proposal templates</b> to generate proposals here.</div>`;
+  const opts = tpls.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  window._LEAD_TPLS = tpls; window._LEAD_RFP = r;
+  return `<div class="field"><label>Template</label><select id="tpl_pick">${opts}</select></div>
+    <div id="tpl_fields"></div>
+    <button class="btn primary" id="tpl_gen">Generate document</button>
+    <div id="tpl_out"></div>`;
+}
+function tplRenderFields(){
+  const t = (window._LEAD_TPLS||[]).find(x=>x.id===$('#tpl_pick').value); if(!t) return;
+  const r = window._LEAD_RFP||{};
+  $('#tpl_fields').innerHTML = (t.tokens||[]).length
+    ? `<div class="row2">${t.tokens.map((tk,i)=>`<div class="field"><label>${esc(tk)}</label><input class="tplv" data-k="${esc(tk)}" value="${esc(tplGuess(tk,r))}"></div>`).join('')}</div>`
+    : '<div class="muted" style="font-size:13px">This template has no {{placeholders}} — generating will just copy it.</div>';
+}
+async function tplGenerate(){
+  const t = (window._LEAD_TPLS||[]).find(x=>x.id===$('#tpl_pick').value); if(!t) return;
+  const out = $('#tpl_out'); const btn=$('#tpl_gen'); btn.disabled=true; btn.textContent='Generating…';
+  try {
+    const rows = await api(`govcon_templates?id=eq.${t.id}&select=docx_b64`);
+    const b64 = rows[0]?.docx_b64; if(!b64) throw new Error('template file missing');
+    await tplEnsureLibs();
+    const data = {}; $$('.tplv').forEach(i=>{ data[i.dataset.k] = i.value; });
+    const zip = new window.PizZip(atob(b64));
+    const doc = new window.docxtemplater(zip, tplDelimOpts({nullGetter:()=> ''}));
+    doc.render(data);
+    const blob = doc.getZip().generate({type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+    const fname = `${(window._LEAD_RFP?.title||'Proposal').replace(/[^\w \-]+/g,'').slice(0,60)} — ${t.name}.docx`;
+    // save to the document library (so it opens in the editor) + offer download
+    let saved=false;
+    try { const {error}=await sb.storage.from(DOCS_BUCKET).upload(`${edDir()}/${fname}`, blob, {upsert:true, contentType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}); if(!error) saved=true; } catch(_){}
+    edDownload(blob, fname);
+    out.innerHTML = `<div class="banner info" style="margin-top:10px">✓ Generated <b>${esc(fname)}</b>. ${saved?'Saved to your Document Editor library — ':''}downloaded to your device.${saved?` <a href="#" onclick="closeModal();route('editor');return false">Open the editor →</a>`:''}</div>`;
+  } catch(e){
+    const msg = /unclosed|unopened|tag/i.test(e.message) ? `Template syntax problem: ${e.message}. Check for a mistyped placeholder (e.g. a missing "}}").` : e.message;
+    out.innerHTML = `<div class="banner bad" style="margin-top:10px">${esc(msg)}</div>`;
   }
+  btn.disabled=false; btn.textContent='Generate document';
 }
 
 /* ═══════════════ TOAST ═══════════════ */
