@@ -38,7 +38,13 @@ export default async function handler(req, res) {
     if (!SUPABASE_URL || !SERVICE_KEY) return res.status(500).json({ error: "Server not configured (missing Supabase env vars)" });
 
     const file = String(req.query.file || "");
-    if (!file) return res.status(400).json({ error: "Missing file" });
+    const passUrl = String(req.query.fileUrl || "");
+    if (!file && !passUrl) return res.status(400).json({ error: "Missing file" });
+    // Passthrough URLs may only point at the GovCon Supabase project's storage —
+    // never sign arbitrary URLs for strangers.
+    if (passUrl && !/^https:\/\/rfdvogakvyodixgpvqvz\.supabase\.co\/storage\/v1\//.test(passUrl)) {
+      return res.status(403).json({ error: "fileUrl host not allowed" });
+    }
 
     // 1) read the caller's user id straight from their Supabase access token (the
     //    JWT "sub"). No second network call — avoids brittle verify failures.
@@ -56,7 +62,6 @@ export default async function handler(req, res) {
     // GovCon lives in a DIFFERENT Supabase project, so it signs its own file URL
     // there and just needs this endpoint's JWT secret to sign the editor config.
     // If a fileUrl is supplied we sign that directly and skip our own storage.
-    const passUrl = String(req.query.fileUrl || "");
     if (passUrl) {
       const pExt = String(req.query.ext || (String(req.query.title || "").split(".").pop()) || "docx");
       const pTitle = decodeURIComponent(String(req.query.title || "document"));
