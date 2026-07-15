@@ -102,6 +102,8 @@
     white-space:pre-wrap;word-break:break-word;line-height:1.4;color:var(--ink)}
   .matx td textarea:focus,.matx td input:focus{outline:2px solid var(--blue-500);outline-offset:-2px;background:#fff}
   .matx .stat-Met{background:#e8f5ee}.matx .stat-Partial{background:#fff3e0}.matx .stat-Gap{background:#fdeaea}.matx .stat-NA{background:transparent}
+  .matx .stat-Todo{background:#fdf3b0}.matx .stat-Todo select{color:#7a5b00;font-weight:700}
+  .matx .stat-Done{background:#c8f0d6}.matx .stat-Done select{color:#0b6b34;font-weight:700}
   .matx .colx,.matx .rowx{cursor:pointer;color:var(--muted);font-weight:800;border:none;background:transparent;padding:2px 6px}
   .matx .colx:hover,.matx .rowx:hover{color:var(--bad)}
   .toggle input{width:auto}
@@ -182,7 +184,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r12-2026-07-15';
+const GOVCON_BUILD = 'r13-2026-07-15';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -915,6 +917,18 @@ async function openLead(itemId) {
         <div class="field"><label>Solicitation / Notice #</label><input id="ld_solnum" value="${esc(leadSolNum(r))}" placeholder="e.g. 140P8626Q0042"></div>
         <div class="field"><label>Folder name <span class="muted" style="font-weight:normal">— rename anytime; applies on Save</span></label><input id="ld_folder_name" value="${esc(leadFolder(r))}"></div>
       </div>
+      <h2 class="section">Contracting officers / points of contact</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Auto-filled from SAM when you click “Pull full detail from SAM.gov”. These feed the {{Contracting Officer}}, {{CO Email}}, {{CO Phone}} template fields.</div>
+      <div class="row3">
+        <div class="field"><label>Contracting Officer 1</label><input id="ld_co1" value="${esc((r.details||{}).contracting_officer||'')}"></div>
+        <div class="field"><label>CO 1 email</label><input id="ld_co1_email" value="${esc((r.details||{}).co_email||'')}"></div>
+        <div class="field"><label>CO 1 phone</label><input id="ld_co1_phone" value="${esc((r.details||{}).co_phone||'')}"></div>
+      </div>
+      <div class="row3">
+        <div class="field"><label>Contracting Officer 2</label><input id="ld_co2" value="${esc((r.details||{}).contracting_officer_2||'')}"></div>
+        <div class="field"><label>CO 2 email</label><input id="ld_co2_email" value="${esc((r.details||{}).co2_email||'')}"></div>
+        <div class="field"><label>CO 2 phone</label><input id="ld_co2_phone" value="${esc((r.details||{}).co2_phone||'')}"></div>
+      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
         <label class="btn primary" style="cursor:pointer">⬆ Upload documents<input id="ld_docup" type="file" multiple accept=".pdf,.docx,.doc,.txt" hidden></label>
         <button class="btn" id="ld_extract">✦ Read documents &amp; build matrices</button>
@@ -980,6 +994,10 @@ async function saveLead(itemId, rfpId) {
   const folderIn = ($('#ld_folder_name') ? $('#ld_folder_name').value : '').trim();
   if(solIn) details.solicitation_number = solIn; else delete details.solicitation_number;
   if(folderIn) details.folder_name = cleanFolder(folderIn); else delete details.folder_name;
+  // contracting officers / points of contact
+  const setDet=(k,id)=>{ const v=($('#'+id)?$('#'+id).value:'').trim(); if(v) details[k]=v; else delete details[k]; };
+  setDet('contracting_officer','ld_co1');   setDet('co_email','ld_co1_email');   setDet('co_phone','ld_co1_phone');
+  setDet('contracting_officer_2','ld_co2'); setDet('co2_email','ld_co2_email');  setDet('co2_phone','ld_co2_phone');
   const newFolder = leadFolder(Object.assign({}, r, {title, details}));
   if(newFolder !== oldFolder){ await renameLeadFolder(oldFolder, newFolder); }
   const { skipped, rows } = await apiPatchTolerant(`govcon_rfps?id=eq.${rfpId}`, {
@@ -1067,7 +1085,7 @@ async function refreshLeadDocs(r){
 async function uploadLeadDocs(r, files){
   const folder=leadFolder(r); const st=$('#ld_docstatus'); st.innerHTML='<div class="muted">Uploading…</div>';
   for(const f of files){
-    try{ await sb.storage.from(DOCS_BUCKET).upload(`${edDir()}/${folder}/${f.name}`, f, {upsert:true}); }
+    try{ await sb.storage.from(DOCS_BUCKET).upload(`${edDir()}/${folder}/${safeName(f.name)}`, f, {upsert:true}); }
     catch(e){ st.innerHTML=`<div class="banner bad">Upload failed: ${esc(e.message)}</div>`; return; }
   }
   st.innerHTML='<div class="banner info">Uploaded. Click “Read documents &amp; build matrices” to extract requirements.</div>';
@@ -1175,11 +1193,11 @@ async function delSub(id){
   renderSubs(window._LEAD_ITEM.rfp_id, window._LEAD_RFP);
 }
 async function uploadSubFile(subId, r, file){
-  const folder=leadFolder(r); const path=`${edDir()}/${folder}/subs/${subId}/${file.name}`;
+  const folder=leadFolder(r); const clean=safeName(file.name); const path=`${edDir()}/${folder}/subs/${subId}/${clean}`;
   try{
     await sb.storage.from(DOCS_BUCKET).upload(path, file, {upsert:true});
     const sub=(window._LEAD_SUBS||[]).find(s=>s.id===subId)||{};
-    const files=(sub.files||[]).filter(f=>f.name!==file.name); files.push({name:file.name, path});
+    const files=(sub.files||[]).filter(f=>f.name!==clean); files.push({name:clean, path});
     await api(`govcon_subcontractors?id=eq.${subId}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({files})});
     toast('File added'); renderSubs(r.id?window._LEAD_ITEM.rfp_id:window._LEAD_ITEM.rfp_id, r);
   }catch(e){ alert('Upload failed: '+e.message); }
@@ -1533,6 +1551,16 @@ function loadScript(src){ return new Promise((res,rej)=>{ if([...document.script
 function edDownload(blob, filename){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); }
 const edDir = () => SESSION.user.id;
+// Supabase storage keys reject non-ASCII (e.g. the “—” em dash) and a few
+// other characters. Sanitize any file NAME segment before using it as a key.
+function safeName(n){
+  return String(n||'')
+    .normalize('NFKD')
+    .replace(/[‐-―−]/g,'-')   // en/em dashes, minus sign → hyphen
+    .replace(/[\\/:*?"<>|]/g,'-')            // path/OS-illegal characters
+    .replace(/[^\x20-\x7E]/g,'')             // drop any remaining non-ASCII
+    .replace(/\s+/g,' ').trim() || 'file';
+}
 function fileGlyph(ext){ ext=(ext||'').toLowerCase();
   if(['xls','xlsx','xlsm','csv','ods'].includes(ext)) return {c:'#217346',t:'XLS'};
   if(['ppt','pptx','odp'].includes(ext)) return {c:'#c43e1c',t:'PPT'};
@@ -1561,7 +1589,9 @@ async function renderEditor() {
         <span style="flex:1"></span>
         <input id="edSearch" placeholder="Search…" style="width:220px;max-width:50vw">
       </div>
-      <div style="margin-top:10px;font-size:13px">${crumbHtml}</div>
+      <div style="margin-top:10px;font-size:13px;display:flex;align-items:center;gap:8px">
+        ${ED_PATH?`<button class="btn sm" id="edBack">← Back</button>`:''}
+        <span>${crumbHtml}</span></div>
       ${bucketErr?`<div class="banner warn" style="margin:12px 0 0">Document storage isn't set up yet: ${esc(bucketErr)}. Run <b>govcon_migration_5.sql</b> and deploy the <b>oo-config</b> / <b>oo-callback</b> functions.</div>`:''}
     </div>
     <h2 class="section" style="margin-top:0">${ED_PATH?esc(crumbs[crumbs.length-1]):'Documents'}</h2>
@@ -1605,6 +1635,7 @@ async function renderEditor() {
     const fold=e.target.closest('[data-folder]'); if(fold){ ED_PATH = (ED_PATH?ED_PATH+'/':'')+fold.dataset.folder; renderEditor(); return; }
     const open=e.target.closest('[data-open]'); if(open) edOpenDoc(open.dataset.open);
   });
+  if($('#edBack')) $('#edBack').onclick=()=>{ ED_PATH = ED_PATH.split('/').slice(0,-1).join('/'); renderEditor(); };
   $$('.ed-crumb').forEach(c=>c.onclick=()=>{ ED_PATH=c.dataset.path; renderEditor(); });
   // templates
   $('#tplFile').onchange = e=>{ if(e.target.files[0]) tplUpload(e.target.files[0]); };
@@ -1612,10 +1643,10 @@ async function renderEditor() {
 }
 async function edUploadDoc(file) {
   try {
-    const rel = (ED_PATH?ED_PATH+'/':'')+file.name;
-    const { error } = await sb.storage.from(DOCS_BUCKET).upload(`${edDir()}/${rel}`, file, {upsert:false});
+    const rel = (ED_PATH?ED_PATH+'/':'')+safeName(file.name);   // sanitize the key (fixes "Invalid key")
+    const { error } = await sb.storage.from(DOCS_BUCKET).upload(`${edDir()}/${rel}`, file, {upsert:true});
     if(error) throw error;
-    toast('Uploaded '+file.name); edOpenDoc(rel);
+    toast('Uploaded '+safeName(file.name)); edOpenDoc(rel);
   } catch(e){ alert('Upload failed: '+e.message); }
 }
 async function edDeleteDoc(rel){
@@ -1734,10 +1765,16 @@ function tplGuess(token, r){
   if (/today|submission.?date|date.?(signed|prepared)|prepared.?date|^date$/.test(t)) return today;
   // Solicitation / RFQ / notice number — the real scraped number, never the UUID.
   if (/solicit|rf[qp].?(num|no|#|number)?|notice.?(num|no|#|id)|control.?num/.test(t)) return has(leadSolNum(r));
-  // Contracting officer + contact info (scraped).
-  if (/contract(ing)?.?officer|\bco\b(?!de|mp|st|nt)|\bkco\b|buyer/.test(t)) return has(d.contracting_officer);
+  // Second contracting officer / point of contact (check FIRST — "2/second/alt").
+  if (/(officer|co|poc|contact).?2|second.?(officer|co|poc|contact)|alt(ernate)?.?(officer|poc|co)/.test(t)) {
+    if (/email/.test(t)) return has(d.co2_email);
+    if (/phone|tel/.test(t)) return has(d.co2_phone);
+    return has(d.contracting_officer_2);
+  }
+  // Primary contracting officer + contact info (scraped).
   if (/(officer|co|poc|contact).?email|email/.test(t)) return has(d.co_email);
   if (/(officer|co|poc|contact).?(phone|tel)|phone|telephone/.test(t)) return has(d.co_phone);
+  if (/contract(ing)?.?officer|\bco\b(?!de|mp|st|nt)|\bkco\b|buyer|point.?of.?contact|\bpoc\b/.test(t)) return has(d.contracting_officer);
   // Agency / department / office / place of performance (scraped).
   if (/department|agency|customer|buyer.?org/.test(t)) return has(r.agency || d.office);
   if (/office|sub.?agency|division/.test(t)) return has(d.office || r.agency);
@@ -1778,7 +1815,14 @@ async function tplEnrich(){
     const r = await callFn('autopilot-run', {action:'enrich', rfp_id: window._LEAD_RFP.id});
     if (window._LEAD_RFP){ window._LEAD_RFP.description = r.description || window._LEAD_RFP.description;
       window._LEAD_RFP.details = Object.assign(window._LEAD_RFP.details||{}, r.details||{}); }
-    tplRenderFields();               // re-fill fields with the richer data
+    // refresh the CO / contact inputs in the pop-up with the scraped values
+    const d = (window._LEAD_RFP||{}).details||{};
+    const setv=(id,v)=>{ const el=$('#'+id); if(el && v) el.value=v; };
+    setv('ld_co1',d.contracting_officer); setv('ld_co1_email',d.co_email); setv('ld_co1_phone',d.co_phone);
+    setv('ld_co2',d.contracting_officer_2); setv('ld_co2_email',d.co2_email); setv('ld_co2_phone',d.co2_phone);
+    if(d.solicitation_number) setv('ld_solnum',d.solicitation_number);
+    if($('#ld_desc') && r.description) $('#ld_desc').value = r.description;
+    tplRenderFields();               // re-fill template fields with the richer data
     toast('Pulled latest detail from SAM.gov');
   } catch(e){ toast('Enrich failed: '+e.message); }
   b.disabled=false; b.textContent='↻ Pull full detail from SAM.gov';
@@ -1802,12 +1846,21 @@ async function tplGenerate(){
       if(fresh.some(x=>!known.has(x))) await api(`govcon_templates?id=eq.${t.id}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({tokens:fresh})});
     } catch(_){}
     const blob = doc.getZip().generate({type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
-    const fname = `${(window._LEAD_RFP?.title||'Proposal').replace(/[^\w \-]+/g,'').slice(0,60)} — ${t.name}.docx`;
-    // save to the document library (so it opens in the editor) + offer download
+    const fname = safeName(`${(window._LEAD_RFP?.title||'Proposal').slice(0,60)} - ${t.name}`) + '.docx';
+    // save into THIS opportunity's folder so it lands next to the solicitation docs
+    const folder = leadFolder(window._LEAD_RFP||{});
+    const rel = folder ? `${folder}/${fname}` : fname;
     let saved=false;
-    try { const {error}=await sb.storage.from(DOCS_BUCKET).upload(`${edDir()}/${fname}`, blob, {upsert:true, contentType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}); if(!error) saved=true; } catch(_){}
+    try { const {error}=await sb.storage.from(DOCS_BUCKET).upload(`${edDir()}/${rel}`, blob, {upsert:true, contentType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}); if(!error) saved=true; } catch(_){}
     edDownload(blob, fname);
-    out.innerHTML = `<div class="banner info" style="margin-top:10px">✓ Generated <b>${esc(fname)}</b>. ${saved?'Saved to your Document Editor library — ':''}downloaded to your device.${saved?` <a href="#" onclick="closeModal();route('editor');return false">Open the editor →</a>`:''}</div>`;
+    out.innerHTML = `<div class="banner info" style="margin-top:10px">✓ Generated <b>${esc(fname)}</b>.${saved?` Saved to the <b>${esc(folder)}</b> folder.`:''} Downloaded to your device.
+      ${saved?`<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn sm primary" id="tpl_openeditor">✎ Open in editor</button>
+        <button class="btn sm" id="tpl_openlib">Open document library →</button></div>`:''}</div>`;
+    if(saved){
+      const oe=$('#tpl_openeditor'); if(oe) oe.onclick=()=>edOpenDoc(rel);
+      const ol=$('#tpl_openlib'); if(ol) ol.onclick=()=>{ ED_PATH=folder; closeModal(); route('editor'); };
+    }
   } catch(e){
     const msg = /unclosed|unopened|tag/i.test(e.message) ? `Template syntax problem: ${e.message}. Check for a mistyped placeholder (e.g. a missing "}}").` : e.message;
     out.innerHTML = `<div class="banner bad" style="margin-top:10px">${esc(msg)}</div>`;
