@@ -181,7 +181,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r7-2026-07-14';
+const GOVCON_BUILD = 'r8-2026-07-14';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -793,47 +793,51 @@ function closeModal() { $('#modalRoot').innerHTML=''; document.body.style.overfl
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
 
 /* ── customizable capability matrix ── */
-const DEFAULT_MATRIX = () => ({
-  columns: ['Requirement','Our Capability','Status','Owner','Notes'],
-  rows: [['','','Partial','','']],
-});
-let MATRIX = DEFAULT_MATRIX();
-function normalizeMatrix(m) {
-  if (!m || !Array.isArray(m.columns) || !m.columns.length) return DEFAULT_MATRIX();
+// Generic matrix widget, keyed by host element id. Two are used per lead:
+//   matrixHost    = Capability matrix (what we must DO)
+//   submatrixHost = Submission matrix (what's required to SUBMIT)
+const MATRIX_DEFAULTS = {
+  matrixHost: () => ({ columns:['Requirement','Our Capability','Status','Owner','Notes'], rows:[['','','Partial','','']] }),
+  submatrixHost: () => ({ columns:['Submission Requirement','Location in RFP','Format / Limit','Due','Status'], rows:[['','','','','Gap']] }),
+};
+const MATRICES = {};   // hostId -> {columns, rows}
+const STATUS_OPTS = ['Met','Partial','Gap','N/A','Done','Todo'];
+const defMatrix = (hostId) => (MATRIX_DEFAULTS[hostId] || MATRIX_DEFAULTS.matrixHost)();
+function normalizeMatrix(m, hostId) {
+  if (!m || !Array.isArray(m.columns) || !m.columns.length) return defMatrix(hostId);
   return { columns: m.columns.slice(), rows: (m.rows||[]).map(row => m.columns.map((_,i)=>row[i]??'')) };
 }
-const STATUS_OPTS = ['Met','Partial','Gap','N/A'];
-function matrixHtml() {
-  const isStatus = (c) => /status/i.test(c);
-  const head = MATRIX.columns.map((c,ci)=>`<th>
+function matrixHtml(hostId) {
+  const M = MATRICES[hostId]; const isStatus = (c) => /status/i.test(c);
+  const head = M.columns.map((c,ci)=>`<th>
       <input value="${esc(c)}" data-col="${ci}" style="width:calc(100% - 18px);font:inherit;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);background:transparent;border:none">
-      <button class="colx" title="Delete column" onclick="delMatrixCol(${ci})">×</button></th>`).join('') + '<th style="width:34px"></th>';
-  const body = MATRIX.rows.map((row,ri)=>`<tr>${row.map((cell,ci)=>{
-      if (isStatus(MATRIX.columns[ci])) {
+      <button class="colx" title="Delete column" onclick="delMatrixCol('${hostId}',${ci})">×</button></th>`).join('') + '<th style="width:34px"></th>';
+  const body = M.rows.map((row,ri)=>`<tr>${row.map((cell,ci)=>{
+      if (isStatus(M.columns[ci])) {
         return `<td class="stat-${esc(String(cell||'N/A').replace(/[^A-Za-z]/g,'')||'NA')}">
           <select data-r="${ri}" data-c="${ci}" style="width:100%;border:none;background:transparent;padding:7px 8px;font:inherit">
             ${STATUS_OPTS.map(o=>`<option ${o===cell?'selected':''}>${o}</option>`).join('')}</select></td>`;
       }
       return `<td><textarea data-r="${ri}" data-c="${ci}" rows="1">${esc(cell||'')}</textarea></td>`;
-    }).join('')}<td style="text-align:center"><button class="rowx" title="Delete row" onclick="delMatrixRow(${ri})">×</button></td></tr>`).join('');
+    }).join('')}<td style="text-align:center"><button class="rowx" title="Delete row" onclick="delMatrixRow('${hostId}',${ri})">×</button></td></tr>`).join('');
   return `<table class="matx"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-      <button class="btn sm" onclick="addMatrixRow()">+ Requirement (row)</button>
-      <button class="btn sm" onclick="addMatrixCol()">+ Column</button>
-      <button class="btn sm" onclick="resetMatrix()">Reset template</button>
+      <button class="btn sm" onclick="addMatrixRow('${hostId}')">+ Row</button>
+      <button class="btn sm" onclick="addMatrixCol('${hostId}')">+ Column</button>
+      <button class="btn sm" onclick="resetMatrix('${hostId}')">Reset</button>
     </div>`;
 }
-function syncMatrixFromDom() {
-  const host = $('#matrixHost'); if(!host) return;
-  host.querySelectorAll('[data-col]').forEach(inp=>{ MATRIX.columns[+inp.dataset.col] = inp.value; });
-  host.querySelectorAll('[data-r]').forEach(el=>{ MATRIX.rows[+el.dataset.r][+el.dataset.c] = el.value; });
+function syncMatrixFromDom(hostId) {
+  const host = $('#'+hostId), M = MATRICES[hostId]; if(!host||!M) return;
+  host.querySelectorAll('[data-col]').forEach(inp=>{ M.columns[+inp.dataset.col] = inp.value; });
+  host.querySelectorAll('[data-r]').forEach(el=>{ M.rows[+el.dataset.r][+el.dataset.c] = el.value; });
 }
-function renderMatrix(){ const h=$('#matrixHost'); if(h) h.innerHTML = matrixHtml(); }
-function addMatrixRow(){ syncMatrixFromDom(); MATRIX.rows.push(MATRIX.columns.map(c=>/status/i.test(c)?'Partial':'')); renderMatrix(); }
-function delMatrixRow(i){ syncMatrixFromDom(); MATRIX.rows.splice(i,1); if(!MATRIX.rows.length) MATRIX.rows.push(MATRIX.columns.map(()=>'')); renderMatrix(); }
-function addMatrixCol(){ syncMatrixFromDom(); const name=prompt('Column name:','Column'); if(name===null)return; MATRIX.columns.push(name||'Column'); MATRIX.rows.forEach(r=>r.push('')); renderMatrix(); }
-function delMatrixCol(i){ if(MATRIX.columns.length<=1) return; syncMatrixFromDom(); MATRIX.columns.splice(i,1); MATRIX.rows.forEach(r=>r.splice(i,1)); renderMatrix(); }
-function resetMatrix(){ if(!confirm('Reset the matrix to the default template? Current rows are cleared.'))return; MATRIX=DEFAULT_MATRIX(); renderMatrix(); }
+function renderMatrix(hostId){ const h=$('#'+hostId); if(h) h.innerHTML = matrixHtml(hostId); }
+function addMatrixRow(hostId){ const M=MATRICES[hostId]; syncMatrixFromDom(hostId); M.rows.push(M.columns.map(c=>/status/i.test(c)?'Gap':'')); renderMatrix(hostId); }
+function delMatrixRow(hostId,i){ const M=MATRICES[hostId]; syncMatrixFromDom(hostId); M.rows.splice(i,1); if(!M.rows.length) M.rows.push(M.columns.map(()=>'')); renderMatrix(hostId); }
+function addMatrixCol(hostId){ const M=MATRICES[hostId]; syncMatrixFromDom(hostId); const name=prompt('Column name:','Column'); if(name===null)return; M.columns.push(name||'Column'); M.rows.forEach(r=>r.push('')); renderMatrix(hostId); }
+function delMatrixCol(hostId,i){ const M=MATRICES[hostId]; if(M.columns.length<=1) return; syncMatrixFromDom(hostId); M.columns.splice(i,1); M.rows.forEach(r=>r.splice(i,1)); renderMatrix(hostId); }
+function resetMatrix(hostId){ if(!confirm('Reset this matrix to the default template? Current rows are cleared.'))return; MATRICES[hostId]=defMatrix(hostId); renderMatrix(hostId); }
 
 async function openLead(itemId) {
   const item = PIPE_ITEMS.find(i=>i.id===itemId) ||
@@ -841,7 +845,9 @@ async function openLead(itemId) {
   if (!item) return;
   const rfpRows = await api(`govcon_rfps?id=eq.${item.rfp_id}&select=*`);
   const r = rfpRows[0] || item.govcon_rfps || {};
-  MATRIX = normalizeMatrix(r.capability_matrix);
+  MATRICES.matrixHost = normalizeMatrix(r.capability_matrix, 'matrixHost');
+  MATRICES.submatrixHost = normalizeMatrix(r.submission_matrix, 'submatrixHost');
+  window._LEAD_ITEM = item;
   openModal(`
     <div class="shd">
       <h3>${esc(r.title||'Lead')}</h3>
@@ -868,9 +874,28 @@ async function openLead(itemId) {
       <div class="field"><label>Requirements / description</label><textarea id="ld_desc" style="min-height:120px">${esc(r.description||'')}</textarea></div>
       <div class="field"><label>Stage notes (risks, owners, next actions)</label><textarea id="ld_notes">${esc(item.notes||'')}</textarea></div>
 
+      <h2 class="section">Contract documents</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Upload the solicitation, SOW/PWS, and attachments. Claude reads them and fills the <b>Submission</b> and <b>Capability</b> matrices below. Files are saved to this opportunity's folder in the Document Editor — add more anytime and re-read.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+        <label class="btn primary" style="cursor:pointer">⬆ Upload documents<input id="ld_docup" type="file" multiple accept=".pdf,.docx,.doc,.txt" hidden></label>
+        <button class="btn" id="ld_extract">✦ Read documents &amp; build matrices</button>
+        <span class="muted" style="font-size:12px" id="ld_folder"></span>
+      </div>
+      <div id="ld_doclist" class="muted" style="font-size:12.5px"></div>
+      <div id="ld_docstatus"></div>
+
+      <h2 class="section">Submission matrix</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Everything required to submit a compliant bid. Auto-filled from the documents; edit freely.</div>
+      <div id="submatrixHost" style="overflow-x:auto"></div>
+
       <h2 class="section">Capability matrix</h2>
-      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Map each requirement to your capability and status. Edit any cell; add or delete rows and columns; the whole matrix saves with the lead.</div>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Everything the contract requires you to do, mapped to your capability and status.</div>
       <div id="matrixHost" style="overflow-x:auto"></div>
+
+      <h2 class="section">Subcontractors &amp; quotes</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Track who you called, their quote, and store their insurance / documents. Add as many as you need.</div>
+      <div id="subsHost"><div class="muted" style="font-size:13px">Loading…</div></div>
+      <button class="btn" id="subAdd" style="margin-top:8px">+ Add subcontractor</button>
 
       <h2 class="section">Generate proposal document</h2>
       <div class="muted" style="font-size:12px;margin:-6px 0 10px">Fill the template's {{placeholders}} and generate a finished .docx — it's saved to your Document Editor and downloaded.</div>
@@ -885,9 +910,19 @@ async function openLead(itemId) {
         <button class="btn" onclick="closeModal()">Close</button>
       </div>
     </div>`);
-  renderMatrix();
-  // recolor status cells live
-  $('#matrixHost').addEventListener('change', e=>{ if(e.target.matches('select[data-c]')){ syncMatrixFromDom(); renderMatrix(); } });
+  renderMatrix('matrixHost'); renderMatrix('submatrixHost');
+  ['matrixHost','submatrixHost'].forEach(h=>$('#'+h).addEventListener('change', e=>{
+    if(e.target.matches('select[data-c]')){ syncMatrixFromDom(h); renderMatrix(h); }
+  }));
+  // document upload + AI extraction
+  window._LEAD_RFP = r;
+  $('#ld_folder').textContent = 'Folder: ' + leadFolder(r);
+  refreshLeadDocs(r);
+  $('#ld_docup').onchange = e=>{ if(e.target.files.length) uploadLeadDocs(r, [...e.target.files]); };
+  $('#ld_extract').onclick = ()=>extractMatrices(r);
+  // subcontractors
+  renderSubs(item.rfp_id, r);
+  $('#subAdd').onclick = ()=>addSub(item.rfp_id, r);
   // template generator (async — fill after the modal is up)
   tplSectionHtml(r).then(html=>{ const host=$('#tplSection'); if(!host) return; host.innerHTML=html;
     if($('#tpl_pick')){ tplRenderFields(); $('#tpl_pick').onchange=tplRenderFields; $('#tpl_gen').onclick=tplGenerate;
@@ -896,14 +931,14 @@ async function openLead(itemId) {
 }
 async function saveLead(itemId, rfpId) {
   const title = $('#ld_title').value.trim(); if(!title) return alert('Title is required');
-  syncMatrixFromDom();
+  syncMatrixFromDom('matrixHost'); syncMatrixFromDom('submatrixHost');
   await api(`govcon_rfps?id=eq.${rfpId}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({
     title, agency:$('#ld_agency').value.trim()||null, category:$('#ld_category').value.trim()||null,
     set_aside:$('#ld_setaside').value.trim()||null, deadline:$('#ld_deadline').value||null,
     budget_min:$('#ld_bmin').value===''?null:+$('#ld_bmin').value,
     budget_max:$('#ld_bmax').value===''?null:+$('#ld_bmax').value,
     url:$('#ld_url').value.trim()||null, description:$('#ld_desc').value.trim()||null,
-    capability_matrix: MATRIX,
+    capability_matrix: MATRICES.matrixHost, submission_matrix: MATRICES.submatrixHost,
   })});
   await api(`govcon_pipeline_items?id=eq.${itemId}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({
     stage:$('#ld_stage').value, priority:$('#ld_prio').value, notes:$('#ld_notes').value.trim()||null,
@@ -919,6 +954,143 @@ async function removeLead(itemId) {
   toast('Removed from pipeline');
   closeModal();
   renderPipeline();
+}
+
+/* ── solicitation folder + document upload + AI extraction ── */
+const PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const MAMMOTH_CDN = 'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js';
+function leadSolNum(r){ return (r.details && r.details.solicitation_number) || (r.notice_id||'').replace(/^[a-z.]+:/,''); }
+function leadFolder(r){
+  const num = leadSolNum(r);
+  return ((r.title||'Opportunity') + (num?(' '+num):'')).replace(/[^A-Za-z0-9 _\-]+/g,' ').replace(/\s+/g,' ').trim().slice(0,90);
+}
+async function refreshLeadDocs(r){
+  const host=$('#ld_doclist'); if(!host) return;
+  const folder=leadFolder(r);
+  try {
+    const { data } = await sb.storage.from(DOCS_BUCKET).list(`${edDir()}/${folder}`, {sortBy:{column:'name',order:'asc'}});
+    const files=(data||[]).filter(f=>f.id && !f.name.startsWith('.'));
+    host.innerHTML = files.length
+      ? 'Documents: ' + files.map(f=>`<span class="chip lead-doc" data-p="${esc(folder+'/'+f.name)}" style="cursor:pointer">${esc(f.name)}</span>`).join(' ')
+      : '<span class="muted">No documents uploaded yet.</span>';
+    host.querySelectorAll('.lead-doc').forEach(el=>el.onclick=()=>edOpenDoc(el.dataset.p));
+  } catch(e){ host.textContent = 'Could not list files: '+e.message; }
+}
+async function uploadLeadDocs(r, files){
+  const folder=leadFolder(r); const st=$('#ld_docstatus'); st.innerHTML='<div class="muted">Uploading…</div>';
+  for(const f of files){
+    try{ await sb.storage.from(DOCS_BUCKET).upload(`${edDir()}/${folder}/${f.name}`, f, {upsert:true}); }
+    catch(e){ st.innerHTML=`<div class="banner bad">Upload failed: ${esc(e.message)}</div>`; return; }
+  }
+  st.innerHTML='<div class="banner info">Uploaded. Click “Read documents &amp; build matrices” to extract requirements.</div>';
+  refreshLeadDocs(r);
+}
+async function extractFileText(name, blob){
+  const ext=(name.split('.').pop()||'').toLowerCase();
+  if(ext==='pdf'){
+    await loadScript(PDFJS_CDN);
+    try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER; } catch(_){}
+    const pdf=await window.pdfjsLib.getDocument({data: await blob.arrayBuffer()}).promise;
+    let t=''; for(let i=1;i<=pdf.numPages;i++){ const pg=await pdf.getPage(i); const c=await pg.getTextContent(); t+=c.items.map(x=>x.str).join(' ')+'\n'; }
+    return t;
+  }
+  if(ext==='docx'||ext==='doc'){
+    await loadScript(MAMMOTH_CDN);
+    const { value }=await window.mammoth.extractRawText({arrayBuffer: await blob.arrayBuffer()});
+    return value||'';
+  }
+  return await blob.text();
+}
+async function extractMatrices(r){
+  const st=$('#ld_docstatus'), btn=$('#ld_extract'); btn.disabled=true; btn.textContent='Reading…';
+  st.innerHTML='<div class="muted">Extracting text from documents…</div>';
+  try {
+    const folder=leadFolder(r);
+    const { data } = await sb.storage.from(DOCS_BUCKET).list(`${edDir()}/${folder}`);
+    const files=(data||[]).filter(f=>f.id && !f.name.startsWith('.'));
+    if(!files.length && !(r.description||'').trim()){ st.innerHTML='<div class="banner warn">Upload a document first, or add a description.</div>'; btn.disabled=false; btn.textContent='✦ Read documents & build matrices'; return; }
+    let text = (r.description||'') + '\n';
+    for(const f of files){
+      try{ const { data:blob } = await sb.storage.from(DOCS_BUCKET).download(`${edDir()}/${folder}/${f.name}`);
+        text += `\n===== ${f.name} =====\n` + await extractFileText(f.name, blob); }
+      catch(_){}
+    }
+    st.innerHTML='<div class="muted">Claude is reading the documents and building the matrices…</div>';
+    const res = await callFn('govcon-ai', {tool:'extract', rfp_id:r.id, text: text.slice(0,180000)});
+    const sub = res.submission||[], req = res.requirements||[];
+    if (sub.length) MATRICES.submatrixHost = { columns:['Submission Requirement','Location in RFP','Format / Limit','Due','Status'],
+      rows: sub.map(s=>[s.requirement||'', s.location||'', s.format||'', s.due||'', 'Todo']) };
+    if (req.length) MATRICES.matrixHost = { columns:['Requirement','Our Capability','Status','Owner','Notes'],
+      rows: req.map(q=>[q.task||'', '', 'Gap', '', q.reference||'']) };
+    renderMatrix('submatrixHost'); renderMatrix('matrixHost');
+    st.innerHTML=`<div class="banner info">✓ Extracted ${sub.length} submission requirement(s) and ${req.length} contract requirement(s). Review, edit, then Save lead.</div>`;
+  } catch(e){ st.innerHTML=`<div class="banner bad">Extraction failed: ${esc(e.message)}</div>`; }
+  btn.disabled=false; btn.textContent='✦ Read documents & build matrices';
+}
+
+/* ── subcontractors ── */
+async function renderSubs(rfpId, r){
+  const host=$('#subsHost'); if(!host) return;
+  const subs=await api(`govcon_subcontractors?owner=eq.${SESSION.user.id}&rfp_id=eq.${rfpId}&select=*&order=created_at.asc`);
+  window._LEAD_SUBS=subs;
+  host.innerHTML = subs.length ? subs.map(subCard).join('') : '<div class="muted" style="font-size:13px">No subcontractors yet.</div>';
+  host.querySelectorAll('[data-subfile]').forEach(inp=>inp.onchange=e=>{ if(e.target.files[0]) uploadSubFile(e.target.dataset.subfile, r, e.target.files[0]); });
+  host.querySelectorAll('.sub-dl').forEach(a=>a.onclick=async e=>{ e.preventDefault();
+    const { data } = await sb.storage.from(DOCS_BUCKET).createSignedUrl(a.dataset.dl, 300); if(data?.signedUrl) window.open(data.signedUrl,'_blank'); });
+}
+function subCard(s){
+  const files=(s.files||[]);
+  return `<div class="rfp" style="margin-bottom:10px" data-sub="${s.id}">
+    <div class="row3">
+      <div class="field"><label>Company</label><input class="sv" data-k="company_name" value="${esc(s.company_name||'')}"></div>
+      <div class="field"><label>POC / owner name</label><input class="sv" data-k="poc_name" value="${esc(s.poc_name||'')}"></div>
+      <div class="field"><label>Quote status</label><select class="sv" data-k="quote_status">${['requested','received','declined','selected'].map(o=>`<option ${o===s.quote_status?'selected':''}>${o}</option>`).join('')}</select></div>
+    </div>
+    <div class="row3">
+      <div class="field"><label>First name</label><input class="sv" data-k="first_name" value="${esc(s.first_name||'')}"></div>
+      <div class="field"><label>Last name</label><input class="sv" data-k="last_name" value="${esc(s.last_name||'')}"></div>
+      <div class="field"><label>Quote amount ($)</label><input class="sv" data-k="quote_amount" type="number" value="${s.quote_amount??''}"></div>
+    </div>
+    <div class="row3">
+      <div class="field"><label>Email</label><input class="sv" data-k="email" value="${esc(s.email||'')}"></div>
+      <div class="field"><label>Phone</label><input class="sv" data-k="phone" value="${esc(s.phone||'')}"></div>
+      <div class="field"><label>Scope of work</label><input class="sv" data-k="scope" value="${esc(s.scope||'')}"></div>
+    </div>
+    <div class="field"><label>Notes</label><textarea class="sv" data-k="notes">${esc(s.notes||'')}</textarea></div>
+    <div class="muted" style="font-size:12px">Files: ${files.length?files.map(f=>`<a href="#" class="chip sub-dl" data-dl="${esc(f.path)}">${esc(f.name)}</a>`).join(' '):'none'}</div>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <label class="btn sm" style="cursor:pointer">⬆ Insurance / documents<input type="file" data-subfile="${s.id}" hidden></label>
+      <button class="btn sm primary" onclick="saveSub('${s.id}')">Save</button>
+      <button class="btn sm" style="color:var(--bad)" onclick="delSub('${s.id}')">Delete</button>
+    </div>
+  </div>`;
+}
+async function addSub(rfpId, r){
+  await api('govcon_subcontractors',{method:'POST',prefer:'return=minimal',body:JSON.stringify({owner:SESSION.user.id, rfp_id:rfpId, quote_status:'requested'})});
+  renderSubs(rfpId, r);
+}
+async function saveSub(id){
+  const card=document.querySelector(`[data-sub="${id}"]`); if(!card) return;
+  const body={}; card.querySelectorAll('.sv').forEach(i=>{ let v=i.value.trim();
+    if(i.dataset.k==='quote_amount') body.quote_amount = v===''?null:+v; else body[i.dataset.k]= v||null; });
+  await api(`govcon_subcontractors?id=eq.${id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify(body)});
+  toast('Subcontractor saved');
+}
+async function delSub(id){
+  if(!confirm('Delete this subcontractor?'))return;
+  await api(`govcon_subcontractors?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'});
+  renderSubs(window._LEAD_ITEM.rfp_id, window._LEAD_RFP);
+}
+async function uploadSubFile(subId, r, file){
+  const folder=leadFolder(r); const path=`${edDir()}/${folder}/subs/${subId}/${file.name}`;
+  try{
+    await sb.storage.from(DOCS_BUCKET).upload(path, file, {upsert:true});
+    const sub=(window._LEAD_SUBS||[]).find(s=>s.id===subId)||{};
+    const files=(sub.files||[]).filter(f=>f.name!==file.name); files.push({name:file.name, path});
+    await api(`govcon_subcontractors?id=eq.${subId}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({files})});
+    toast('File added'); renderSubs(r.id?window._LEAD_ITEM.rfp_id:window._LEAD_ITEM.rfp_id, r);
+  }catch(e){ alert('Upload failed: '+e.message); }
 }
 
 /* ═══════════════ AWARDS RESEARCH ═══════════════ */
@@ -1263,6 +1435,7 @@ const OO_API = 'https://docs.connexiontwo.com/web-apps/apps/api/documents/api.js
 const PIZZIP_CDN = 'https://cdn.jsdelivr.net/npm/pizzip@3.1.7/dist/pizzip.min.js';
 const DOCXT_CDN  = 'https://cdn.jsdelivr.net/npm/docxtemplater@3.50.0/build/docxtemplater.js';
 let ooEditor = null;
+let ED_PATH = '';   // current subfolder under the user's documents root
 function loadScript(src){ return new Promise((res,rej)=>{ if([...document.scripts].some(s=>s.src===src)) return res();
   const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('load '+src)); document.head.appendChild(s); }); }
 function edDownload(blob, filename){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename;
@@ -1277,11 +1450,16 @@ function fileGlyph(ext){ ext=(ext||'').toLowerCase();
 
 async function renderEditor() {
   loading();
-  let files=[], templates=[], bucketErr=null;
-  try { const { data, error } = await sb.storage.from(DOCS_BUCKET).list(edDir(), {sortBy:{column:'updated_at',order:'desc'}});
-    if(error) bucketErr=error.message; else files=(data||[]).filter(f=>f.id && !f.name.startsWith('.')); }
+  let items=[], templates=[], bucketErr=null;
+  const listPath = `${edDir()}${ED_PATH?'/'+ED_PATH:''}`;
+  try { const { data, error } = await sb.storage.from(DOCS_BUCKET).list(listPath, {sortBy:{column:'name',order:'asc'}});
+    if(error) bucketErr=error.message; else items=(data||[]).filter(f=>!f.name.startsWith('.')); }
   catch(e){ bucketErr=e.message; }
+  const folders = items.filter(f=>!f.id), files = items.filter(f=>f.id);
   try { templates = await api(`govcon_templates?owner=eq.${SESSION.user.id}&select=id,name,tokens,created_at&order=created_at.desc`); } catch(e){}
+  const crumbs = ED_PATH ? ED_PATH.split('/') : [];
+  const crumbHtml = `<span class="ed-crumb" data-path="" style="cursor:pointer;font-weight:700">All documents</span>` +
+    crumbs.map((c,i)=>` / <span class="ed-crumb" data-path="${esc(crumbs.slice(0,i+1).join('/'))}" style="cursor:pointer">${esc(c)}</span>`).join('');
   V().innerHTML = `
     <div class="card" style="margin-bottom:16px">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
@@ -1289,20 +1467,29 @@ async function renderEditor() {
           <input type="file" id="edFile" accept=".docx,.xlsx,.pptx,.doc,.xls,.ppt,.odt,.ods,.odp,.txt,.csv,.pdf" hidden></label>
         <button class="btn" id="edRefresh">Refresh</button>
         <span style="flex:1"></span>
-        <input id="edSearch" placeholder="Search documents…" style="width:220px;max-width:50vw">
+        <input id="edSearch" placeholder="Search…" style="width:220px;max-width:50vw">
       </div>
+      <div style="margin-top:10px;font-size:13px">${crumbHtml}</div>
       ${bucketErr?`<div class="banner warn" style="margin:12px 0 0">Document storage isn't set up yet: ${esc(bucketErr)}. Run <b>govcon_migration_5.sql</b> and deploy the <b>oo-config</b> / <b>oo-callback</b> functions.</div>`:''}
     </div>
-    <h2 class="section" style="margin-top:0">Documents</h2>
-    <div class="tools" id="edGrid">${files.length ? files.map(f=>{
-      const ext=(f.name.split('.').pop()||''); const g=fileGlyph(ext);
-      return `<div class="tool" data-open="${esc(f.name)}" style="position:relative">
-        <button class="btn sm" style="position:absolute;top:8px;right:8px;color:var(--bad)" data-del="${esc(f.name)}">✕</button>
-        <div class="ic" style="width:42px;height:42px;border-radius:10px;background:${g.c};color:#fff;display:grid;place-items:center;font-weight:800;font-size:12px">${g.t}</div>
+    <h2 class="section" style="margin-top:0">${ED_PATH?esc(crumbs[crumbs.length-1]):'Documents'}</h2>
+    <div class="tools" id="edGrid">${
+      folders.map(f=>`<div class="tool ed-folder" data-folder="${esc(f.name)}" style="position:relative;cursor:pointer">
+        <div class="ic" style="width:42px;height:42px;border-radius:10px;background:#e8a33d;color:#fff;display:grid;place-items:center;font-weight:800;font-size:18px">📁</div>
         <div class="nm" style="word-break:break-word">${esc(f.name)}</div>
-        <div class="d muted" style="font-size:12px">${f.updated_at?new Date(f.updated_at).toLocaleDateString():''} · ${f.metadata?.size?(f.metadata.size/1024).toFixed(0)+' KB':''}</div>
-      </div>`;
-    }).join('') : `<div class="card center muted" style="grid-column:1/-1">No documents yet. Upload one, or generate a proposal from a template inside a Pipeline lead.</div>`}</div>
+        <div class="d muted" style="font-size:12px">folder</div>
+      </div>`).join('') +
+      (files.length ? files.map(f=>{
+        const ext=(f.name.split('.').pop()||''); const g=fileGlyph(ext);
+        const rel = (ED_PATH?ED_PATH+'/':'')+f.name;
+        return `<div class="tool" data-open="${esc(rel)}" style="position:relative">
+          <button class="btn sm" style="position:absolute;top:8px;right:8px;color:var(--bad)" data-del="${esc(rel)}">✕</button>
+          <div class="ic" style="width:42px;height:42px;border-radius:10px;background:${g.c};color:#fff;display:grid;place-items:center;font-weight:800;font-size:12px">${g.t}</div>
+          <div class="nm" style="word-break:break-word">${esc(f.name)}</div>
+          <div class="d muted" style="font-size:12px">${f.updated_at?new Date(f.updated_at).toLocaleDateString():''} · ${f.metadata?.size?(f.metadata.size/1024).toFixed(0)+' KB':''}</div>
+        </div>`;
+      }).join('') : (folders.length?'':`<div class="card center muted" style="grid-column:1/-1">Empty. Upload a document, or generate a proposal from a template inside a Pipeline lead — each opportunity gets its own folder here.</div>`))
+    }</div>
 
     <h2 class="section">Proposal templates</h2>
     <div class="banner info">Upload a <b>.docx</b> that contains <kbd>{{PLACEHOLDERS}}</kbd> (e.g. your Technical Proposal Template). Each placeholder becomes a fillable field inside a Pipeline lead, and generates a finished document.</div>
@@ -1320,25 +1507,28 @@ async function renderEditor() {
   // documents
   $('#edFile').onchange = e=>{ if(e.target.files[0]) edUploadDoc(e.target.files[0]); };
   $('#edRefresh').onclick = renderEditor;
-  $('#edSearch').oninput = e=>{ const q=e.target.value.toLowerCase(); $$('#edGrid .tool').forEach(el=>{ el.style.display = el.dataset.open.toLowerCase().includes(q)?'':'none'; }); };
+  $('#edSearch').oninput = e=>{ const q=e.target.value.toLowerCase(); $$('#edGrid .tool').forEach(el=>{ const n=(el.dataset.open||el.dataset.folder||'').toLowerCase(); el.style.display = n.includes(q)?'':'none'; }); };
   $('#edGrid').addEventListener('click', e=>{
     const del=e.target.closest('[data-del]'); if(del){ e.stopPropagation(); edDeleteDoc(del.dataset.del); return; }
+    const fold=e.target.closest('[data-folder]'); if(fold){ ED_PATH = (ED_PATH?ED_PATH+'/':'')+fold.dataset.folder; renderEditor(); return; }
     const open=e.target.closest('[data-open]'); if(open) edOpenDoc(open.dataset.open);
   });
+  $$('.ed-crumb').forEach(c=>c.onclick=()=>{ ED_PATH=c.dataset.path; renderEditor(); });
   // templates
   $('#tplFile').onchange = e=>{ if(e.target.files[0]) tplUpload(e.target.files[0]); };
   $('#tplList').addEventListener('click', e=>{ const d=e.target.closest('[data-tpldel]'); if(d) tplDelete(d.dataset.tpldel); });
 }
 async function edUploadDoc(file) {
   try {
-    const { error } = await sb.storage.from(DOCS_BUCKET).upload(`${edDir()}/${file.name}`, file, {upsert:false});
+    const rel = (ED_PATH?ED_PATH+'/':'')+file.name;
+    const { error } = await sb.storage.from(DOCS_BUCKET).upload(`${edDir()}/${rel}`, file, {upsert:false});
     if(error) throw error;
-    toast('Uploaded '+file.name); edOpenDoc(file.name);
+    toast('Uploaded '+file.name); edOpenDoc(rel);
   } catch(e){ alert('Upload failed: '+e.message); }
 }
-async function edDeleteDoc(name){
-  if(!confirm('Delete "'+name+'"?')) return;
-  const { error } = await sb.storage.from(DOCS_BUCKET).remove([`${edDir()}/${name}`]);
+async function edDeleteDoc(rel){
+  if(!confirm('Delete "'+rel.split('/').pop()+'"?')) return;
+  const { error } = await sb.storage.from(DOCS_BUCKET).remove([`${edDir()}/${rel}`]);
   if(error){ alert('Delete failed: '+error.message); return; }
   toast('Deleted'); renderEditor();
 }
