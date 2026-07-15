@@ -495,10 +495,11 @@ async function saveRfp() {
 }
 async function addToPipeline(rfpId) {
   try {
-    await api('govcon_pipeline_items', {method:'POST', prefer:'resolution=ignore-duplicates',
+    await api('govcon_pipeline_items?on_conflict=owner,rfp_id', {method:'POST',
+      prefer:'resolution=ignore-duplicates,return=minimal',
       body:JSON.stringify({owner:SESSION.user.id, rfp_id:rfpId, stage:'lead'})});
     toast('Added to pipeline');
-  } catch(e){ alert(e.message); }
+  } catch(e){ if(/23505|duplicate/i.test(e.message)) toast('Already in pipeline'); else alert(e.message); }
 }
 async function runAutopilotNow() {
   toast('Running Autopilot…', true);
