@@ -181,7 +181,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r9-2026-07-15';
+const GOVCON_BUILD = 'r10-2026-07-15';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -214,6 +214,22 @@ async function api(path, opts={}) {
   if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
   const text = await res.text();               // tolerate empty bodies (return=minimal / 204)
   return text ? JSON.parse(text) : null;
+}
+// PATCH that survives a missing column: if the schema cache doesn't have a
+// column yet (PGRST204, e.g. capability_matrix before its migration is run),
+// drop that field and retry so the rest of the edit still saves. Returns the
+// list of columns that had to be skipped so the caller can warn the user.
+async function apiPatchTolerant(path, obj) {
+  const payload = { ...obj }; const skipped = [];
+  for (let i=0; i<8; i++) {
+    try { await api(path, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify(payload)}); return skipped; }
+    catch(e){
+      const m = /Could not find the '([^']+)' column/.exec(e.message||'');
+      if (m && Object.prototype.hasOwnProperty.call(payload, m[1])) { delete payload[m[1]]; skipped.push(m[1]); continue; }
+      throw e;
+    }
+  }
+  return skipped;
 }
 async function callFn(name, body) {
   const token = await freshToken();
@@ -786,8 +802,14 @@ async function moveStage(id, stage) {
 /* view / edit the full lead (pipeline item + its RFP) */
 /* ── generic scrollable modal ── */
 function openModal(html) {
-  $('#modalRoot').innerHTML = `<div class="ovl" onclick="if(event.target===this)closeModal()"><div class="sheet">${html}</div></div>`;
+  $('#modalRoot').innerHTML = `<div class="ovl"><div class="sheet">${html}</div></div>`;
   document.body.style.overflow = 'hidden';
+  // Close only on a genuine click on the backdrop — i.e. mousedown AND mouseup
+  // both land on the overlay itself. This stops the modal from closing when you
+  // select text in a field/matrix and release the mouse outside the sheet.
+  const ovl = $('#modalRoot .ovl'); let downOnOvl = false;
+  ovl.addEventListener('mousedown', e=>{ downOnOvl = (e.target===ovl); });
+  ovl.addEventListener('mouseup',   e=>{ if(downOnOvl && e.target===ovl) closeModal(); downOnOvl = false; });
 }
 function closeModal() { $('#modalRoot').innerHTML=''; document.body.style.overflow=''; }
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
@@ -947,7 +969,7 @@ async function saveLead(itemId, rfpId) {
   if(folderIn) details.folder_name = cleanFolder(folderIn); else delete details.folder_name;
   const newFolder = leadFolder(Object.assign({}, r, {title, details}));
   if(newFolder !== oldFolder){ await renameLeadFolder(oldFolder, newFolder); }
-  await api(`govcon_rfps?id=eq.${rfpId}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({
+  const skipped = await apiPatchTolerant(`govcon_rfps?id=eq.${rfpId}`, {
     title, agency:$('#ld_agency').value.trim()||null, category:$('#ld_category').value.trim()||null,
     set_aside:$('#ld_setaside').value.trim()||null, deadline:$('#ld_deadline').value||null,
     budget_min:$('#ld_bmin').value===''?null:+$('#ld_bmin').value,
@@ -955,9 +977,10 @@ async function saveLead(itemId, rfpId) {
     url:$('#ld_url').value.trim()||null, description:$('#ld_desc').value.trim()||null,
     capability_matrix: MATRICES.matrixHost, submission_matrix: MATRICES.submatrixHost,
     details,
-  })});
+  });
   // keep the in-memory copy in sync so re-opening / uploads use the new folder
   r.title = title; r.details = details;
+  if (skipped.length) toast('Saved. These need their DB migration first: '+skipped.join(', '));
   await api(`govcon_pipeline_items?id=eq.${itemId}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({
     stage:$('#ld_stage').value, priority:$('#ld_prio').value, notes:$('#ld_notes').value.trim()||null,
     stage_updated_at:new Date().toISOString(),
@@ -1071,7 +1094,12 @@ async function extractMatrices(r){
       rows: req.map(q=>[q.task||'', '', 'Gap', '', q.reference||'']) };
     renderMatrix('submatrixHost'); renderMatrix('matrixHost');
     st.innerHTML=`<div class="banner info">✓ Extracted ${sub.length} submission requirement(s) and ${req.length} contract requirement(s). Review, edit, then Save lead.</div>`;
-  } catch(e){ st.innerHTML=`<div class="banner bad">Extraction failed: ${esc(e.message)}</div>`; }
+  } catch(e){
+    const msg=e.message||'';
+    st.innerHTML = /credit balance|insufficient|billing|quota/i.test(msg)
+      ? `<div class="banner bad">Claude couldn't run: your Anthropic account is out of credit. Add credits at console.anthropic.com → Plans &amp; Billing, then try again.<br><span class="muted" style="font-size:12px">(${esc(msg)})</span></div>`
+      : `<div class="banner bad">Extraction failed: ${esc(msg)}</div>`;
+  }
   btn.disabled=false; btn.textContent='✦ Read documents & build matrices';
 }
 
@@ -1578,8 +1606,23 @@ async function edDeleteDoc(rel){
   if(error){ alert('Delete failed: '+error.message); return; }
   toast('Deleted'); renderEditor();
 }
+// Editable Office formats OnlyOffice handles; everything else (PDF, images,
+// txt) just opens in a browser tab via a short-lived signed URL.
+const OO_EDITABLE = ['docx','doc','odt','rtf','xlsx','xls','ods','csv','pptx','ppt','odp'];
+async function edSignedUrl(rel){
+  const { data, error } = await sb.storage.from(DOCS_BUCKET).createSignedUrl(`${edDir()}/${rel}`, 3600);
+  if(error) throw error;
+  return data.signedUrl;
+}
 async function edOpenDoc(name) {
-  // full-screen OnlyOffice editor
+  const ext = (name.split('.').pop()||'').toLowerCase();
+  // No login, no editor: view/download the file straight from a signed URL.
+  if(!OO_EDITABLE.includes(ext)){
+    try { window.open(await edSignedUrl(name), '_blank', 'noopener'); }
+    catch(e){ alert('Could not open document: '+e.message); }
+    return;
+  }
+  // Editable Office doc → full-screen OnlyOffice editor.
   let scr = $('#ooScreen');
   if(!scr){ scr=document.createElement('div'); scr.id='ooScreen';
     scr.style.cssText='position:fixed;inset:0;z-index:1000;background:#fff;display:none';
@@ -1591,8 +1634,8 @@ async function edOpenDoc(name) {
     await loadScript(OO_API);
     const token = await freshToken();
     const res = await fetch(`${SB_URL}/functions/v1/oo-config?file=${encodeURIComponent(edDir()+'/'+name)}`,
-      { headers:{ Authorization:`Bearer ${token}` } });
-    const cfg = await res.json();
+      { headers:{ apikey:SB_KEY, Authorization:`Bearer ${token}` } });
+    const cfg = await res.json().catch(()=>({error:'HTTP '+res.status}));
     if(!res.ok || cfg.error) throw new Error(cfg.error||('HTTP '+res.status));
     cfg.width='100%'; cfg.height='100%';
     cfg.type = (window.innerWidth<=768)?'mobile':'desktop';
@@ -1600,7 +1643,13 @@ async function edOpenDoc(name) {
     if(ooEditor){ ooEditor.destroyEditor(); ooEditor=null; }
     if(!window.DocsAPI) throw new Error('OnlyOffice script did not load (check docs.connexiontwo.com)');
     ooEditor = new window.DocsAPI.DocEditor('ooPlaceholder', cfg);
-  } catch(e){ alert('Could not open document: '+e.message); edCloseEditor(); }
+  } catch(e){
+    edCloseEditor();
+    // Editor unavailable — fall back to just opening the file so work isn't blocked.
+    if(confirm('The live editor is unavailable ('+e.message+').\n\nOpen the file in a new tab instead?')){
+      try { window.open(await edSignedUrl(name), '_blank', 'noopener'); } catch(_){}
+    }
+  }
 }
 function edCloseEditor(){ if(ooEditor){ try{ooEditor.destroyEditor();}catch(_){} ooEditor=null; }
   const scr=$('#ooScreen'); if(scr) scr.style.display='none'; renderEditor(); }
