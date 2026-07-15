@@ -98,7 +98,8 @@
   .matx th{background:var(--blue-050);padding:6px 8px;font-size:11.5px;text-transform:uppercase;
     letter-spacing:.4px;color:var(--muted);position:relative}
   .matx td textarea,.matx td input{width:100%;border:none;background:transparent;padding:7px 8px;
-    font-size:13px;font-family:inherit;resize:vertical;min-height:34px;color:var(--ink)}
+    font-size:13px;font-family:inherit;resize:none;min-height:34px;overflow:hidden;
+    white-space:pre-wrap;word-break:break-word;line-height:1.4;color:var(--ink)}
   .matx td textarea:focus,.matx td input:focus{outline:2px solid var(--blue-500);outline-offset:-2px;background:#fff}
   .matx .stat-Met{background:#e8f5ee}.matx .stat-Partial{background:#fff3e0}.matx .stat-Gap{background:#fdeaea}.matx .stat-NA{background:transparent}
   .matx .colx,.matx .rowx{cursor:pointer;color:var(--muted);font-weight:800;border:none;background:transparent;padding:2px 6px}
@@ -181,7 +182,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r11-2026-07-15';
+const GOVCON_BUILD = 'r12-2026-07-15';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -222,14 +223,17 @@ async function api(path, opts={}) {
 async function apiPatchTolerant(path, obj) {
   const payload = { ...obj }; const skipped = [];
   for (let i=0; i<8; i++) {
-    try { await api(path, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify(payload)}); return skipped; }
-    catch(e){
+    try {
+      // return=representation so we can confirm a row was actually updated
+      const rows = await api(path, {method:'PATCH', prefer:'return=representation', body:JSON.stringify(payload)});
+      return { skipped, rows: rows || [] };
+    } catch(e){
       const m = /Could not find the '([^']+)' column/.exec(e.message||'');
       if (m && Object.prototype.hasOwnProperty.call(payload, m[1])) { delete payload[m[1]]; skipped.push(m[1]); continue; }
       throw e;
     }
   }
-  return skipped;
+  return { skipped, rows: [] };
 }
 async function callFn(name, body) {
   const token = await freshToken();
@@ -847,7 +851,7 @@ function matrixHtml(hostId) {
           <select data-r="${ri}" data-c="${ci}" style="width:100%;border:none;background:transparent;padding:7px 8px;font:inherit">
             ${STATUS_OPTS.map(o=>`<option ${o===cell?'selected':''}>${o}</option>`).join('')}</select></td>`;
       }
-      return `<td><textarea data-r="${ri}" data-c="${ci}" rows="1">${esc(cell||'')}</textarea></td>`;
+      return `<td><textarea data-r="${ri}" data-c="${ci}" rows="1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${esc(cell||'')}</textarea></td>`;
     }).join('')}<td style="text-align:center"><button class="rowx" title="Delete row" onclick="delMatrixRow('${hostId}',${ri})">×</button></td></tr>`).join('');
   return `<table class="matx"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
@@ -861,7 +865,9 @@ function syncMatrixFromDom(hostId) {
   host.querySelectorAll('[data-col]').forEach(inp=>{ M.columns[+inp.dataset.col] = inp.value; });
   host.querySelectorAll('[data-r]').forEach(el=>{ M.rows[+el.dataset.r][+el.dataset.c] = el.value; });
 }
-function renderMatrix(hostId){ const h=$('#'+hostId); if(h) h.innerHTML = matrixHtml(hostId); }
+function autoSizeMatrix(hostId){ const h=$('#'+hostId); if(!h) return;
+  h.querySelectorAll('td textarea').forEach(ta=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; }); }
+function renderMatrix(hostId){ const h=$('#'+hostId); if(h){ h.innerHTML = matrixHtml(hostId); autoSizeMatrix(hostId); } }
 function addMatrixRow(hostId){ const M=MATRICES[hostId]; syncMatrixFromDom(hostId); M.rows.push(M.columns.map(c=>/status/i.test(c)?'Gap':'')); renderMatrix(hostId); }
 function delMatrixRow(hostId,i){ const M=MATRICES[hostId]; syncMatrixFromDom(hostId); M.rows.splice(i,1); if(!M.rows.length) M.rows.push(M.columns.map(()=>'')); renderMatrix(hostId); }
 function addMatrixCol(hostId){ const M=MATRICES[hostId]; syncMatrixFromDom(hostId); const name=prompt('Column name:','Column'); if(name===null)return; M.columns.push(name||'Column'); M.rows.forEach(r=>r.push('')); renderMatrix(hostId); }
@@ -976,7 +982,7 @@ async function saveLead(itemId, rfpId) {
   if(folderIn) details.folder_name = cleanFolder(folderIn); else delete details.folder_name;
   const newFolder = leadFolder(Object.assign({}, r, {title, details}));
   if(newFolder !== oldFolder){ await renameLeadFolder(oldFolder, newFolder); }
-  const skipped = await apiPatchTolerant(`govcon_rfps?id=eq.${rfpId}`, {
+  const { skipped, rows } = await apiPatchTolerant(`govcon_rfps?id=eq.${rfpId}`, {
     title, agency:$('#ld_agency').value.trim()||null, category:$('#ld_category').value.trim()||null,
     set_aside:$('#ld_setaside').value.trim()||null, deadline:$('#ld_deadline').value||null,
     budget_min:$('#ld_bmin').value===''?null:+$('#ld_bmin').value,
@@ -986,15 +992,20 @@ async function saveLead(itemId, rfpId) {
     details,
   });
   // keep the in-memory copy in sync so re-opening / uploads use the new folder
-  r.title = title; r.details = details;
-  if (skipped.length) toast('Saved. These need their DB migration first: '+skipped.join(', '));
-  await api(`govcon_pipeline_items?id=eq.${itemId}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({
+  r.title = title; r.details = details; if(rows[0]) window._LEAD_RFP = Object.assign(r, rows[0]);
+  const pipeRes = await apiPatchTolerant(`govcon_pipeline_items?id=eq.${itemId}`, {
     stage:$('#ld_stage').value, priority:$('#ld_prio').value, notes:$('#ld_notes').value.trim()||null,
     stage_updated_at:new Date().toISOString(),
-  })});
-  toast('Lead saved');
-  closeModal();
-  renderPipeline();
+  });
+  // If NOTHING was updated, the write hit no row — surface it instead of a false "saved".
+  if(!rows.length && !pipeRes.rows.length){
+    toast('⚠ Nothing saved — no matching row. Check you are on project rfdvogakvyodixgpvqvz and signed in as this lead’s owner.');
+  } else if(skipped.length){
+    toast('Saved ✓  (these columns still need the DB migration: '+skipped.join(', ')+')');
+  } else {
+    toast('Lead saved ✓');
+  }
+  renderPipeline();   // refresh the board behind the pop-up; pop-up stays open
 }
 async function removeLead(itemId) {
   if(!confirm('Remove this opportunity from the pipeline? (The RFP stays in Discovery.)')) return;
@@ -1666,14 +1677,32 @@ function abToB64(buf){ const bytes=new Uint8Array(buf); let bin=''; const chunk=
   for(let i=0;i<bytes.length;i+=chunk) bin+=String.fromCharCode.apply(null, bytes.subarray(i,i+chunk)); return btoa(bin); }
 async function tplEnsureLibs(){ await loadScript(PIZZIP_CDN); await loadScript(DOCXT_CDN); }
 function tplDelimOpts(extra){ return Object.assign({paragraphLoop:true, linebreaks:true, delimiters:{start:'{{',end:'}}'}}, extra||{}); }
+// Repair common placeholder typos: {{X}  →  {{X}}   and   {X}}  →  {{X}}
+// (only clean word-like tokens, so real single-brace text and split XML runs are untouched).
+function tplRepairTags(s){
+  return String(s)
+    .replace(/\{\{\s*([A-Za-z0-9 _\-]{1,60}?)\s*\}(?!\})/g, '{{$1}}')
+    .replace(/(?<!\{)\{\s*([A-Za-z0-9 _\-]{1,60}?)\s*\}\}/g, '{{$1}}');
+}
+// Repair the tag typos inside every text part of the .docx zip, in place.
+function tplRepairZip(zip){
+  Object.keys(zip.files).forEach(n=>{
+    if(/^word\/(document|header\d*|footer\d*|footnotes|endnotes)\.xml$/.test(n)){
+      try{ const c=zip.file(n).asText(); const f=tplRepairTags(c); if(f!==c) zip.file(n, f); }catch(_){}
+    }
+  });
+  return zip;
+}
+function tplTokensFromText(text){
+  const set=new Set();
+  (tplRepairTags(text).match(/\{\{\s*[^{}]+?\s*\}\}/g)||[]).forEach(m=>{ const t=m.replace(/^\{\{\s*|\s*\}\}$/g,'').trim(); if(t) set.add(t); });
+  return [...set];
+}
 async function tplExtractTokens(binaryString){
   await tplEnsureLibs();
   const zip = new window.PizZip(binaryString);
   const doc = new window.docxtemplater(zip, tplDelimOpts());
-  const text = doc.getFullText();                 // template text incl. {{tokens}}
-  const set = new Set();
-  (text.match(/\{\{\s*[^{}]+?\s*\}\}/g)||[]).forEach(m=>{ const t=m.replace(/^\{\{\s*|\s*\}\}$/g,'').trim(); if(t) set.add(t); });
-  return [...set];
+  return tplTokensFromText(doc.getFullText());    // catches {{good}} AND repaired {{typo} placeholders
 }
 async function tplUpload(file){
   if(!/\.docx$/i.test(file.name)) return alert('Please upload a .docx template.');
@@ -1690,15 +1719,38 @@ async function tplUpload(file){
 async function tplDelete(id){ if(!confirm('Delete this template?'))return; await api(`govcon_templates?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); renderEditor(); }
 
 // map a placeholder to a sensible default from the lead + company profile
+// Fill a placeholder ONLY from real data: the scraped SAM/portal details,
+// the stored RFP fields, or the user's own company profile. Never fabricate —
+// unknown fields are left blank for the user to complete.
 function tplGuess(token, r){
-  const t = token.toLowerCase(), today = new Date().toISOString().slice(0,10);
-  if (/due|deadline|close/.test(t)) return r.deadline || '';
-  if (/submission|today|date/.test(t)) return today;
-  if (/solicit|rf[qp].?(num|no|#|number)|notice/.test(t)) return (r.notice_id||'').replace(/^[a-z.]+:/,'') || r.title || '';
-  if (/department|agency|customer/.test(t)) return r.agency || '';
-  if (/set.?aside/.test(t)) return r.set_aside || '';
-  if (/company|offeror|contractor(?!ing)/.test(t)) return PROFILE?.company_name || '';
-  return '';
+  const t = token.toLowerCase();
+  const d = r.details || {};
+  const today = new Date().toISOString().slice(0,10);   // today = a real fact (used only for "today's date")
+  const has = (v)=> (v===0 || v) ? String(v) : '';
+
+  // Response deadline (scraped) — NEVER today's date.
+  if (/(rf[qp]).*(due|deadline|close)|due.?date|deadline|closing|response.?date/.test(t)) return has(r.deadline);
+  // "Today's date" / date the proposal is signed — legitimately today.
+  if (/today|submission.?date|date.?(signed|prepared)|prepared.?date|^date$/.test(t)) return today;
+  // Solicitation / RFQ / notice number — the real scraped number, never the UUID.
+  if (/solicit|rf[qp].?(num|no|#|number)?|notice.?(num|no|#|id)|control.?num/.test(t)) return has(leadSolNum(r));
+  // Contracting officer + contact info (scraped).
+  if (/contract(ing)?.?officer|\bco\b(?!de|mp|st|nt)|\bkco\b|buyer/.test(t)) return has(d.contracting_officer);
+  if (/(officer|co|poc|contact).?email|email/.test(t)) return has(d.co_email);
+  if (/(officer|co|poc|contact).?(phone|tel)|phone|telephone/.test(t)) return has(d.co_phone);
+  // Agency / department / office / place of performance (scraped).
+  if (/department|agency|customer|buyer.?org/.test(t)) return has(r.agency || d.office);
+  if (/office|sub.?agency|division/.test(t)) return has(d.office || r.agency);
+  if (/place.?of.?perform|work.?(location|site)|location|city|state|jobsite/.test(t)) return has(d.place_of_performance || r.location);
+  if (/naics|psc|classification/.test(t)) return has(d.naics || r.category);
+  if (/set.?aside/.test(t)) return has(r.set_aside);
+  if (/posted|issue.?date|release.?date/.test(t)) return has(d.posted);
+  // Project title / description (scraped).
+  if (/project.?(title|name)|opportunity|subject/.test(t)) return has(r.title);
+  // Our own company info (from the user's profile — real, not invented).
+  if (/company|offeror|contractor(?!ing)|vendor|firm|business.?name/.test(t)) return has(PROFILE?.company_name);
+  if (/duns|uei|cage|sam.?(id|reg)/.test(t)) return has(PROFILE?.[t.replace(/[^a-z]/g,'')]);
+  return '';   // unknown → leave blank
 }
 // build the fields UI + generate handler for a lead's pop-up
 async function tplSectionHtml(r){
@@ -1740,8 +1792,15 @@ async function tplGenerate(){
     await tplEnsureLibs();
     const data = {}; $$('.tplv').forEach(i=>{ data[i.dataset.k] = i.value; });
     const zip = new window.PizZip(atob(b64));
+    tplRepairZip(zip);                                   // fix {{X} / {X}} typos so render never throws
     const doc = new window.docxtemplater(zip, tplDelimOpts({nullGetter:()=> ''}));
     doc.render(data);
+    // heal the stored token list so any newly-repaired placeholders show as fields next time
+    try {
+      const fresh = tplTokensFromText(doc.getFullText ? doc.getFullText() : '');
+      const known = new Set(t.tokens||[]);
+      if(fresh.some(x=>!known.has(x))) await api(`govcon_templates?id=eq.${t.id}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({tokens:fresh})});
+    } catch(_){}
     const blob = doc.getZip().generate({type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
     const fname = `${(window._LEAD_RFP?.title||'Proposal').replace(/[^\w \-]+/g,'').slice(0,60)} — ${t.name}.docx`;
     // save to the document library (so it opens in the editor) + offer download
