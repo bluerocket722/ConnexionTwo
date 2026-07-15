@@ -184,7 +184,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r15-2026-07-15';
+const GOVCON_BUILD = 'r16-2026-07-15';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -486,6 +486,14 @@ async function openReview(id){
       <h2 class="section">Analysis</h2>
       <div id="rvAnalysis"><div class="muted" style="font-size:13px">No analysis yet — select documents above and click Analyze.</div></div>
 
+      <h2 class="section">Partners for this contract</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Researches subcontractors near the place of performance for every capability gap. Finding a company never marks a requirement Met — verification is a separate, human step.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+        <button class="btn primary" id="rvFindPartners">🔎 Find Partners for This Contract</button>
+        <span class="muted" style="font-size:12px" id="rvPartnerStatus"></span>
+      </div>
+      <div id="rvPartners"><div class="muted" style="font-size:13px">No partner research yet.</div></div>
+
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;position:sticky;bottom:0;background:var(--panel);padding-top:12px;border-top:1px solid var(--line)">
         <button class="btn primary" id="rvApproveBtn" disabled>✔ Approve and Move to Pipeline</button>
         <button class="btn" id="rvNoBidBtn">Mark No-Bid</button>
@@ -495,7 +503,8 @@ async function openReview(id){
       </div>
       <div id="rvApproveBox"></div>
     </div>`);
-  rvRenderDocs(); rvRenderAnalysis();
+  rvRenderDocs(); rvRenderAnalysis(); rvRenderPartners();
+  $('#rvFindPartners').onclick = rvFindPartners;
   $('#rvEnrich').onclick = rvEnrich;
   $('#rvDownload').onclick = rvDownload;
   $('#rvSelAll').onclick = ()=>rvSelect(true);
@@ -645,11 +654,12 @@ async function rvLoadRows(){
   ]);
   const REQ_STATUS=['Met','Met Through Verified Partner','Partial','Gap','Blocked','Not Applicable','Verification Required'];
   const reqHost=$('#rvReqs');
-  if(reqHost) reqHost.innerHTML=(reqs||[]).length?`<table class="matx"><thead><tr><th>Requirement</th><th>Source</th><th>Type</th><th>Capability</th><th>Delivery</th><th>Status</th><th>Action</th></tr></thead>
+  if(reqHost) reqHost.innerHTML=(reqs||[]).length?`<table class="matx"><thead><tr><th>Requirement</th><th>Source</th><th>Type</th><th>Location</th><th>Capability</th><th>Delivery</th><th>Status</th><th>Action</th></tr></thead>
     <tbody>${reqs.map(x=>`<tr>
       <td style="padding:7px 8px;min-width:220px">${esc(x.requirement)}${x.mandatory===false?' <span class="muted">(optional)</span>':''}</td>
       <td style="padding:7px 8px;font-size:12px">${esc(x.source_reference||'')}</td>
       <td style="padding:7px 8px">${esc(x.requirement_type||'')}</td>
+      <td style="padding:7px 8px;font-size:12px">${esc(x.place_of_performance||'')}${x.partner_status?`<div class="pill" style="margin-top:2px">${esc(x.partner_status)}</div>`:''}</td>
       <td style="padding:7px 8px">${esc(x.capability||'')}${x.subcontractor_type?`<div class="muted" style="font-size:11px">sub: ${esc(x.subcontractor_type)}</div>`:''}</td>
       <td style="padding:7px 8px">${esc(x.delivery_method||'')}</td>
       <td><select class="rvreqst" data-id="${x.id}" style="border:none;background:transparent;font:inherit;padding:7px 4px">${REQ_STATUS.map(s=>`<option ${s===x.status?'selected':''}>${s}</option>`).join('')}</select>${x.origin==='human'?'<div class="muted" style="font-size:10px;text-align:center">edited</div>':''}</td>
@@ -674,6 +684,40 @@ async function rvLoadRows(){
       <span style="${x.status==='done'?'text-decoration:line-through;color:var(--muted)':''}">${esc(x.action)}${x.due_date?` <span class="muted">· due ${x.due_date}</span>`:''}${x.reason?` <span class="muted">· ${esc(x.reason)}</span>`:''}</span>
     </label>`).join(''):'<div class="muted" style="font-size:13px">No next actions yet.</div>';
   document.querySelectorAll('.rvact').forEach(cb=>cb.onchange=()=>api(`govcon_next_actions?id=eq.${cb.dataset.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({status:cb.checked?'done':'open'})}));
+}
+async function rvFindPartners(){
+  const btn=$('#rvFindPartners'), st=$('#rvPartnerStatus');
+  btn.disabled=true; btn.textContent='Researching… (2–4 min)';
+  st.textContent='Searching public sources near the place of performance…';
+  try{
+    const r=await callFn('govcon-opportunity-partner-match',{rfp_id:window._RV.rfp.id, search_radius_miles:100, max_results_per_category:15, include_backup_partners:true});
+    st.textContent = r.note || `✓ ${r.partners.length} compan${r.partners.length===1?'y':'ies'} across ${r.categories.length} categor${r.categories.length===1?'y':'ies'}${(r.errors||[]).length?` · ⚠ ${r.errors[0]}`:''}`;
+    rvRenderPartners();
+  }catch(e){ st.textContent='Failed: '+e.message; }
+  btn.disabled=false; btn.textContent='🔎 Find Partners for This Contract';
+}
+async function rvRenderPartners(){
+  const host=$('#rvPartners'); if(!host) return;
+  const links=await api(`govcon_opportunity_partners?rfp_id=eq.${window._RV.rfp.id}&owner=eq.${SESSION.user.id}&select=*,govcon_partners(id,company_name,website,city,state,primary_phone,general_email,contact_emails,research_confidence,partner_status)&order=fit_score.desc.nullslast&limit=60`);
+  if(!links.length){ host.innerHTML='<div class="muted" style="font-size:13px">No partner research yet.</div>'; return; }
+  const row=(l)=>{ const p=l.govcon_partners||{};
+    return `<tr>
+      <td style="padding:7px 8px"><a href="#" onclick="openPartner('${p.id}');return false"><b>${esc(p.company_name||'?')}</b></a>
+        <div class="muted" style="font-size:11px">${esc([p.city,p.state].filter(Boolean).join(', '))}${p.primary_phone?' · '+esc(p.primary_phone):''}${(p.contact_emails||[]).length?' · '+(p.contact_emails||[]).length+' email(s)':''}</div></td>
+      <td style="padding:7px 8px;text-align:center"><b>${l.fit_score??'—'}</b>${l.fit_hard_fail?`<div class="pill" style="background:#b3261e;color:#fff" title="${esc(l.fit_hard_fail)}">hard fail</div>`:''}</td>
+      <td style="padding:7px 8px;text-align:center">${l.distance_miles!=null?l.distance_miles+' mi':'—'}</td>
+      <td style="padding:7px 8px">${esc(l.primary_or_backup)}</td>
+      <td><select class="rvql" data-id="${l.id}" style="border:none;background:transparent;font:inherit;padding:7px 4px">${['none','requested','received','declined'].map(s=>`<option ${s===l.quote_status?'selected':''}>${s}</option>`).join('')}</select></td>
+      <td style="text-align:center"><input type="checkbox" class="rvsel4bid" data-id="${l.id}" ${l.selected_for_bid?'checked':''} style="width:auto" title="Attach to contract (selected for bid)"></td>
+      <td style="padding:7px 8px;font-size:11px">${esc(l.why_fit||'').slice(0,110)}</td>
+    </tr>`; };
+  host.innerHTML=`<table class="matx"><thead><tr><th>Company</th><th>Fit</th><th>Distance</th><th>Role</th><th>Quote</th><th>Attach</th><th>Why</th></tr></thead>
+    <tbody>${links.map(row).join('')}</tbody></table>`;
+  host.querySelectorAll('.rvql').forEach(s=>s.onchange=()=>api(`govcon_opportunity_partners?id=eq.${s.dataset.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({quote_status:s.value, outreach_status:s.value==='requested'?'Sent':undefined})}));
+  host.querySelectorAll('.rvsel4bid').forEach(cb=>cb.onchange=async ()=>{
+    await api(`govcon_opportunity_partners?id=eq.${cb.dataset.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({selected_for_bid:cb.checked})});
+    toast(cb.checked?'Attached to contract':'Detached');
+  });
 }
 function rvApproveUI(){
   const a=window._RV.analysis; if(!a) return;
@@ -1274,6 +1318,18 @@ async function openLead(itemId) {
         <div class="field"><label>CO 2 email</label><input id="ld_co2_email" value="${esc((r.details||{}).co2_email||'')}"></div>
         <div class="field"><label>CO 2 phone</label><input id="ld_co2_phone" value="${esc((r.details||{}).co2_phone||'')}"></div>
       </div>
+
+      <h2 class="section">Contract Location and Partner Coverage</h2>
+      <div class="row3">
+        <div class="field"><label>Place of performance</label><input id="ld_pop" value="${esc(r.place_of_performance_raw||(r.details||{}).place_of_performance||'')}"></div>
+        <div class="field"><label>Service radius (miles)</label><input id="ld_radius" type="number" value="${r.service_radius_miles??''}"></div>
+        <div class="field"><label>On-site / remote</label><select id="ld_remote">${['unknown','on_site','remote','hybrid'].map(v=>`<option value="${v}" ${v===(r.remote_or_on_site||'unknown')?'selected':''}>${v.replace('_',' ')}</option>`).join('')}</select></div>
+      </div>
+      <div id="ld_partnercov"><div class="muted" style="font-size:13px">Loading partner coverage…</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 0">
+        <button class="btn sm" id="ld_findpartners">🔎 Find partners for this contract</button>
+        <button class="btn sm" id="ld_wonwith">🏆 Mark Won With…</button>
+      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
         <label class="btn primary" style="cursor:pointer">⬆ Upload documents<input id="ld_docup" type="file" multiple accept=".pdf,.docx,.doc,.txt" hidden></label>
         <button class="btn" id="ld_extract">✦ Read documents &amp; build matrices</button>
@@ -1322,6 +1378,16 @@ async function openLead(itemId) {
   // subcontractors
   renderSubs(item.rfp_id, r);
   $('#subAdd').onclick = ()=>addSub(item.rfp_id, r);
+  // partner coverage
+  renderLeadPartners(r);
+  $('#ld_findpartners').onclick = async ()=>{
+    const b=$('#ld_findpartners'); b.disabled=true; b.textContent='Researching… (2–4 min)';
+    try{ const res=await callFn('govcon-opportunity-partner-match',{rfp_id:r.id, search_radius_miles:+($('#ld_radius').value||100)||100, max_results_per_category:15});
+      toast(res.note || `Found ${res.partners.length} candidate(s)`); renderLeadPartners(r);
+    }catch(e){ toast('Partner research failed: '+e.message); }
+    b.disabled=false; b.textContent='🔎 Find partners for this contract';
+  };
+  $('#ld_wonwith').onclick = ()=>leadWonWith(r);
   // template generator (async — fill after the modal is up)
   tplSectionHtml(r).then(html=>{ const host=$('#tplSection'); if(!host) return; host.innerHTML=html;
     if($('#tpl_pick')){ tplRenderFields(); $('#tpl_pick').onchange=tplRenderFields; $('#tpl_gen').onclick=tplGenerate;
@@ -1353,6 +1419,9 @@ async function saveLead(itemId, rfpId) {
     url:$('#ld_url').value.trim()||null, description:$('#ld_desc').value.trim()||null,
     capability_matrix: MATRICES.matrixHost, submission_matrix: MATRICES.submatrixHost,
     details,
+    place_of_performance_raw: $('#ld_pop')?($('#ld_pop').value.trim()||null):undefined,
+    service_radius_miles: $('#ld_radius')?($('#ld_radius').value===''?null:+$('#ld_radius').value):undefined,
+    remote_or_on_site: $('#ld_remote')?$('#ld_remote').value:undefined,
   });
   // keep the in-memory copy in sync so re-opening / uploads use the new folder
   r.title = title; r.details = details; if(rows[0]) window._LEAD_RFP = Object.assign(r, rows[0]);
@@ -1369,6 +1438,43 @@ async function saveLead(itemId, rfpId) {
     toast('Lead saved ✓');
   }
   renderPipeline();   // refresh the board behind the pop-up; pop-up stays open
+}
+async function renderLeadPartners(r){
+  const host=$('#ld_partnercov'); if(!host) return;
+  try{
+    const links=await api(`govcon_opportunity_partners?rfp_id=eq.${r.id}&owner=eq.${SESSION.user.id}&select=*,govcon_partners(id,company_name,city,state,primary_phone,research_confidence)&order=fit_score.desc.nullslast&limit=40`);
+    if(!links.length){ host.innerHTML='<div class="muted" style="font-size:13px">No partners attached yet — click “Find partners for this contract”.</div>'; return; }
+    host.innerHTML = links.map(l=>{ const p=l.govcon_partners||{};
+      return `<div class="rfp" style="margin-bottom:6px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <a href="#" onclick="openPartner('${p.id}');return false"><b>${esc(p.company_name||'?')}</b></a>
+        <span class="pill">Fit ${l.fit_score??'—'}</span>
+        ${l.distance_miles!=null?`<span class="pill">${l.distance_miles} mi</span>`:''}
+        <span class="pill">${esc(l.primary_or_backup)}</span>
+        <span class="pill">quote: ${esc(l.quote_status)}</span>
+        ${l.selected_for_bid?'<span class="pill" style="background:var(--blue-500);color:#fff">selected for bid</span>':''}
+        ${l.won_with_partner?'<span class="pill" style="background:#0b6b34;color:#fff">🏆 Won With</span>':''}
+        ${l.verification_status==='User Confirmed'||l.verification_status==='Verified'?'<span class="pill" style="background:#0b6b34;color:#fff">verified</span>':''}
+      </div>`; }).join('');
+  }catch(e){ host.innerHTML=`<div class="muted" style="font-size:13px">Partner coverage unavailable: ${esc(e.message.slice(0,80))} (run govcon_migration_10.sql)</div>`; }
+}
+async function leadWonWith(r){
+  const links=await api(`govcon_opportunity_partners?rfp_id=eq.${r.id}&owner=eq.${SESSION.user.id}&select=id,won_with_partner,govcon_partners(id,company_name)&order=fit_score.desc.nullslast&limit=40`);
+  if(!links.length) return alert('No partners are attached to this opportunity yet.');
+  openModal(`<div class="shd"><h3>Which partners helped win / will perform this contract?</h3><button class="sclose" onclick="closeModal()">×</button></div>
+    <div class="sbd">
+      ${links.map(l=>`<label class="toggle" style="display:flex;gap:8px;margin:6px 0"><input type="checkbox" class="wonw" data-id="${l.id}" data-pid="${(l.govcon_partners||{}).id||''}" ${l.won_with_partner?'checked':''} style="width:auto"> ${esc((l.govcon_partners||{}).company_name||'?')}</label>`).join('')}
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn primary" id="wonw_go">Save</button>
+        <button class="btn" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>`);
+  $('#wonw_go').onclick=async ()=>{
+    for(const cb of document.querySelectorAll('.wonw')){
+      await api(`govcon_opportunity_partners?id=eq.${cb.dataset.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({won_with_partner:cb.checked, included_in_award:cb.checked})});
+      if(cb.checked && cb.dataset.pid) await api(`govcon_partners?id=eq.${cb.dataset.pid}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({partner_status:'Won With'})});
+    }
+    toast('Won With saved 🏆'); closeModal();
+  };
 }
 async function removeLead(itemId) {
   if(!confirm('Remove this opportunity from the pipeline? (The RFP stays in Discovery.)')) return;
@@ -1593,24 +1699,212 @@ async function renderAwards() {
 async function delAward(id){ await api(`govcon_awards?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); renderAwards(); }
 
 /* ═══════════════ PARTNERS ═══════════════ */
+/* ═══════════ PARTNER NETWORK — research workspace ═══════════ */
+const PARTNER_STATUSES = ['Researched','Needs Verification','Contact Ready','Contacted','Follow-Up','Interested','Not Interested','Quote Requested','Quote Received','Verified','Selected','Backup','Active Partner','Won With','Do Not Use','Archived'];
+const EMAIL_TYPES = ['General','Estimating','Bids','Sales','Owner','Operations','Government Contracts','Accounts','Dispatch','Other'];
+const PN_VIEWS = [
+  ['Contact Ready', p=>p.partner_status==='Contact Ready'],
+  ['Needs Verification', p=>p.partner_status==='Needs Verification'],
+  ['Quote Requested', p=>p.partner_status==='Quote Requested'],
+  ['Verified Partners', p=>['Verified','Active Partner','Selected'].includes(p.partner_status)],
+  ['Backup Partners', p=>p.partner_status==='Backup'],
+  ['Won With Before', p=>p.partner_status==='Won With'],
+  ['Janitorial', p=>JSON.stringify(p.service_categories||[]).toLowerCase().includes('janitorial')||JSON.stringify(p.capabilities||[]).toLowerCase().includes('janitorial')],
+  ['Landscaping', p=>JSON.stringify([p.service_categories,p.capabilities]).toLowerCase().match(/landscap|lawn|tree|grounds/)],
+  ['Facilities', p=>JSON.stringify([p.service_categories,p.capabilities]).toLowerCase().match(/facilit|building maint/)],
+  ['Moving', p=>JSON.stringify([p.service_categories,p.capabilities]).toLowerCase().match(/moving|relocat/)],
+];
+let PN_Q='', PN_STATE='', PN_STATUS='', PN_VIEW=-1;
 async function renderPartners() {
   loading();
-  const [all, mine] = await Promise.all([
-    api(`govcon_partners?select=*&order=created_at.desc&limit=200`),
-    api(`govcon_partners?owner=eq.${SESSION.user.id}&select=id`),
-  ]);
-  const mineIds = new Set(mine.map(m=>m.id));
+  const mine = await api(`govcon_partners?owner=eq.${SESSION.user.id}&select=*&order=updated_at.desc.nullslast&limit=500`);
+  let shown = mine.filter(p=>{
+    if (PN_Q && !`${p.company_name} ${p.city||''} ${p.state||''} ${JSON.stringify(p.capabilities||[])} ${JSON.stringify(p.service_categories||[])} ${JSON.stringify(p.naics_codes||[])}`.toLowerCase().includes(PN_Q.toLowerCase())) return false;
+    if (PN_STATE && (p.state||'').toUpperCase()!==PN_STATE.toUpperCase()) return false;
+    if (PN_STATUS && p.partner_status!==PN_STATUS) return false;
+    if (PN_VIEW>=0 && !PN_VIEWS[PN_VIEW][1](p)) return false;
+    if (PN_VIEW<0 && p.partner_status==='Archived') return false;
+    return true;
+  });
   V().innerHTML = `
-    <div class="banner info">Find teaming partners to fill capability gaps and strengthen bids. List your own company so others can find you.</div>
-    <button class="btn primary" onclick="showAddPartner()" style="margin-bottom:14px">+ List my company</button>
+    <div class="banner info">Research subcontractors and teaming partners automatically — no manual Googling. Add a web-search API key under <b>Settings → API keys</b> (provider <b>serper</b> — free tier at serper.dev — or <b>google_cse</b> / <b>bing</b>) to enable automated research.</div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn primary" onclick="pnResearchUI()">🔎 Research Partners</button>
+        <button class="btn" onclick="pnDedupe()">Merge duplicates</button>
+        <button class="btn" onclick="showAddPartner()">+ Add manually</button>
+        <span style="flex:1"></span>
+        <input id="pnQ" placeholder="Search name, capability, NAICS…" value="${esc(PN_Q)}" style="width:220px">
+        <input id="pnState" placeholder="State" value="${esc(PN_STATE)}" style="width:70px">
+        <select id="pnStatus" style="width:auto"><option value="">All statuses</option>${PARTNER_STATUSES.map(s=>`<option ${s===PN_STATUS?'selected':''}>${s}</option>`).join('')}</select>
+      </div>
+      <div class="chips" style="margin-top:10px">${PN_VIEWS.map((v,i)=>`<span class="chip" data-view="${i}" style="cursor:pointer;${i===PN_VIEW?'background:var(--blue-500);color:#fff':''}">${v[0]}</span>`).join('')}${PN_VIEW>=0?'<span class="chip" data-view="-1" style="cursor:pointer">✕ clear view</span>':''}</div>
+    </div>
     <div id="addPartnerBox"></div>
-    ${all.map(p=>`<div class="rfp">
-      <div class="t">${esc(p.company_name)} ${mineIds.has(p.id)?'<span class="pill">you</span>':''}</div>
-      <div class="m">${esc(p.location||'')} ${p.contact_email?'· '+esc(p.contact_email):''}</div>
-      ${p.description?`<div class="m">${esc(p.description)}</div>`:''}
-      <div class="chips" style="margin-top:6px">${(p.capabilities||[]).map(c=>`<span class="chip">${esc(c)}</span>`).join('')}${(p.certifications||[]).map(c=>`<span class="chip">${esc(c)}</span>`).join('')}</div>
-      ${!mineIds.has(p.id)?`<div class="acts"><button class="btn sm primary" onclick="requestPartner('${p.id}','${esc(p.company_name)}')">Request to team</button></div>`:''}
-    </div>`).join('') || '<div class="card center muted">No partners listed yet.</div>'}`;
+    <div class="muted" style="margin-bottom:10px">${shown.length} of ${mine.length} partners</div>
+    ${shown.map(pnCard).join('') || '<div class="card center muted">No partners yet — click <b>Research Partners</b> to find some, or run <b>Find Partners for This Contract</b> from an opportunity.</div>'}`;
+  $('#pnQ').oninput = e=>{ PN_Q=e.target.value; clearTimeout(window._pt); window._pt=setTimeout(renderPartners,300); };
+  $('#pnState').onchange = e=>{ PN_STATE=e.target.value; renderPartners(); };
+  $('#pnStatus').onchange = e=>{ PN_STATUS=e.target.value; renderPartners(); };
+  document.querySelectorAll('[data-view]').forEach(c=>c.onclick=()=>{ PN_VIEW=+c.dataset.view; renderPartners(); });
+  document.querySelectorAll('.pn-status').forEach(s=>s.onchange=async ()=>{
+    await api(`govcon_partners?id=eq.${s.dataset.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({partner_status:s.value, ...(s.value==='Verified'?{verification_status:'User Confirmed',verification_date:new Date().toISOString()}:{})})});
+    toast('Status: '+s.value);
+  });
+}
+function pnConfPill(p){ const c=p.research_confidence; if(c==null) return '';
+  const lbl=c>=85?'Strongly Verified':c>=70?'Verified':c>=50?'Partially Verified':'Needs Manual Verification';
+  return `<span class="pill" title="${lbl}">Conf ${c}</span>`; }
+function pnCard(p){
+  const emails=(p.contact_emails||[]);
+  return `<div class="rfp">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <div class="t" style="cursor:pointer;flex:1" onclick="openPartner('${p.id}')">${esc(p.company_name)}</div>
+      ${pnConfPill(p)}
+      <select class="pn-status" data-id="${p.id}" style="width:auto;font-size:12px">${PARTNER_STATUSES.map(s=>`<option ${s===p.partner_status?'selected':''}>${s}</option>`).join('')}</select>
+    </div>
+    <div class="m">${esc([p.city,p.state].filter(Boolean).join(', ')||p.location||'')}${p.primary_phone?' · '+esc(p.primary_phone):''}${p.website?` · <a href="${esc(p.website)}" target="_blank">site ↗</a>`:''}${emails.length?` · ${emails.length} email(s)`:''}</div>
+    <div class="chips" style="margin-top:6px">${[...(p.service_categories||[]),...(p.capabilities||[])].slice(0,8).map(c=>`<span class="chip">${esc(String(c))}</span>`).join('')}${(p.public_awards||[]).length?`<span class="chip">🏛 ${(p.public_awards||[]).length} award(s)</span>`:''}</div>
+    <div class="acts">
+      <button class="btn sm primary" onclick="openPartner('${p.id}')">Open</button>
+      <button class="btn sm" onclick="pnCall('govcon-partner-refresh','${p.id}','Refreshing company info…')">↻ Refresh info</button>
+      <button class="btn sm" onclick="pnCall('govcon-partner-contact-research','${p.id}','Finding contacts…')">☎ Find contacts</button>
+      <button class="btn sm" onclick="pnCall('govcon-partner-award-research','${p.id}','Searching public awards…')">🏛 Award history</button>
+    </div></div>`;
+}
+async function pnCall(fn, partnerId, msg){
+  toast(msg, true);
+  try{ const r=await callFn(fn,{partner_id:partnerId});
+    toast(r.warning || 'Done ✓ '+(r.awards_found!=null?`(${r.awards_found} award(s))`:r.partner?`(confidence ${r.partner.research_confidence})`:''));
+    renderPartners();
+  }catch(e){ toast('Failed: '+e.message); }
+}
+function pnResearchUI(){
+  openModal(`<div class="shd"><h3>Research Partners</h3><button class="sclose" onclick="closeModal()">×</button></div>
+    <div class="sbd">
+      <div class="muted" style="font-size:13px;margin-bottom:10px">Searches public sources (web search, SAM entity registry), reads company websites, and stores structured results. Every fact keeps its source URL. Nothing is marked verified without evidence.</div>
+      <div class="field"><label>Service category *</label><input id="pnr_cat" placeholder="e.g. commercial janitorial services"></div>
+      <div class="row2">
+        <div class="field"><label>City</label><input id="pnr_city" placeholder="e.g. Chicago"></div>
+        <div class="field"><label>State</label><input id="pnr_state" placeholder="e.g. IL"></div>
+      </div>
+      <div class="field"><label>Max companies</label><input id="pnr_max" type="number" value="10" min="3" max="25"></div>
+      <button class="btn primary" id="pnr_go">Start research</button>
+      <div id="pnr_out"></div>
+    </div>`);
+  $('#pnr_go').onclick=async ()=>{
+    const cat=$('#pnr_cat').value.trim(); if(!cat) return alert('Category required');
+    const b=$('#pnr_go'), out=$('#pnr_out'); b.disabled=true; b.textContent='Researching… (1–3 min)';
+    try{
+      const r=await callFn('govcon-partner-research',{category:cat, city:$('#pnr_city').value.trim(), state:$('#pnr_state').value.trim(), max_results:+$('#pnr_max').value||10});
+      out.innerHTML=`<div class="banner info" style="margin-top:10px">✓ Found ${r.found} compan${r.found===1?'y':'ies'}.${(r.errors||[]).length?` ⚠ ${esc(r.errors[0])}`:''}</div>`;
+      renderPartners();
+    }catch(e){ out.innerHTML=`<div class="banner bad" style="margin-top:10px">${esc(e.message)}</div>`; }
+    b.disabled=false; b.textContent='Start research';
+  };
+}
+async function pnDedupe(){
+  toast('Merging duplicates…', true);
+  try{ const r=await callFn('govcon-partner-dedupe',{}); toast(`Scanned ${r.scanned}, merged ${r.merged} duplicate(s)`); renderPartners(); }
+  catch(e){ toast('Dedupe failed: '+e.message); }
+}
+async function openPartner(id){
+  const rows=await api(`govcon_partners?id=eq.${id}&owner=eq.${SESSION.user.id}&select=*`);
+  const p=rows[0]; if(!p) return toast('Partner not found');
+  const emails=(p.contact_emails||[]);
+  openModal(`<div class="shd"><h3>${esc(p.company_name)}</h3><button class="sclose" onclick="closeModal()">×</button></div>
+    <div class="sbd">
+      <div class="scores" style="margin-bottom:10px">${pnConfPill(p)}<span class="pill">${esc(p.partner_status||'Researched')}</span><span class="pill">${esc(p.verification_status||'Found')}</span>${p.last_researched_at?`<span class="pill">researched ${fmtDate(p.last_researched_at)}</span>`:''}</div>
+      <div class="row3">
+        <div class="field"><label>Website</label><input id="pp_web" value="${esc(p.website||'')}"></div>
+        <div class="field"><label>Phone</label><input id="pp_phone" value="${esc(p.primary_phone||'')}"></div>
+        <div class="field"><label>General email</label><input id="pp_gem" value="${esc(p.general_email||'')}"></div>
+      </div>
+      <div class="row3">
+        <div class="field"><label>City</label><input id="pp_city" value="${esc(p.city||'')}"></div>
+        <div class="field"><label>State</label><input id="pp_state" value="${esc(p.state||'')}"></div>
+        <div class="field"><label>Service radius (mi)</label><input id="pp_rad" type="number" value="${p.service_radius_miles??''}"></div>
+      </div>
+      <div class="field"><label>Capabilities / services (comma-separated)</label><input id="pp_caps" value="${esc([...(p.service_categories||[]),...(p.capabilities||[])].join(', '))}"></div>
+      <div class="field"><label>Research notes</label><textarea id="pp_notes">${esc(p.research_notes||'')}</textarea></div>
+
+      <h2 class="section">Emails (${emails.length})</h2>
+      <div id="pp_emails">${emails.map((e,i)=>`
+        <div class="rfp" style="margin-bottom:6px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <b>${esc(e.email)}</b><span class="chip">${esc(e.type||'general')}</span>
+          ${e.contact_name?`<span class="muted">${esc(e.contact_name)}${e.title?' · '+esc(e.title):''}</span>`:''}
+          ${e.verified?'<span class="pill" style="background:#0b6b34;color:#fff">verified</span>':'<span class="pill">unverified</span>'}
+          ${e.primary?'<span class="pill">primary</span>':''}
+          ${e.source_url?`<a href="${esc(e.source_url)}" target="_blank" class="muted" style="font-size:11px">source ↗</a>`:''}
+        </div>`).join('')||'<div class="muted" style="font-size:13px">No emails yet — try “Find contacts”.</div>'}</div>
+      <button class="btn sm" id="pp_addemail">+ Add Email</button>
+
+      ${(p.public_awards||[]).length?`<h2 class="section">Public awards (${p.public_awards.length})</h2>
+        ${p.public_awards.slice(0,6).map(a=>`<div class="m">🏛 ${esc(String(a.agency||''))} · $${Number(a.amount||0).toLocaleString()} · ${esc(String(a.description||'')).slice(0,90)}</div>`).join('')}`:''}
+      ${(p.source_urls||[]).length?`<div class="muted" style="font-size:12px;margin-top:10px">Sources: ${(p.source_urls||[]).slice(0,5).map(u=>`<a href="${esc(String(u))}" target="_blank">${esc(String(u)).slice(0,45)}…</a>`).join(' · ')}</div>`:''}
+
+      <h2 class="section">Outreach</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 8px">Draft only — nothing is ever sent automatically. Review, copy, and send from your own email.</div>
+      <button class="btn sm" id="pp_draft">✉ Draft outreach message</button>
+      <div id="pp_draftout"></div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;position:sticky;bottom:0;background:var(--panel);padding-top:12px;border-top:1px solid var(--line)">
+        <button class="btn primary" id="pp_save">Save</button>
+        <button class="btn" onclick="pnCall('govcon-partner-refresh','${p.id}','Refreshing…');closeModal()">↻ Refresh info</button>
+        <span style="flex:1"></span>
+        <button class="btn" style="color:var(--bad)" id="pp_archive">Archive partner</button>
+        <button class="btn" onclick="closeModal()">Close</button>
+      </div>
+    </div>`);
+  $('#pp_save').onclick=async ()=>{
+    await api(`govcon_partners?id=eq.${p.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({
+      website:$('#pp_web').value.trim()||null, primary_phone:$('#pp_phone').value.trim()||null,
+      general_email:$('#pp_gem').value.trim()||null, city:$('#pp_city').value.trim()||null,
+      state:$('#pp_state').value.trim()||null, service_radius_miles:$('#pp_rad').value===''?null:+$('#pp_rad').value,
+      capabilities:$('#pp_caps').value.split(',').map(s=>s.trim()).filter(Boolean),
+      research_notes:$('#pp_notes').value.trim()||null,
+    })});
+    toast('Partner saved'); closeModal(); renderPartners();
+  };
+  $('#pp_archive').onclick=async ()=>{
+    if(!confirm('Archive this partner?')) return;
+    await api(`govcon_partners?id=eq.${p.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({partner_status:'Archived'})});
+    toast('Archived'); closeModal(); renderPartners();
+  };
+  $('#pp_addemail').onclick=async ()=>{
+    const email=prompt('Email address:'); if(!email||!/@/.test(email)) return;
+    const type=(prompt('Type ('+EMAIL_TYPES.join(', ')+'):','General')||'General').toLowerCase();
+    const name=prompt('Contact name (optional):')||null;
+    const list=[...emails];
+    if(list.some(e=>String(e.email).toLowerCase()===email.toLowerCase())) return alert('That email is already on file.');
+    list.push({email:email.trim(), type, contact_name:name, title:null, source_url:null, verified:false, primary:false, notes:'added manually'});
+    await api(`govcon_partners?id=eq.${p.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({contact_emails:list})});
+    toast('Email added'); openPartner(p.id);
+  };
+  $('#pp_draft').onclick=()=>{
+    const to=(emails.find(e=>['estimating','bids','government'].includes(String(e.type)))||emails[0]||{}).email||p.general_email||'';
+    const body=`Hello${emails[0]?.contact_name?' '+emails[0].contact_name:''},
+
+${PROFILE?.company_name||'Blu Balances'} is preparing a bid for an upcoming government contract and is looking for a qualified ${( [...(p.service_categories||[]),...(p.capabilities||[])][0]||'service')} subcontractor in your area.
+
+Could you please send:
+• A capability statement
+• Confirmation of licensing and insurance (COI)
+• Rough pricing or a quote for the scope below
+• Your availability for the anticipated timeline
+• A completed W-9
+• Two references
+
+Scope: [DESCRIBE SCOPE]
+Location: [PLACE OF PERFORMANCE]
+Quote needed by: [DATE]
+
+Thank you,
+${PROFILE?.company_name||'Blu Balances'} · ${PROFILE?.phone||'(224) 206-3770'}`;
+    $('#pp_draftout').innerHTML=`<div class="field" style="margin-top:8px"><label>Draft (edit, then copy)</label><textarea id="pp_draft_txt" style="min-height:220px">${esc(body)}</textarea></div>
+      <div style="display:flex;gap:8px"><button class="btn sm primary" onclick="navigator.clipboard.writeText($('#pp_draft_txt').value).then(()=>toast('Copied'))">Copy</button>
+      ${to?`<a class="btn sm" href="mailto:${esc(to)}?subject=${encodeURIComponent('Subcontractor quote request — '+(PROFILE?.company_name||'Blu Balances'))}" onclick="api('govcon_partners?id=eq.${p.id}',{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({outreach_status:'Drafted'})})">Open in email app →</a>`:''}</div>`;
+  };
 }
 function showAddPartner() {
   $('#addPartnerBox').innerHTML = `<div class="card" style="margin-bottom:14px">
