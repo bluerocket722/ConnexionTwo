@@ -52,6 +52,30 @@ export default async function handler(req, res) {
         userId = JSON.parse(json)?.sub || null;
       }
     } catch (_) { /* ignore — fall through */ }
+    // ── Passthrough mode (used by the GovCon app) ───────────────────────────
+    // GovCon lives in a DIFFERENT Supabase project, so it signs its own file URL
+    // there and just needs this endpoint's JWT secret to sign the editor config.
+    // If a fileUrl is supplied we sign that directly and skip our own storage.
+    const passUrl = String(req.query.fileUrl || "");
+    if (passUrl) {
+      const pExt = String(req.query.ext || (String(req.query.title || "").split(".").pop()) || "docx");
+      const pTitle = decodeURIComponent(String(req.query.title || "document"));
+      const pCallback = String(req.query.callbackUrl || "");
+      const pKey = crypto.createHash("md5").update(passUrl + "|" + Date.now()).digest("hex").slice(0, 20);
+      const pConfig = {
+        document: { fileType: pExt, key: pKey, title: pTitle, url: passUrl, permissions: { edit: true, download: true } },
+        documentType: DOC_TYPE(pExt),
+        editorConfig: {
+          callbackUrl: pCallback, mode: "edit", lang: "en",
+          user: { id: userId || "user", name: "Connexion Two User" },
+          customization: { autosave: true, forcesave: true, compactToolbar: false },
+        },
+      };
+      if (JWT_SECRET) pConfig.token = jwtSign(pConfig, JWT_SECRET);
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).json(pConfig);
+    }
+
     // Only enforce ownership when we could read an id AND the path is user-scoped.
     if (userId && file.includes("/") && !file.startsWith(`${userId}/`)) {
       return res.status(403).json({ error: "Not your file" });
