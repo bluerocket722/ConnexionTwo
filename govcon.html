@@ -210,7 +210,8 @@ async function api(path, opts={}) {
       'Content-Type':'application/json', Prefer: opts.prefer || 'return=representation', ...(opts.headers||{}) },
   });
   if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
-  return res.status === 204 ? null : res.json();
+  const text = await res.text();               // tolerate empty bodies (return=minimal / 204)
+  return text ? JSON.parse(text) : null;
 }
 async function callFn(name, body) {
   const token = await freshToken();
@@ -681,7 +682,12 @@ function openTool(toolId, rfpId) {
   </div>`;
   $('#ai_run').onclick = () => runAi(toolId);
 }
-function aiFor(rfpId, toolId){ route('ai'); setTimeout(()=>openTool(toolId, rfpId), 60); }
+function aiFor(rfpId, toolId){
+  closeModal();                                // close the lead pop-up if open
+  $$('#nav a[data-view]').forEach(a=>a.classList.toggle('active', a.dataset.view==='ai'));
+  $('#viewTitle').textContent = TITLES.ai || 'AI Tools';
+  renderAi(rfpId, toolId);                      // builds the panel, then opens the tool (no race)
+}
 async function runAi(toolId) {
   const rfp_id = $('#ai_rfp').value || undefined;
   const text = $('#ai_text')?.value.trim() || undefined;
