@@ -181,6 +181,8 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
+const GOVCON_BUILD = 'r7-2026-07-14';
+console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
 const sb = supabase.createClient(SB_URL, SB_KEY);
