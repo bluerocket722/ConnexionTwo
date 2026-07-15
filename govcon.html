@@ -184,7 +184,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r13-2026-07-15';
+const GOVCON_BUILD = 'r14-2026-07-15';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -1542,6 +1542,9 @@ function renderCreateDoc(){ embed('document-creation.html', 'Create & Send'); }
    lead's data. */
 const DOCS_BUCKET = 'documents';
 const OO_API = 'https://docs.connexiontwo.com/web-apps/apps/api/documents/api.js';
+// The SAME signer welcome.html uses — it already holds the OnlyOffice JWT secret,
+// so GovCon reuses it (passthrough mode) instead of duplicating the secret.
+const OO_CONFIG_URL = '/api/onlyoffice-config';
 const PIZZIP_CDN = 'https://cdn.jsdelivr.net/npm/pizzip@3.1.7/dist/pizzip.min.js';
 const DOCXT_CDN  = 'https://cdn.jsdelivr.net/npm/docxtemplater@3.50.0/build/docxtemplater.js';
 let ooEditor = null;
@@ -1681,9 +1684,17 @@ async function edOpenDoc(name) {
   scr.style.display='block';
   try {
     await loadScript(OO_API);
+    const rel = edDir()+'/'+name;
+    // 1) sign the file straight from GovCon's own storage (this project's login)
+    const { data:signed, error:sErr } = await sb.storage.from(DOCS_BUCKET).createSignedUrl(rel, 3600);
+    if(sErr) throw sErr;
+    // 2) ask the shared Vercel signer (which has the JWT secret) to sign the config
     const token = await freshToken();
-    const res = await fetch(`${SB_URL}/functions/v1/oo-config?file=${encodeURIComponent(edDir()+'/'+name)}`,
-      { headers:{ apikey:SB_KEY, Authorization:`Bearer ${token}` } });
+    const q = new URLSearchParams({
+      fileUrl: signed.signedUrl, ext, title: name.split('/').pop(),
+      callbackUrl: `${SB_URL}/functions/v1/oo-callback?file=${encodeURIComponent(rel)}`,
+    });
+    const res = await fetch(`${OO_CONFIG_URL}?${q.toString()}`, { headers:{ Authorization:`Bearer ${token}` } });
     const cfg = await res.json().catch(()=>({error:'HTTP '+res.status}));
     if(!res.ok || cfg.error) throw new Error(cfg.error||('HTTP '+res.status));
     cfg.width='100%'; cfg.height='100%';
