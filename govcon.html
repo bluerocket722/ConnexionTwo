@@ -184,7 +184,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r16-2026-07-15';
+const GOVCON_BUILD = 'r17-2026-07-15';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -2029,6 +2029,9 @@ async function renderProfile() {
       <div class="field"><label>Provider</label>
         <select id="k_provider">
           <option value="sam.gov">sam.gov</option>
+          <option value="serper">serper (partner web search — serper.dev)</option>
+          <option value="google_cse">google_cse (partner web search — value "API_KEY|CX")</option>
+          <option value="bing">bing (partner web search)</option>
           <option value="emma">eMMA (Maryland)</option>
           <option value="ohio">Ohio</option>
           <option value="other">other…</option>
