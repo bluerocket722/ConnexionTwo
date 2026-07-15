@@ -181,7 +181,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r10-2026-07-15';
+const GOVCON_BUILD = 'r11-2026-07-15';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -804,12 +804,19 @@ async function moveStage(id, stage) {
 function openModal(html) {
   $('#modalRoot').innerHTML = `<div class="ovl"><div class="sheet">${html}</div></div>`;
   document.body.style.overflow = 'hidden';
-  // Close only on a genuine click on the backdrop — i.e. mousedown AND mouseup
-  // both land on the overlay itself. This stops the modal from closing when you
-  // select text in a field/matrix and release the mouse outside the sheet.
+  // Close only on a genuine click on the backdrop — the press AND the release
+  // must BOTH land on the overlay itself. Pressing inside a field/matrix and
+  // releasing outside (text selection, drag) must never close the sheet.
   const ovl = $('#modalRoot .ovl'); let downOnOvl = false;
-  ovl.addEventListener('mousedown', e=>{ downOnOvl = (e.target===ovl); });
-  ovl.addEventListener('mouseup',   e=>{ if(downOnOvl && e.target===ovl) closeModal(); downOnOvl = false; });
+  ovl.addEventListener('pointerdown', e=>{ downOnOvl = (e.target===ovl); });
+  ovl.addEventListener('pointerup',   e=>{
+    const sel = window.getSelection && window.getSelection();
+    const selecting = sel && sel.type === 'Range';       // mid text-selection → keep open
+    if(downOnOvl && e.target===ovl && !selecting) closeModal();
+    downOnOvl = false;
+  });
+  // Belt and suspenders: never let a plain click event on the overlay close it.
+  ovl.addEventListener('click', e=>{ e.stopPropagation(); });
 }
 function closeModal() { $('#modalRoot').innerHTML=''; document.body.style.overflow=''; }
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
