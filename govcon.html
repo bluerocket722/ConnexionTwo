@@ -184,7 +184,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r14-2026-07-15';
+const GOVCON_BUILD = 'r15-2026-07-15';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -336,7 +336,7 @@ async function renderDashboard() {
 const kpi = (l,v,s) => `<div class="card kpi"><div class="lbl">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
 
 /* ═══════════════ RFP DISCOVERY ═══════════════ */
-let RFP_FILTER = '', RFP_DUE_FROM = '', RFP_DUE_TO = '';
+let RFP_FILTER = '', RFP_DUE_FROM = '', RFP_DUE_TO = '', RFP_STAGE_F = '', RFP_REC_F = '';
 const RFP_SEL = new Set();
 async function renderRfps() {
   loading();
@@ -347,6 +347,11 @@ async function renderRfps() {
     if (q && !`${r.title} ${r.agency} ${r.category} ${r.description||''}`.toLowerCase().includes(q)) return false;
     if (RFP_DUE_FROM && (!r.deadline || r.deadline < RFP_DUE_FROM)) return false;
     if (RFP_DUE_TO && (!r.deadline || r.deadline > RFP_DUE_TO)) return false;
+    if (RFP_STAGE_F && (r.review_stage||'Discovered') !== RFP_STAGE_F) return false;
+    if (RFP_REC_F) {
+      const rec = (r.details && r.details.analysis_summary && r.details.analysis_summary.recommendation) || '';
+      if (rec !== RFP_REC_F) return false;
+    }
     return true;
   });
   const shownIds = new Set(shown.map(r=>r.id));
@@ -358,6 +363,8 @@ async function renderRfps() {
         <input id="rfpSearch" placeholder="Filter by keyword (title, agency, description)…" value="${esc(RFP_FILTER)}" style="flex:1;min-width:200px">
         <label style="margin:0">Due from</label><input id="rfpDueFrom" type="date" value="${RFP_DUE_FROM}" style="width:auto">
         <label style="margin:0">to</label><input id="rfpDueTo" type="date" value="${RFP_DUE_TO}" style="width:auto">
+        <select id="rfpStageF" style="width:auto"><option value="">All stages</option>${['Discovered','Documents Downloaded','Ready for Document Review','Documents Selected','Analysis Complete','Awaiting Human Decision','Approved for Pipeline','Rejected / No-Bid','Archived'].map(s=>`<option ${s===RFP_STAGE_F?'selected':''}>${s}</option>`).join('')}</select>
+        <select id="rfpRecF" style="width:auto"><option value="">All recommendations</option>${['Strong Pursue','Pursue','Conditional Pursue','Monitor','Team','No-Bid'].map(s=>`<option ${s===RFP_REC_F?'selected':''}>${s}</option>`).join('')}</select>
         <button class="btn sm" id="rfpClear">Clear filters</button>
         <button class="btn primary" onclick="runAutopilotNow()">✈ Run Autopilot</button>
         <button class="btn" onclick="showAddRfp()">+ Add RFP</button>
@@ -377,7 +384,9 @@ async function renderRfps() {
   $('#rfpSearch').oninput = (e) => { RFP_FILTER = e.target.value; clearTimeout(window._rt); window._rt = setTimeout(renderRfps, 250); };
   $('#rfpDueFrom').onchange = (e) => { RFP_DUE_FROM = e.target.value; renderRfps(); };
   $('#rfpDueTo').onchange = (e) => { RFP_DUE_TO = e.target.value; renderRfps(); };
-  $('#rfpClear').onclick = () => { RFP_FILTER=RFP_DUE_FROM=RFP_DUE_TO=''; renderRfps(); };
+  $('#rfpClear').onclick = () => { RFP_FILTER=RFP_DUE_FROM=RFP_DUE_TO=RFP_STAGE_F=RFP_REC_F=''; renderRfps(); };
+  $('#rfpStageF').onchange = (e) => { RFP_STAGE_F = e.target.value; renderRfps(); };
+  $('#rfpRecF').onchange = (e) => { RFP_REC_F = e.target.value; renderRfps(); };
   $('#selAllRfps').onchange = (e) => {
     if (e.target.checked) shownIds.forEach(id=>RFP_SEL.add(id)); else shownIds.forEach(id=>RFP_SEL.delete(id));
     renderRfps();
@@ -410,24 +419,334 @@ async function bulkPipelineRfps() {
   RFP_SEL.clear();
   renderRfps();
 }
+/* ═══════════ RFP DISCOVERY REVIEW WORKSPACE ═══════════
+   Discovery is the qualification workspace: enrich → download documents →
+   read them → SELECT which ones Claude may scan → analyze → review scores,
+   gates, matrices → explicitly Approve for Pipeline / No-Bid / Archive.   */
+const DOC_TYPES = ['Solicitation','RFQ','RFP','SOW','PWS','SOO','Amendment','Pricing Schedule','Wage Determination','Instructions to Offerors','Evaluation Criteria','Required Form','Site Visit Information','Questions and Answers','Technical Attachment','Drawing','Specification','Past Performance Form','Insurance Requirement','Bonding Requirement','License Requirement','Safety Requirement','Quality-Control Requirement','Other'];
+const DOC_REVIEW = ['Unreviewed','Reviewed','Relevant','Irrelevant','Needs Follow-Up'];
+
+async function openReview(id){
+  const [rfpRows, docs, analyses] = await Promise.all([
+    api(`govcon_rfps?id=eq.${id}&select=*`),
+    api(`govcon_source_documents?rfp_id=eq.${id}&owner=eq.${SESSION.user.id}&select=*&order=downloaded_at.desc.nullslast`),
+    api(`govcon_opportunity_analysis?rfp_id=eq.${id}&owner=eq.${SESSION.user.id}&select=*&order=version.desc&limit=1`),
+  ]);
+  const r = rfpRows[0]; if(!r) return toast('Opportunity not found');
+  window._RV = { rfp:r, docs:docs||[], analysis:(analyses||[])[0]||null };
+  const d = r.details||{};
+  openModal(`
+    <div class="shd">
+      <h3>${esc(r.title)}</h3>
+      <button class="sclose" onclick="closeModal()" title="Close (Esc)">×</button>
+    </div>
+    <div class="sbd">
+      <div class="scores" style="margin-bottom:10px">
+        <span class="pill">${esc(r.review_stage||'Discovered')}</span>
+        <span class="pill">Analysis: ${esc(r.analysis_status||'Not Started')}</span>
+        ${r.last_analyzed_at?`<span class="pill">Analyzed ${fmtDate(r.last_analyzed_at)} · v${r.latest_analysis_version||1}</span>`:''}
+      </div>
+      <div class="row3">
+        <div class="field"><label>Agency</label><input value="${esc(r.agency||'')}" readonly></div>
+        <div class="field"><label>Solicitation #</label><input value="${esc(d.solicitation_number||'')}" readonly></div>
+        <div class="field"><label>Notice ID</label><input value="${esc((r.notice_id||'').replace(/^sam:/,''))}" readonly></div>
+      </div>
+      <div class="row3">
+        <div class="field"><label>NAICS</label><input value="${esc(r.category||'')}" readonly></div>
+        <div class="field"><label>PSC</label><input value="${esc(r.psc||d.psc||'')}" readonly></div>
+        <div class="field"><label>Set-aside</label><input value="${esc(r.set_aside||'—')}" readonly></div>
+      </div>
+      <div class="row3">
+        <div class="field"><label>Response deadline</label><input value="${esc(r.deadline||'?')}" readonly></div>
+        <div class="field"><label>Question deadline</label><input value="${esc(r.question_deadline||'—')}" readonly></div>
+        <div class="field"><label>Site visit</label><input value="${esc(r.site_visit_date?(r.site_visit_date+(r.site_visit_mandatory?' (mandatory)':'')):'—')}" readonly></div>
+      </div>
+      <div class="row3">
+        <div class="field"><label>Place of performance</label><input value="${esc(d.place_of_performance||r.location||'—')}" readonly></div>
+        <div class="field"><label>Type</label><input value="${esc(r.opportunity_type||'—')}" readonly></div>
+        <div class="field"><label>Est. value</label><input value="${r.estimated_value!=null?('$'+Number(r.estimated_value).toLocaleString()):'—'}" readonly></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
+        ${r.url?`<a class="btn sm" href="${esc(r.url)}" target="_blank">Open source notice ↗</a>`:''}
+        <button class="btn sm" id="rvEnrich">↻ Pull latest full detail</button>
+        <button class="btn sm" id="rvDownload">⬇ Download / refresh documents</button>
+        <span id="rvActStatus" class="muted" style="font-size:12px"></span>
+      </div>
+
+      <h2 class="section">Documents <span class="muted" style="font-weight:normal;font-size:13px">— open and read each one, then tick the ones Claude may scan</span></h2>
+      <div id="rvDocs" style="overflow-x:auto"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0">
+        <button class="btn sm" id="rvSelAll">Select all</button>
+        <button class="btn sm" id="rvSelNone">Clear selection</button>
+        <span style="flex:1"></span>
+        <button class="btn primary" id="rvAnalyze" disabled>✦ Analyze Selected Documents</button>
+      </div>
+      <div id="rvAnalyzeStatus"></div>
+
+      <h2 class="section">Analysis</h2>
+      <div id="rvAnalysis"><div class="muted" style="font-size:13px">No analysis yet — select documents above and click Analyze.</div></div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;position:sticky;bottom:0;background:var(--panel);padding-top:12px;border-top:1px solid var(--line)">
+        <button class="btn primary" id="rvApproveBtn" disabled>✔ Approve and Move to Pipeline</button>
+        <button class="btn" id="rvNoBidBtn">Mark No-Bid</button>
+        <button class="btn" id="rvArchiveBtn">Archive</button>
+        <span style="flex:1"></span>
+        <button class="btn" onclick="closeModal()">Close</button>
+      </div>
+      <div id="rvApproveBox"></div>
+    </div>`);
+  rvRenderDocs(); rvRenderAnalysis();
+  $('#rvEnrich').onclick = rvEnrich;
+  $('#rvDownload').onclick = rvDownload;
+  $('#rvSelAll').onclick = ()=>rvSelect(true);
+  $('#rvSelNone').onclick = ()=>rvSelect(false);
+  $('#rvAnalyze').onclick = rvAnalyze;
+  $('#rvApproveBtn').onclick = rvApproveUI;
+  $('#rvNoBidBtn').onclick = rvNoBid;
+  $('#rvArchiveBtn').onclick = rvArchive;
+}
+function rvChecked(){ return [...document.querySelectorAll('#rvDocs .rvsel:checked')].map(c=>c.dataset.id); }
+function rvRenderDocs(){
+  const host=$('#rvDocs'); if(!host) return;
+  const docs=window._RV.docs;
+  if(!docs.length){ host.innerHTML='<div class="muted" style="font-size:13px">No documents downloaded yet — click “Download / refresh documents”, or upload manually from the opportunity folder in the Document Editor.</div>'; rvSyncAnalyzeBtn(); return; }
+  host.innerHTML=`<table class="matx"><thead><tr>
+      <th></th><th>Filename</th><th>Type</th><th>Amend #</th><th>Size</th><th>Downloaded</th><th>Text</th><th>Reviewed</th><th></th>
+    </tr></thead><tbody>${docs.map(dc=>`<tr>
+      <td style="text-align:center"><input type="checkbox" class="rvsel" data-id="${dc.id}" ${dc.include_in_analysis?'checked':''} style="width:auto"></td>
+      <td style="padding:7px 8px;max-width:280px;word-break:break-word"><a href="#" class="rvopen" data-path="${esc(dc.stored_path)}">${esc(dc.original_filename)}</a>${dc.user_notes?`<div class="muted" style="font-size:11px">${esc(dc.user_notes)}</div>`:''}</td>
+      <td><select class="rvtype" data-id="${dc.id}" style="border:none;background:transparent;font:inherit;padding:7px 4px">${DOC_TYPES.map(t=>`<option ${t===(dc.document_type||'Other')?'selected':''}>${t}</option>`).join('')}</select></td>
+      <td style="padding:7px 8px;text-align:center">${dc.amendment_number??''}</td>
+      <td style="padding:7px 8px">${dc.file_size?(dc.file_size/1024).toFixed(0)+' KB':''}</td>
+      <td style="padding:7px 8px">${fmtDate(dc.downloaded_at)}</td>
+      <td style="padding:7px 8px">${esc(dc.extraction_status||'pending')}</td>
+      <td><select class="rvreview" data-id="${dc.id}" style="border:none;background:transparent;font:inherit;padding:7px 4px">${DOC_REVIEW.map(t=>`<option ${t===(dc.user_review_status||'Unreviewed')?'selected':''}>${t}</option>`).join('')}</select></td>
+      <td style="padding:7px 4px;white-space:nowrap"><button class="btn sm rvnote" data-id="${dc.id}" title="Add note">✎</button></td>
+    </tr>`).join('')}</tbody></table>`;
+  host.querySelectorAll('.rvopen').forEach(a=>a.onclick=e=>{e.preventDefault(); rvOpenDoc(a.dataset.path);});
+  host.querySelectorAll('.rvsel').forEach(cb=>cb.onchange=async ()=>{
+    await api(`govcon_source_documents?id=eq.${cb.dataset.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({include_in_analysis:cb.checked})});
+    const dc=window._RV.docs.find(x=>x.id===cb.dataset.id); if(dc) dc.include_in_analysis=cb.checked;
+    rvSyncAnalyzeBtn();
+  });
+  host.querySelectorAll('.rvtype').forEach(s=>s.onchange=()=>api(`govcon_source_documents?id=eq.${s.dataset.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({document_type:s.value})}));
+  host.querySelectorAll('.rvreview').forEach(s=>s.onchange=()=>api(`govcon_source_documents?id=eq.${s.dataset.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({user_review_status:s.value})}));
+  host.querySelectorAll('.rvnote').forEach(b=>b.onclick=async ()=>{
+    const dc=window._RV.docs.find(x=>x.id===b.dataset.id);
+    const note=prompt('Note about this document:', dc?.user_notes||''); if(note===null) return;
+    await api(`govcon_source_documents?id=eq.${b.dataset.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({user_notes:note||null})});
+    if(dc) dc.user_notes=note; rvRenderDocs();
+  });
+  rvSyncAnalyzeBtn();
+}
+function rvSyncAnalyzeBtn(){ const b=$('#rvAnalyze'); if(b) b.disabled = rvChecked().length===0; }
+function rvSelect(on){ document.querySelectorAll('#rvDocs .rvsel').forEach(cb=>{ if(cb.checked!==on){ cb.checked=on; cb.dispatchEvent(new Event('change')); } }); }
+async function rvOpenDoc(path){
+  // stored_path is "{uid}/rest…" — the editor expects the path relative to the user root
+  const rel = path.startsWith(SESSION.user.id+'/') ? path.slice(SESSION.user.id.length+1) : path;
+  edOpenDoc(rel);
+}
+async function rvReload(){
+  const id=window._RV.rfp.id;
+  const [rfpRows, docs, analyses] = await Promise.all([
+    api(`govcon_rfps?id=eq.${id}&select=*`),
+    api(`govcon_source_documents?rfp_id=eq.${id}&owner=eq.${SESSION.user.id}&select=*&order=downloaded_at.desc.nullslast`),
+    api(`govcon_opportunity_analysis?rfp_id=eq.${id}&owner=eq.${SESSION.user.id}&select=*&order=version.desc&limit=1`),
+  ]);
+  window._RV={rfp:rfpRows[0]||window._RV.rfp, docs:docs||[], analysis:(analyses||[])[0]||null};
+  rvRenderDocs(); rvRenderAnalysis();
+}
+async function rvEnrich(){
+  const st=$('#rvActStatus'); st.textContent='Pulling full detail from the source…';
+  try{ const r=await callFn('govcon-enrich',{rfp_id:window._RV.rfp.id}); st.textContent=`✓ Detail updated (${r.attachment_count||0} attachment(s) listed).`; await rvReload(); }
+  catch(e){ st.textContent='Enrich failed: '+e.message; }
+}
+async function rvDownload(){
+  const st=$('#rvActStatus'); st.textContent='Downloading solicitation documents server-side…';
+  try{ const r=await callFn('govcon-download-documents',{rfp_id:window._RV.rfp.id});
+    st.textContent=`✓ ${r.saved||0} new file(s), ${r.duplicates||0} duplicate(s) skipped${(r.errors||[]).length?`, ${r.errors.length} error(s)`:''}.`;
+    await rvReload();
+  } catch(e){ st.textContent='Download failed: '+e.message; }
+}
+async function rvAnalyze(){
+  const ids=rvChecked(); if(!ids.length) return;
+  const btn=$('#rvAnalyze'), st=$('#rvAnalyzeStatus');
+  btn.disabled=true; btn.textContent='Analyzing…';
+  st.innerHTML='<div class="muted">Extracting text and running the qualification analysis — this can take a couple of minutes for large documents…</div>';
+  try{
+    const mode = window._RV.analysis ? 'refresh' : 'initial';
+    const r=await callFn('govcon-analyze-selected-documents',{rfp_id:window._RV.rfp.id, document_ids:ids, analysis_mode:mode, preserve_human_edits:true});
+    st.innerHTML=`<div class="banner info">✓ Analysis v${r.version} complete — ${esc(r.recommendation)} (fit ${r.fit_score}, confidence ${r.analysis_confidence}${r.status==='preliminary'?' · <b>Preliminary</b>':''}).</div>`;
+    await rvReload();
+  } catch(e){
+    st.innerHTML=`<div class="banner bad">${/credit balance|billing/i.test(e.message)?'Claude could not run: your Anthropic account is out of credit (console.anthropic.com → Plans & Billing).':'Analysis failed: '+esc(e.message)}</div>`;
+  }
+  btn.textContent='✦ Analyze Selected Documents'; rvSyncAnalyzeBtn();
+}
+function gateChip(g){
+  const col={pass:'#0b6b34',warning:'#7a5b00',blocked:'#b3261e',fail:'#b3261e'}[g.status]||'#555';
+  return `<span class="pill" title="${esc(g.reason)}${g.action?' — '+esc(g.action):''}" style="background:${col};color:#fff">${esc(g.gate)}: ${esc(g.status)}</span>`;
+}
+async function rvRenderAnalysis(){
+  const host=$('#rvAnalysis'); if(!host) return;
+  const a=window._RV.analysis;
+  $('#rvApproveBtn').disabled = !a;
+  if(!a){ host.innerHTML='<div class="muted" style="font-size:13px">No analysis yet — select documents above and click Analyze.</div>'; return; }
+  const warn=(a.completeness_warnings||[]);
+  host.innerHTML=`
+    <div class="scores" style="margin-bottom:8px">
+      <span class="pill" style="background:${REC_COLOR[a.recommendation]||'#555'};color:#fff;font-size:13px">${esc(a.recommendation)}</span>
+      <span class="pill">Fit ${a.fit_score}/100</span>
+      <span class="pill">Bid-ready ${a.bid_readiness_score}/100</span>
+      <span class="pill">Sub-dependency ${a.subcontractor_dependency_score}/100</span>
+      <span class="pill">Confidence ${a.analysis_confidence}${a.status==='preliminary'?' · Preliminary':''}</span>
+      <span class="pill">v${a.version} · ${fmtDate(a.completed_at)}</span>
+    </div>
+    <div class="m" style="margin-bottom:8px">${esc(a.recommendation_reason||'')}</div>
+    <div class="scores" style="margin-bottom:8px">${(a.hard_gates||[]).map(gateChip).join(' ')}</div>
+    ${warn.length?`<div class="banner warn" style="margin:8px 0">Analysis may be incomplete:<br>${warn.map(esc).join('<br>')}</div>`:''}
+    <div style="display:flex;gap:18px;flex-wrap:wrap;margin:8px 0">
+      ${(a.top_strengths||[]).length?`<div style="flex:1;min-width:220px"><b>Strengths</b><ul style="margin:6px 0 0 18px">${a.top_strengths.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div>`:''}
+      ${(a.top_risks||[]).length?`<div style="flex:1;min-width:220px"><b>Risks</b><ul style="margin:6px 0 0 18px">${a.top_risks.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div>`:''}
+      ${(a.missing_information||[]).length?`<div style="flex:1;min-width:220px"><b>Missing information</b><ul style="margin:6px 0 0 18px">${a.missing_information.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div>`:''}
+    </div>
+    <button class="btn sm" id="rvWhy">Why this score?</button>
+    <div id="rvWhyBox"></div>
+    <h2 class="section">Capability matrix (from analysis v${a.version})</h2>
+    <div id="rvReqs" style="overflow-x:auto"><div class="muted">Loading…</div></div>
+    <h2 class="section">Submission compliance</h2>
+    <div id="rvSubs" style="overflow-x:auto"><div class="muted">Loading…</div></div>
+    <h2 class="section">Next actions</h2>
+    <div id="rvActs"><div class="muted">Loading…</div></div>`;
+  $('#rvWhy').onclick=rvWhy;
+  rvLoadRows();
+}
+async function rvWhy(){
+  const box=$('#rvWhyBox'); const a=window._RV.analysis; if(!a) return;
+  box.innerHTML='<div class="muted">Loading…</div>';
+  const comps=await api(`govcon_score_components?analysis_id=eq.${a.id}&owner=eq.${SESSION.user.id}&select=*&order=score_type,category`);
+  const byType={}; (comps||[]).forEach(c=>{(byType[c.score_type]=byType[c.score_type]||[]).push(c);});
+  box.innerHTML=Object.entries(byType).map(([t,rows])=>`
+    <h3 style="margin:12px 0 6px;text-transform:capitalize">${esc(t.replace('_',' '))}</h3>
+    <table class="matx"><thead><tr><th>Category</th><th>Points</th><th>Evidence</th><th>Missing</th></tr></thead>
+    <tbody>${rows.map(c=>`<tr>
+      <td style="padding:7px 8px">${esc(c.category)}</td>
+      <td style="padding:7px 8px;white-space:nowrap"><b>${c.points}</b> / ${c.max_points}${c.human_override!=null?` <span class="pill">override: ${c.human_override}</span>`:''}</td>
+      <td style="padding:7px 8px">${esc(c.evidence||'')}</td>
+      <td style="padding:7px 8px">${esc(c.missing_evidence||'')}</td>
+    </tr>`).join('')}</tbody></table>`).join('');
+}
+async function rvLoadRows(){
+  const rid=window._RV.rfp.id, uid=SESSION.user.id;
+  const [reqs, subs, acts]=await Promise.all([
+    api(`govcon_requirements?rfp_id=eq.${rid}&owner=eq.${uid}&select=*&order=sort_order&limit=300`),
+    api(`govcon_submission_requirements?rfp_id=eq.${rid}&owner=eq.${uid}&select=*&order=sort_order&limit=300`),
+    api(`govcon_next_actions?rfp_id=eq.${rid}&owner=eq.${uid}&select=*&order=due_date.asc.nullslast&limit=100`),
+  ]);
+  const REQ_STATUS=['Met','Met Through Verified Partner','Partial','Gap','Blocked','Not Applicable','Verification Required'];
+  const reqHost=$('#rvReqs');
+  if(reqHost) reqHost.innerHTML=(reqs||[]).length?`<table class="matx"><thead><tr><th>Requirement</th><th>Source</th><th>Type</th><th>Capability</th><th>Delivery</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody>${reqs.map(x=>`<tr>
+      <td style="padding:7px 8px;min-width:220px">${esc(x.requirement)}${x.mandatory===false?' <span class="muted">(optional)</span>':''}</td>
+      <td style="padding:7px 8px;font-size:12px">${esc(x.source_reference||'')}</td>
+      <td style="padding:7px 8px">${esc(x.requirement_type||'')}</td>
+      <td style="padding:7px 8px">${esc(x.capability||'')}${x.subcontractor_type?`<div class="muted" style="font-size:11px">sub: ${esc(x.subcontractor_type)}</div>`:''}</td>
+      <td style="padding:7px 8px">${esc(x.delivery_method||'')}</td>
+      <td><select class="rvreqst" data-id="${x.id}" style="border:none;background:transparent;font:inherit;padding:7px 4px">${REQ_STATUS.map(s=>`<option ${s===x.status?'selected':''}>${s}</option>`).join('')}</select>${x.origin==='human'?'<div class="muted" style="font-size:10px;text-align:center">edited</div>':''}</td>
+      <td style="padding:7px 8px;font-size:12px">${esc(x.required_action||'')}</td>
+    </tr>`).join('')}</tbody></table>`:'<div class="muted" style="font-size:13px">No requirements extracted yet.</div>';
+  document.querySelectorAll('.rvreqst').forEach(s=>s.onchange=()=>api(`govcon_requirements?id=eq.${s.dataset.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({status:s.value,origin:'human'})}));
+  const subHost=$('#rvSubs');
+  if(subHost) subHost.innerHTML=(subs||[]).length?`<table class="matx"><thead><tr><th>Item</th><th>Section</th><th>Form</th><th>Format / limit</th><th>Due</th><th>Status</th></tr></thead>
+    <tbody>${subs.map(x=>`<tr>
+      <td style="padding:7px 8px;min-width:200px">${esc(x.submission_item)}${x.signature_required?' <span class="pill">signature</span>':''}</td>
+      <td style="padding:7px 8px;font-size:12px">${esc(x.solicitation_section||'')}</td>
+      <td style="padding:7px 8px">${esc(x.required_form||'')}</td>
+      <td style="padding:7px 8px">${esc([x.required_format,x.page_limit].filter(Boolean).join(' · '))}</td>
+      <td style="padding:7px 8px">${esc(x.government_due_date||'')}</td>
+      <td><select class="rvsubst" data-id="${x.id}" style="border:none;background:transparent;font:inherit;padding:7px 4px">${['Todo','In Progress','Done','Blocked','N/A'].map(s=>`<option ${s===x.status?'selected':''}>${s}</option>`).join('')}</select></td>
+    </tr>`).join('')}</tbody></table>`:'<div class="muted" style="font-size:13px">No submission items extracted yet.</div>';
+  document.querySelectorAll('.rvsubst').forEach(s=>s.onchange=()=>api(`govcon_submission_requirements?id=eq.${s.dataset.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({status:s.value,origin:'human'})}));
+  const actHost=$('#rvActs');
+  if(actHost) actHost.innerHTML=(acts||[]).length?acts.map(x=>`
+    <label class="toggle" style="display:flex;gap:8px;align-items:flex-start;margin:4px 0">
+      <input type="checkbox" class="rvact" data-id="${x.id}" ${x.status==='done'?'checked':''} style="width:auto;margin-top:3px">
+      <span style="${x.status==='done'?'text-decoration:line-through;color:var(--muted)':''}">${esc(x.action)}${x.due_date?` <span class="muted">· due ${x.due_date}</span>`:''}${x.reason?` <span class="muted">· ${esc(x.reason)}</span>`:''}</span>
+    </label>`).join(''):'<div class="muted" style="font-size:13px">No next actions yet.</div>';
+  document.querySelectorAll('.rvact').forEach(cb=>cb.onchange=()=>api(`govcon_next_actions?id=eq.${cb.dataset.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({status:cb.checked?'done':'open'})}));
+}
+function rvApproveUI(){
+  const a=window._RV.analysis; if(!a) return;
+  const gates=a.hard_gates||[]; const blocked=gates.some(g=>g.status==='fail'||g.status==='blocked');
+  const needsOverride = a.recommendation==='No-Bid' || blocked;
+  const defStage={'Strong Pursue':'qualified'}[a.recommendation]||'lead';
+  $('#rvApproveBox').innerHTML=`<div class="card" style="margin-top:10px;border:2px solid var(--blue-500)">
+    <h3 style="margin:0 0 8px">Confirm: move to Pipeline</h3>
+    <div class="m">${esc(window._RV.rfp.title)}</div>
+    <div class="scores" style="margin:8px 0">
+      <span class="pill" style="background:${REC_COLOR[a.recommendation]||'#555'};color:#fff">${esc(a.recommendation)}</span>
+      <span class="pill">Fit ${a.fit_score}</span><span class="pill">Ready ${a.bid_readiness_score}</span>
+      <span class="pill">Sub-dep ${a.subcontractor_dependency_score}</span><span class="pill">Conf ${a.analysis_confidence}</span>
+    </div>
+    ${blocked?`<div class="banner warn">Blocked gates: ${gates.filter(g=>g.status!=='pass').map(g=>esc(g.gate)).join(', ')}</div>`:''}
+    ${(a.required_subcontractors||[]).length?`<div class="m">Required subcontractors: ${a.required_subcontractors.map(s=>esc(s.category||s)).join(', ')}</div>`:''}
+    <div class="row2" style="margin-top:8px">
+      <div class="field"><label>Initial stage</label><select id="rvStage">${['lead','qualified','proposal'].map(s=>`<option ${s===defStage?'selected':''}>${s}</option>`).join('')}</select></div>
+      ${needsOverride?`<div class="field"><label>Override reason (required)</label><input id="rvOverride" placeholder="Why move a ${esc(a.recommendation)} / blocked opportunity?"></div>`:'<div></div>'}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn primary" id="rvApproveGo">Confirm — move to Pipeline</button>
+      <button class="btn" onclick="$('#rvApproveBox').innerHTML=''">Cancel</button>
+    </div></div>`;
+  $('#rvApproveGo').onclick=rvApprove;
+  $('#rvApproveBox').scrollIntoView({behavior:'smooth'});
+}
+async function rvApprove(){
+  const a=window._RV.analysis; const btn=$('#rvApproveGo'); btn.disabled=true;
+  try{
+    const r=await callFn('govcon-pipeline-automation',{action:'approve', rfp_id:window._RV.rfp.id,
+      stage:$('#rvStage')?$('#rvStage').value:undefined,
+      override_reason:$('#rvOverride')?$('#rvOverride').value.trim():undefined});
+    toast(`Moved to Pipeline (${r.stage}) ✓`); $('#rvApproveBox').innerHTML=''; await rvReload();
+  }catch(e){ alert(e.message); btn.disabled=false; }
+}
+async function rvNoBid(){
+  const reason=prompt('No-Bid reason (stored and used to improve future filtering):'); if(reason===null) return;
+  if(!reason.trim()) return alert('A reason is required.');
+  try{ await callFn('govcon-pipeline-automation',{action:'nobid', rfp_id:window._RV.rfp.id, reason:reason.trim()});
+    toast('Marked No-Bid'); await rvReload(); }catch(e){ alert(e.message); }
+}
+async function rvArchive(){
+  if(!confirm('Archive this opportunity? It stays stored but leaves the active list.')) return;
+  try{ await callFn('govcon-pipeline-automation',{action:'archive', rfp_id:window._RV.rfp.id});
+    toast('Archived'); closeModal(); renderRfps(); }catch(e){ alert(e.message); }
+}
+
+const REC_COLOR = {'Strong Pursue':'#0b6b34','Pursue':'#0b6b34','Conditional Pursue':'#7a5b00','Monitor':'#555','Team':'#0054d1','No-Bid':'#b3261e'};
 function rfpCard(r) {
+  const sum = (r.details && r.details.analysis_summary) || null;
+  const stage = r.review_stage || 'Discovered';
   return `<div class="rfp">
     <div style="display:flex;align-items:flex-start;gap:9px">
       <input type="checkbox" class="selrfp" data-id="${r.id}" ${RFP_SEL.has(r.id)?'checked':''} style="width:auto;margin-top:4px">
-      <div class="t" style="cursor:pointer;flex:1" onclick="openRfp('${r.id}')" title="Click to view / edit">${esc(r.title)}</div>
+      <div class="t" style="cursor:pointer;flex:1" onclick="openReview('${r.id}')" title="Click to review">${esc(r.title)}</div>
+      <span class="pill" title="Review stage">${esc(stage)}</span>
     </div>
-    <div class="m">${esc(r.agency||'—')} · ${esc(r.source)} · deadline ${fmtDate(r.deadline)}${r.set_aside?` · ${esc(r.set_aside)}`:''}</div>
+    <div class="m">${esc(r.agency||'—')} · ${esc(r.source)} · deadline ${fmtDate(r.deadline)}${r.set_aside?` · ${esc(r.set_aside)}`:''}${r.category?` · NAICS ${esc(r.category)}`:''}</div>
     ${r.description?`<div class="m">${esc(String(r.description).slice(0,200))}${r.description.length>200?'…':''}</div>`:''}
     <div class="scores">
-      ${r.relevance_score!=null?`<span class="pill">Relevance ${r.relevance_score}%</span>`:''}
-      ${r.win_probability!=null?`<span class="pill">Win ${r.win_probability}%</span>`:''}
+      ${sum?`<span class="pill" style="background:${REC_COLOR[sum.recommendation]||'#555'};color:#fff">${esc(sum.recommendation||'')}</span>
+        <span class="pill">Fit ${sum.fit}</span><span class="pill">Ready ${sum.readiness}</span>
+        <span class="pill">Sub-dep ${sum.dependency}</span><span class="pill">Conf ${sum.confidence}${sum.confidence<70?' · Preliminary':''}</span>
+        <span class="pill">v${sum.version}</span>`
+      : `${r.relevance_score!=null?`<span class="pill">Relevance ${r.relevance_score}%</span>`:''}
+         ${r.win_probability!=null?`<span class="pill">Win ${r.win_probability}%</span>`:''}`}
       ${r.priority?`<span class="pill ${r.priority}">${r.priority}</span>`:''}
+      ${r.analysis_status==='Amendment Review Required'?`<span class="pill" style="background:#b3261e;color:#fff">⚠ Amendment</span>`:''}
     </div>
     <div class="acts">
-      <button class="btn sm" onclick="openRfp('${r.id}')">View / Edit</button>
-      <button class="btn sm" onclick="addToPipeline('${r.id}')">+ Pipeline</button>
-      <button class="btn sm" onclick="aiFor('${r.id}','analyzer')">Analyze</button>
-      <button class="btn sm primary" onclick="aiFor('${r.id}','writer')">Generate proposal</button>
+      <button class="btn sm primary" onclick="openReview('${r.id}')">Review</button>
+      <button class="btn sm" onclick="openRfp('${r.id}')">Edit</button>
       ${r.url?`<a class="btn sm" href="${esc(r.url)}" target="_blank">Source ↗</a>`:''}
       <button class="btn sm" style="color:var(--bad)" onclick="deleteRfp('${r.id}')">Delete</button>
     </div></div>`;
@@ -528,13 +847,23 @@ async function addToPipeline(rfpId) {
 }
 async function runAutopilotNow() {
   toast('Running Autopilot…', true);
-  try { const r = await callFn('autopilot-run', {action:'run'});
-    let msg = `Autopilot: ${r.new_rfps} new, ${r.added_to_pipeline} to pipeline, ${r.proposals_generated} drafts`;
+  try {
+    // New qualification-engine orchestrator: discover → enrich → download
+    // documents → flag ready for review. Never auto-analyzes or auto-pipelines.
+    const r = await callFn('govcon-autopilot-run', {});
+    let msg = `Autopilot (${r.mode}): found ${r.found}, new ${r.new}, merged ${r.merged}, excluded ${r.excluded}`;
+    if (r.files_downloaded != null) msg += `, ${r.files_downloaded} file(s) downloaded, ${r.ready_for_review||0} ready for review`;
     if (r.errors?.length) msg += ` · ⚠ ${r.errors[0]}`;
     toast(msg);
-    if (r.errors?.length) console.warn('Autopilot source errors:', r.errors);
+    if (r.errors?.length) console.warn('Autopilot errors:', r.errors);
     if ($('#rfpList')) renderRfps();
-  } catch(e){ toast('Autopilot failed: '+e.message); }
+  } catch(e){
+    // orchestrator not deployed yet → fall back to the legacy autopilot
+    try { const r = await callFn('autopilot-run', {action:'run'});
+      toast(`Autopilot (legacy): ${r.new_rfps} new — deploy govcon-autopilot-run for the full workflow`);
+      if ($('#rfpList')) renderRfps();
+    } catch(e2){ toast('Autopilot failed: '+e.message); }
+  }
 }
 
 /* ═══════════════ AUTOPILOT SETTINGS ═══════════════ */
@@ -548,6 +877,13 @@ async function renderAutopilot() {
     <div class="banner info">Autopilot discovers, scores, and (optionally) drafts proposals for RFPs matching your profile and keywords. Configure it once, then run manually or on a schedule.</div>
     <div class="card">
       <label class="toggle"><input type="checkbox" id="ap_enabled" ${s.enabled?'checked':''}> Enable Autopilot</label>
+      <div class="field"><label>Autopilot mode</label>
+        <select id="ap_mode">
+          <option value="mode1_discovery" ${s.autopilot_mode==='mode1_discovery'?'selected':''}>Mode 1 — Discovery only (find &amp; store, no documents, no AI)</option>
+          <option value="mode2_manual" ${(!s.autopilot_mode||s.autopilot_mode==='mode2_manual')?'selected':''}>Mode 2 — Discover + download documents; I select &amp; approve (recommended)</option>
+          <option value="mode3_full" ${s.autopilot_mode==='mode3_full'?'selected':''}>Mode 3 — Also pre-select all documents for analysis (advanced)</option>
+        </select></div>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">No mode ever runs the final analysis, moves opportunities into the Pipeline, generates proposals, or submits anything without your explicit click.</div>
       <div class="row2">
         <div class="field"><label>Run every (hours) — 24 = once a day</label><input id="ap_interval" type="number" min="1" max="24" value="${s.interval_hours||6}"></div>
         <div class="field"><label>Max RFPs per run</label><input id="ap_max" type="number" value="${s.max_per_run||50}"></div>
@@ -607,10 +943,19 @@ async function saveAutopilot() {
     auto_generate: $('#ap_gen').checked, generation_threshold: +$('#ap_genth').value,
     generation_mode: $('#ap_genmode').value,
     auto_add_pipeline: $('#ap_addpipe').checked, auto_prioritize: $('#ap_prio').checked,
+    autopilot_mode: $('#ap_mode') ? $('#ap_mode').value : 'mode2_manual',
     updated_at: new Date().toISOString(),
   };
-  await api('govcon_autopilot_settings', {method:'POST', prefer:'resolution=merge-duplicates', body:JSON.stringify(body)});
-  toast('Autopilot settings saved');
+  try {
+    await api('govcon_autopilot_settings', {method:'POST', prefer:'resolution=merge-duplicates', body:JSON.stringify(body)});
+    toast('Autopilot settings saved');
+  } catch(e){
+    if (/autopilot_mode/.test(e.message)) {           // migration 9 not run yet — save the rest
+      delete body.autopilot_mode;
+      await api('govcon_autopilot_settings', {method:'POST', prefer:'resolution=merge-duplicates', body:JSON.stringify(body)});
+      toast('Saved (mode needs govcon_migration_9.sql first)');
+    } else throw e;
+  }
 }
 
 /* ═══════════════ CUSTOM SOURCES ═══════════════ */
