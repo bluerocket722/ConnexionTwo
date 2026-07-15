@@ -181,7 +181,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r8-2026-07-14';
+const GOVCON_BUILD = 'r9-2026-07-15';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -876,6 +876,10 @@ async function openLead(itemId) {
 
       <h2 class="section">Contract documents</h2>
       <div class="muted" style="font-size:12px;margin:-6px 0 10px">Upload the solicitation, SOW/PWS, and attachments. Claude reads them and fills the <b>Submission</b> and <b>Capability</b> matrices below. Files are saved to this opportunity's folder in the Document Editor — add more anytime and re-read.</div>
+      <div class="row2">
+        <div class="field"><label>Solicitation / Notice #</label><input id="ld_solnum" value="${esc(leadSolNum(r))}" placeholder="e.g. 140P8626Q0042"></div>
+        <div class="field"><label>Folder name <span class="muted" style="font-weight:normal">— rename anytime; applies on Save</span></label><input id="ld_folder_name" value="${esc(leadFolder(r))}"></div>
+      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
         <label class="btn primary" style="cursor:pointer">⬆ Upload documents<input id="ld_docup" type="file" multiple accept=".pdf,.docx,.doc,.txt" hidden></label>
         <button class="btn" id="ld_extract">✦ Read documents &amp; build matrices</button>
@@ -917,6 +921,7 @@ async function openLead(itemId) {
   // document upload + AI extraction
   window._LEAD_RFP = r;
   $('#ld_folder').textContent = 'Folder: ' + leadFolder(r);
+  if($('#ld_folder_name')) $('#ld_folder_name').oninput = e=>{ $('#ld_folder').textContent = 'Folder: ' + cleanFolder(e.target.value) + ' (applies on Save)'; };
   refreshLeadDocs(r);
   $('#ld_docup').onchange = e=>{ if(e.target.files.length) uploadLeadDocs(r, [...e.target.files]); };
   $('#ld_extract').onclick = ()=>extractMatrices(r);
@@ -932,6 +937,16 @@ async function openLead(itemId) {
 async function saveLead(itemId, rfpId) {
   const title = $('#ld_title').value.trim(); if(!title) return alert('Title is required');
   syncMatrixFromDom('matrixHost'); syncMatrixFromDom('submatrixHost');
+  const r = window._LEAD_RFP || {};
+  const oldFolder = leadFolder(r);
+  // fold the real solicitation number + optional folder override into details
+  const details = Object.assign({}, r.details || {});
+  const solIn = ($('#ld_solnum') ? $('#ld_solnum').value : '').trim();
+  const folderIn = ($('#ld_folder_name') ? $('#ld_folder_name').value : '').trim();
+  if(solIn) details.solicitation_number = solIn; else delete details.solicitation_number;
+  if(folderIn) details.folder_name = cleanFolder(folderIn); else delete details.folder_name;
+  const newFolder = leadFolder(Object.assign({}, r, {title, details}));
+  if(newFolder !== oldFolder){ await renameLeadFolder(oldFolder, newFolder); }
   await api(`govcon_rfps?id=eq.${rfpId}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({
     title, agency:$('#ld_agency').value.trim()||null, category:$('#ld_category').value.trim()||null,
     set_aside:$('#ld_setaside').value.trim()||null, deadline:$('#ld_deadline').value||null,
@@ -939,7 +954,10 @@ async function saveLead(itemId, rfpId) {
     budget_max:$('#ld_bmax').value===''?null:+$('#ld_bmax').value,
     url:$('#ld_url').value.trim()||null, description:$('#ld_desc').value.trim()||null,
     capability_matrix: MATRICES.matrixHost, submission_matrix: MATRICES.submatrixHost,
+    details,
   })});
+  // keep the in-memory copy in sync so re-opening / uploads use the new folder
+  r.title = title; r.details = details;
   await api(`govcon_pipeline_items?id=eq.${itemId}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({
     stage:$('#ld_stage').value, priority:$('#ld_prio').value, notes:$('#ld_notes').value.trim()||null,
     stage_updated_at:new Date().toISOString(),
@@ -960,10 +978,38 @@ async function removeLead(itemId) {
 const PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
 const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const MAMMOTH_CDN = 'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js';
-function leadSolNum(r){ return (r.details && r.details.solicitation_number) || (r.notice_id||'').replace(/^[a-z.]+:/,''); }
+// A SAM/portal notice UUID is NOT a solicitation number — never surface it.
+function isUuidish(s){ return /^[0-9a-f]{32}$/i.test(s) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s); }
+function cleanFolder(s){ return String(s||'').replace(/[^A-Za-z0-9 _\-]+/g,' ').replace(/\s+/g,' ').trim().slice(0,90) || 'Opportunity'; }
+// The real solicitation/notice number scraped from SAM.gov or a state site.
+function leadSolNum(r){
+  const d = r.details || {};
+  if(d.solicitation_number && String(d.solicitation_number).trim()) return String(d.solicitation_number).trim();
+  const raw = (r.notice_id||'').replace(/^[a-z.]+:/,'').trim();   // strip "sam:" etc.
+  return (raw && !isUuidish(raw)) ? raw : '';                     // ignore the internal UUID
+}
 function leadFolder(r){
+  const d = r.details || {};
+  if(d.folder_name && String(d.folder_name).trim()) return cleanFolder(d.folder_name);   // user override
   const num = leadSolNum(r);
-  return ((r.title||'Opportunity') + (num?(' '+num):'')).replace(/[^A-Za-z0-9 _\-]+/g,' ').replace(/\s+/g,' ').trim().slice(0,90);
+  return cleanFolder((r.title||'Opportunity') + (num?(' '+num):''));
+}
+// Move an opportunity's stored documents when its folder is renamed.
+async function renameLeadFolder(oldFolder, newFolder){
+  oldFolder=cleanFolder(oldFolder); newFolder=cleanFolder(newFolder);
+  if(oldFolder===newFolder) return;
+  const base=edDir();
+  const mv=(from,to)=>sb.storage.from(DOCS_BUCKET).move(from,to).catch(()=>{});
+  try{
+    const { data } = await sb.storage.from(DOCS_BUCKET).list(`${base}/${oldFolder}`);
+    for(const f of (data||[])){ if(f.id) await mv(`${base}/${oldFolder}/${f.name}`,`${base}/${newFolder}/${f.name}`); }
+    // subcontractor files live under subs/<id>/<file>
+    const { data:subDirs } = await sb.storage.from(DOCS_BUCKET).list(`${base}/${oldFolder}/subs`);
+    for(const d of (subDirs||[])){ if(d.id) continue;
+      const { data:sf } = await sb.storage.from(DOCS_BUCKET).list(`${base}/${oldFolder}/subs/${d.name}`);
+      for(const f of (sf||[])){ if(f.id) await mv(`${base}/${oldFolder}/subs/${d.name}/${f.name}`,`${base}/${newFolder}/subs/${d.name}/${f.name}`); }
+    }
+  }catch(_){}
 }
 async function refreshLeadDocs(r){
   const host=$('#ld_doclist'); if(!host) return;
