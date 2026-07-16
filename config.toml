@@ -1,0 +1,99 @@
+# supabase/config.toml — edge-function entrypoints
+#
+# Each function's TypeScript file is named after the function itself
+# (govcon-discover/govcon-discover.ts) instead of the default index.ts,
+# so downloads and code review are unambiguous. Supabase's CLI looks for
+# index.ts unless told otherwise — these entries tell it otherwise.
+#
+# If you deploy by PASTING code in the Supabase dashboard, you don't need
+# this file at all — the dashboard doesn't care what the file was called.
+#
+# Place this content inside your project's supabase/config.toml (merge with
+# what's already there), with the functions living at:
+#   supabase/functions/<name>/<name>.ts
+#   supabase/functions/_shared/*.ts
+
+[functions.autopilot-run]
+entrypoint = "./functions/autopilot-run/autopilot-run.ts"
+
+[functions.govcon-ai]
+entrypoint = "./functions/govcon-ai/govcon-ai.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.oo-config]
+entrypoint = "./functions/oo-config/oo-config.ts"
+
+[functions.oo-callback]
+entrypoint = "./functions/oo-callback/oo-callback.ts"
+verify_jwt = false   # the OnlyOffice doc server calls this, not a signed-in user
+
+[functions.scrape-ingest]
+entrypoint = "./functions/scrape-ingest/scrape-ingest.ts"
+verify_jwt = false   # authenticates with the per-user ingest_token instead
+
+[functions.govcon-discover]
+entrypoint = "./functions/govcon-discover/govcon-discover.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-enrich]
+entrypoint = "./functions/govcon-enrich/govcon-enrich.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-download-documents]
+entrypoint = "./functions/govcon-download-documents/govcon-download-documents.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-extract-documents]
+entrypoint = "./functions/govcon-extract-documents/govcon-extract-documents.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-analyze-selected-documents]
+entrypoint = "./functions/govcon-analyze-selected-documents/govcon-analyze-selected-documents.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-pipeline-automation]
+entrypoint = "./functions/govcon-pipeline-automation/govcon-pipeline-automation.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-monitor-amendments]
+entrypoint = "./functions/govcon-monitor-amendments/govcon-monitor-amendments.ts"
+
+[functions.govcon-autopilot-run]
+entrypoint = "./functions/govcon-autopilot-run/govcon-autopilot-run.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-opportunity-partner-match]
+entrypoint = "./functions/govcon-opportunity-partner-match/govcon-opportunity-partner-match.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-partner-research]
+entrypoint = "./functions/govcon-partner-research/govcon-partner-research.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-partner-enrich]
+entrypoint = "./functions/govcon-partner-enrich/govcon-partner-enrich.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-partner-contact-research]
+entrypoint = "./functions/govcon-partner-contact-research/govcon-partner-contact-research.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-partner-score]
+entrypoint = "./functions/govcon-partner-score/govcon-partner-score.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-partner-dedupe]
+entrypoint = "./functions/govcon-partner-dedupe/govcon-partner-dedupe.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-partner-refresh]
+entrypoint = "./functions/govcon-partner-refresh/govcon-partner-refresh.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-partner-award-research]
+entrypoint = "./functions/govcon-partner-award-research/govcon-partner-award-research.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-research-intelligence]
+entrypoint = "./functions/govcon-research-intelligence/govcon-research-intelligence.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
