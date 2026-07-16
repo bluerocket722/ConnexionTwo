@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r21-2026-07-15';
+const GOVCON_BUILD = 'r22-2026-07-15';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -296,43 +296,100 @@ const V = () => $('#views');
 const loading = () => V().innerHTML = '<div class="card center muted">Loading…</div>';
 
 /* ═══════════════ DASHBOARD ═══════════════ */
+let DASH_SORT = 'deadline', DASH_DIR = 1;
+function scoreCell(v, goodHigh=true){
+  if(v==null) return '<span class="pill" style="background:#e6e8eb;color:#555">—</span>';
+  const g=goodHigh?v:100-v; const col=g>=68?'#0b6b34':g>=45?'#7a5b00':'#b3261e';
+  return `<span class="pill" style="background:${col};color:#fff">${v}</span>`;
+}
 async function renderDashboard() {
   loading();
   const uid = SESSION.user.id;
-  const [rfps, pipeline, proposals, runs] = await Promise.all([
-    api(`govcon_rfps?owner=eq.${uid}&select=id,status,priority,win_probability`),
+  const [rfps, pipeline, proposals, research, runs] = await Promise.all([
+    api(`govcon_rfps?owner=eq.${uid}&select=id,title,agency,deadline,review_stage,automation_stage,category,place_of_performance_raw,details,status,priority`),
     api(`govcon_pipeline_items?owner=eq.${uid}&select=id,stage`),
     api(`govcon_proposals?owner=eq.${uid}&select=id,status`),
-    api(`govcon_autopilot_runs?owner=eq.${uid}&select=*&order=started_at.desc&limit=5`),
+    api(`govcon_research?owner=eq.${uid}&select=rfp_id,win_probability_score,risk_score,competition_score,recommendation_label`).catch(()=>[]),
+    api(`govcon_run_logs?owner=eq.${uid}&fn=eq.govcon-autopilot-run&select=*&order=started_at.desc&limit=5`).catch(()=>[]),
   ]);
-  const awarded = pipeline.filter(p=>p.stage==='awarded').length;
-  const closed = pipeline.filter(p=>p.stage==='awarded'||p.stage==='lost').length;
+  const rById={}; (research||[]).forEach(r=>rById[r.rfp_id]=r);
+  const awarded = pipeline.filter(p=>p.stage==='awarded'||p.stage==='won').length;
+  const closed = pipeline.filter(p=>['awarded','won','lost'].includes(p.stage)).length;
   const winRate = closed ? Math.round(awarded/closed*100) : 0;
+  const analyzed = rfps.filter(r=>(r.details&&r.details.analysis_summary)).length;
+
+  // merged scored rows for the sortable table
+  const rows = rfps.map(r=>{ const sum=(r.details&&r.details.analysis_summary)||{}; const rr=rById[r.id]||{};
+    return { id:r.id, title:r.title, agency:r.agency, deadline:r.deadline, stage:r.review_stage||'Discovered',
+      astage:r.automation_stage, pop:r.place_of_performance_raw, naics:r.category,
+      fit:sum.fit??null, conf:sum.confidence??null, rec:sum.recommendation||rr.recommendation_label||null,
+      win:rr.win_probability_score??null, risk:rr.risk_score??null, comp:rr.competition_score??null };
+  });
+  const key=DASH_SORT;
+  rows.sort((a,b)=>{ let x=a[key],y=b[key];
+    if(key==='deadline'){ x=x||'9999'; y=y||'9999'; return (x<y?-1:x>y?1:0)*DASH_DIR; }
+    x=x==null?-1:x; y=y==null?-1:y; return (x-y)*DASH_DIR; });
+
+  const th=(k,lbl)=>`<th style="cursor:pointer;white-space:nowrap" data-sort="${k}">${lbl}${DASH_SORT===k?(DASH_DIR>0?' ▲':' ▼'):''}</th>`;
   V().innerHTML = `
     <div class="cards kpis">
-      ${kpi('Total RFPs', rfps.length, 'all opportunities')}
+      ${kpi('Total RFPs', rfps.length, `${analyzed} analyzed`)}
       ${kpi('Pipeline', pipeline.length, 'actively pursuing')}
       ${kpi('Proposals', proposals.length, 'drafts & submissions')}
       ${kpi('Win Rate', winRate+'%', `${awarded} of ${closed} closed`)}
     </div>
-    <h2 class="section">Quick actions</h2>
-    <div class="card"><div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn primary" onclick="route('rfps')">Discover RFPs</button>
-      <button class="btn" onclick="route('ai')">Create Proposal</button>
-      <button class="btn" onclick="route('pipeline')">View Pipeline</button>
+    <div class="card" style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn primary" onclick="analyzeAllPending()">⚙ Analyze all pending</button>
       <button class="btn" onclick="runAutopilotNow()">✈ Run Autopilot</button>
-    </div></div>
+      <button class="btn" onclick="route('research')">Research</button>
+      <button class="btn" onclick="route('pipeline')">Pipeline</button>
+      <span id="dashPendStatus" class="muted" style="font-size:12px"></span>
+    </div>
+    <h2 class="section">Opportunity scoreboard <span class="muted" style="font-weight:normal;font-size:13px">— click a header to sort</span></h2>
+    <div class="card" style="overflow-x:auto">
+      <table class="matx"><thead><tr>
+        <th style="text-align:left">Opportunity</th>${th('fit','Fit')}${th('win','Win%')}${th('risk','Risk')}${th('comp','Comp')}${th('conf','Conf')}
+        <th>Rec</th>${th('deadline','Deadline')}<th>Stage</th>
+      </tr></thead><tbody>${rows.slice(0,200).map(r=>`<tr>
+        <td style="padding:7px 8px;max-width:280px"><a href="#" class="dashopen" data-id="${r.id}">${esc(String(r.title||'').slice(0,70))}</a>
+          <div class="muted" style="font-size:11px">${esc(r.agency||'')}${r.naics?' · '+esc(r.naics):''}${r.pop?' · '+esc(String(r.pop).slice(0,30)):''}</div></td>
+        <td style="text-align:center">${scoreCell(r.fit)}</td>
+        <td style="text-align:center">${scoreCell(r.win)}</td>
+        <td style="text-align:center">${scoreCell(r.risk,false)}</td>
+        <td style="text-align:center">${scoreCell(r.comp,false)}</td>
+        <td style="text-align:center">${scoreCell(r.conf)}</td>
+        <td style="text-align:center">${r.rec?`<span class="pill" style="background:${REC_COLOR[r.rec]||'#555'};color:#fff">${esc(r.rec)}</span>`:'—'}</td>
+        <td style="text-align:center;white-space:nowrap">${r.deadline?fmtDate(r.deadline):'—'}</td>
+        <td style="text-align:center;font-size:11px">${esc(r.astage||r.stage)}</td>
+      </tr>`).join('')||'<tr><td colspan="9" class="muted" style="padding:12px;text-align:center">No opportunities yet.</td></tr>'}</tbody></table>
+    </div>
     <h2 class="section">Recent Autopilot runs</h2>
-    <div class="card">${runs.length ? runs.map(r=>`
+    <div class="card">${(runs||[]).length ? runs.map(r=>`
       <div class="rfp" style="margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between">
-          <b>${fmtDate(r.started_at)}</b>
-          <span class="pill ${r.status==='error'?'high':'low'}">${r.status}</span>
-        </div>
-        <div class="m">Found ${r.rfps_found} · New ${r.new_rfps} · High-priority ${r.high_priority} · Proposals ${r.proposals_generated} · Pipeline +${r.added_to_pipeline}</div>
+        <div style="display:flex;justify-content:space-between"><b>${fmtDate(r.started_at)}</b>
+          <span class="pill ${r.status==='error'?'high':'low'}">${r.status}</span></div>
+        <div class="m">${esc(JSON.stringify(r.stats||{}).slice(1,-1).replace(/"/g,'').slice(0,160))}</div>
         ${r.error?`<div class="m" style="color:var(--bad)">${esc(r.error)}</div>`:''}
       </div>`).join('') : '<p class="muted">No runs yet. Configure Autopilot and run it.</p>'}
     </div>`;
+  document.querySelectorAll('[data-sort]').forEach(t=>t.onclick=()=>{ const k=t.dataset.sort;
+    if(DASH_SORT===k) DASH_DIR*=-1; else { DASH_SORT=k; DASH_DIR = (k==='deadline'||k==='risk'||k==='comp')?1:-1; } renderDashboard(); });
+  document.querySelectorAll('.dashopen').forEach(a=>a.onclick=e=>{e.preventDefault(); openReview(a.dataset.id);});
+}
+async function analyzeAllPending(){
+  const st=$('#dashPendStatus'); st.textContent='Finding pending opportunities…';
+  let pending=[];
+  try{ const r=await callFn('govcon-autopilot-run',{action:'list_pending'}); pending=r.pending||[]; }
+  catch(e){ st.textContent='Could not list pending: '+e.message; return; }
+  if(!pending.length){ st.textContent='✓ Nothing pending — all opportunities are analyzed.'; return; }
+  let done=0, fail=0;
+  for(const p of pending){
+    st.textContent=`Analyzing ${done+1}/${pending.length}: ${String(p.title||'').slice(0,50)}…`;
+    try{ await callFn('govcon-autopilot-run',{action:'process_one', rfp_id:p.id}); done++; }
+    catch(e){ fail++; }
+  }
+  st.textContent=`✓ Analyzed ${done} opportunit${done===1?'y':'ies'}${fail?`, ${fail} failed`:''}.`;
+  renderDashboard();
 }
 const kpi = (l,v,s) => `<div class="card kpi"><div class="lbl">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
 
