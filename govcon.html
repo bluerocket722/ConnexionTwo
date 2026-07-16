@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r19-2026-07-15';
+const GOVCON_BUILD = 'r20-2026-07-15';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -508,27 +508,29 @@ async function openReview(id){
         <span class="pill">Analysis: ${esc(r.analysis_status||'Not Started')}</span>
         ${r.last_analyzed_at?`<span class="pill">Analyzed ${fmtDate(r.last_analyzed_at)} · v${r.latest_analysis_version||1}</span>`:''}
       </div>
+      <div class="muted" style="font-size:12px;margin-bottom:6px">All fields are editable — fill them in manually, or they auto-fill once you analyze the documents / pull SAM detail. Click <b>Save fields</b> after editing.</div>
       <div class="row3">
-        <div class="field"><label>Agency</label><input value="${esc(r.agency||'')}" readonly></div>
-        <div class="field"><label>Solicitation #</label><input value="${esc(d.solicitation_number||'')}" readonly></div>
+        <div class="field"><label>Agency</label><input id="rf_agency" value="${esc(r.agency||'')}"></div>
+        <div class="field"><label>Solicitation #</label><input id="rf_solnum" value="${esc(d.solicitation_number||'')}"></div>
         <div class="field"><label>Notice ID</label><input value="${esc((r.notice_id||'').replace(/^sam:/,''))}" readonly></div>
       </div>
       <div class="row3">
-        <div class="field"><label>NAICS</label><input value="${esc(r.category||'')}" readonly></div>
-        <div class="field"><label>PSC</label><input value="${esc(r.psc||d.psc||'')}" readonly></div>
-        <div class="field"><label>Set-aside</label><input value="${esc(r.set_aside||'—')}" readonly></div>
+        <div class="field"><label>NAICS</label><input id="rf_naics" value="${esc(r.category||'')}"></div>
+        <div class="field"><label>PSC</label><input id="rf_psc" value="${esc(r.psc||d.psc||'')}"></div>
+        <div class="field"><label>Set-aside</label><input id="rf_setaside" value="${esc(r.set_aside||'')}"></div>
       </div>
       <div class="row3">
-        <div class="field"><label>Response deadline</label><input value="${esc(r.deadline||'?')}" readonly></div>
-        <div class="field"><label>Question deadline</label><input value="${esc(r.question_deadline||'—')}" readonly></div>
-        <div class="field"><label>Site visit</label><input value="${esc(r.site_visit_date?(r.site_visit_date+(r.site_visit_mandatory?' (mandatory)':'')):'—')}" readonly></div>
+        <div class="field"><label>Response deadline</label><input id="rf_deadline" type="date" value="${r.deadline||''}"></div>
+        <div class="field"><label>Question deadline</label><input id="rf_qdeadline" type="date" value="${r.question_deadline||''}"></div>
+        <div class="field"><label>Site visit date</label><input id="rf_sitevisit" type="date" value="${r.site_visit_date||''}"></div>
       </div>
       <div class="row3">
-        <div class="field"><label>Place of performance</label><input value="${esc(d.place_of_performance||r.location||'—')}" readonly></div>
-        <div class="field"><label>Type</label><input value="${esc(r.opportunity_type||'—')}" readonly></div>
-        <div class="field"><label>Est. value</label><input value="${r.estimated_value!=null?('$'+Number(r.estimated_value).toLocaleString()):'—'}" readonly></div>
+        <div class="field"><label>Place of performance</label><input id="rf_pop" value="${esc(r.place_of_performance_raw||d.place_of_performance||r.location||'')}"></div>
+        <div class="field"><label>Type</label><input id="rf_type" value="${esc(r.opportunity_type||'')}" placeholder="RFQ / RFP / combined"></div>
+        <div class="field"><label>Est. value ($)</label><input id="rf_value" type="number" value="${r.estimated_value??''}"></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
+        <button class="btn sm primary" id="rvSaveFields">💾 Save fields</button>
         ${r.url?`<a class="btn sm" href="${esc(r.url)}" target="_blank">Open source notice ↗</a>`:''}
         <button class="btn sm" id="rvEnrich">↻ Pull latest full detail</button>
         <button class="btn sm" id="rvDownload">⬇ Download from SAM.gov</button>
@@ -584,6 +586,7 @@ async function openReview(id){
   $('#rvEnrich').onclick = rvEnrich;
   $('#rvDownload').onclick = rvDownload;
   $('#rvUpload').onchange = e=>{ if(e.target.files.length) rvUploadDocs([...e.target.files]); };
+  $('#rvSaveFields').onclick = rvSaveFields;
   $('#rvSelAll').onclick = ()=>rvSelect(true);
   $('#rvSelNone').onclick = ()=>rvSelect(false);
   $('#rvAnalyze').onclick = rvAnalyze;
@@ -655,6 +658,26 @@ async function rvDownload(){
     await rvReload();
   } catch(e){ st.textContent='Download failed: '+e.message; }
 }
+async function rvSaveFields(){
+  const r=window._RV.rfp, st=$('#rvActStatus'); st.textContent='Saving…';
+  const details=Object.assign({}, r.details||{});
+  const sol=$('#rf_solnum').value.trim(); if(sol) details.solicitation_number=sol; else delete details.solicitation_number;
+  const pop=$('#rf_pop').value.trim();
+  const patch={
+    agency:$('#rf_agency').value.trim()||null, category:$('#rf_naics').value.trim()||null,
+    psc:$('#rf_psc').value.trim()||null, set_aside:$('#rf_setaside').value.trim()||null,
+    deadline:$('#rf_deadline').value||null, question_deadline:$('#rf_qdeadline').value||null,
+    site_visit_date:$('#rf_sitevisit').value||null,
+    place_of_performance_raw:pop||null, opportunity_type:$('#rf_type').value.trim()||null,
+    estimated_value:$('#rf_value').value===''?null:+$('#rf_value').value,
+    details,
+  };
+  try{
+    const { skipped }=await apiPatchTolerant(`govcon_rfps?id=eq.${r.id}`, patch);
+    Object.assign(window._RV.rfp, patch);
+    st.textContent = skipped.length ? 'Saved (these need a migration: '+skipped.join(', ')+')' : '✓ Fields saved.';
+  }catch(e){ st.textContent='Save failed: '+e.message; }
+}
 async function rvUploadDocs(files){
   const r=window._RV.rfp, st=$('#rvActStatus'); st.textContent='Uploading…';
   const folder=leadFolder(r);
@@ -688,11 +711,24 @@ async function rvUploadDocs(files){
 async function rvAnalyze(){
   const ids=rvChecked(); if(!ids.length) return;
   const btn=$('#rvAnalyze'), st=$('#rvAnalyzeStatus');
-  btn.disabled=true; btn.textContent='Analyzing…';
-  st.innerHTML='<div class="muted">Extracting text and running the qualification analysis — this can take a couple of minutes for large documents…</div>';
+  btn.disabled=true; btn.textContent='Reading documents…';
+  st.innerHTML='<div class="muted">Reading the selected documents in your browser (PDF/DOCX/XLSX)…</div>';
+  // Extract text CLIENT-SIDE (pdf.js/mammoth are reliable in the browser; the
+  // server-side PDF parser is not) and pass it to the analyzer.
+  const texts={}; let readOk=0;
+  for(const id of ids){
+    const d=window._RV.docs.find(x=>x.id===id); if(!d) continue;
+    try{
+      const { data:blob }=await sb.storage.from(DOCS_BUCKET).download(d.stored_path);
+      const t=await extractFileText(d.original_filename, blob);
+      if(t && t.trim().length>20){ texts[id]=t.slice(0,180000); readOk++; }
+    }catch(_){ /* fall back to server extraction for this one */ }
+  }
+  btn.textContent='Analyzing…';
+  st.innerHTML=`<div class="muted">Read ${readOk}/${ids.length} document(s). Running the qualification analysis — a couple of minutes for large files…</div>`;
   try{
     const mode = window._RV.analysis ? 'refresh' : 'initial';
-    const r=await callFn('govcon-analyze-selected-documents',{rfp_id:window._RV.rfp.id, document_ids:ids, analysis_mode:mode, preserve_human_edits:true});
+    const r=await callFn('govcon-analyze-selected-documents',{rfp_id:window._RV.rfp.id, document_ids:ids, analysis_mode:mode, preserve_human_edits:true, texts});
     st.innerHTML=`<div class="banner info">✓ Analysis v${r.version} complete — ${esc(r.recommendation)} (fit ${r.fit_score}, confidence ${r.analysis_confidence}${r.status==='preliminary'?' · <b>Preliminary</b>':''}).</div>`;
     await rvReload();
   } catch(e){
