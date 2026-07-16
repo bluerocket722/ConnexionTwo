@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r22-2026-07-15';
+const GOVCON_BUILD = 'r23-2026-07-15';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -1271,7 +1271,118 @@ async function renderAutopilot() {
         <button class="btn primary" onclick="saveAutopilot()">Save settings</button>
         <button class="btn" onclick="runAutopilotNow()">✈ Run now</button>
       </div>
-    </div>`;
+    </div>
+    ${automationRulesCard(s)}`;
+  wireAutomationRules();
+}
+// ── comprehensive automation control panel (spec §1,§9,§15,§16,§17,§20) ──
+function automationRulesCard(s){
+  const R = s.automation_rules || {};
+  const ds = R.doc_selection||{}, pl = R.pipeline||{}, dv = R.development||{}, pr = R.partners||{}, rj = R.reject||{};
+  const chk = (v)=>v?'checked':'';
+  const RECS = ['Strong Pursue','Pursue','Conditional Pursue','Team With Prime','Subcontract Only','Monitor','No-Bid'];
+  const recBoxes = (id, sel)=>RECS.map(r=>`<label class="toggle" style="font-size:12px;margin-right:10px"><input type="checkbox" class="${id}" value="${r}" ${(sel||[]).includes(r)?'checked':''} style="width:auto"> ${r}</label>`).join('');
+  const numf = (id,lbl,val,ph='')=>`<div class="field"><label>${lbl}</label><input id="${id}" type="number" value="${val??''}" placeholder="${ph}"></div>`;
+  return `<div class="card" style="margin-top:16px">
+    <h2 class="section" style="margin-top:0">⚙ Automation rules <span class="muted" style="font-weight:normal;font-size:13px">— control every automatic decision here</span></h2>
+
+    <h2 class="section">Master controls</h2>
+    <div class="row3">
+      <label class="toggle"><input type="checkbox" id="ar_paused" ${chk(s.paused)}> Pause ALL automation</label>
+      ${numf('ar_maxanalyses','Max AI analyses per run', s.max_analyses_per_run, '3')}
+      ${numf('ar_highscore','High-score alert at', s.high_score_threshold, '80')}
+    </div>
+    <div class="row3">
+      <label class="toggle"><input type="checkbox" id="ar_notifycomplete" ${chk(s.notify_on_complete)}> Notify on completion</label>
+      <label class="toggle"><input type="checkbox" id="ar_notifyfail" ${chk(s.notify_on_failure!==false)}> Notify on failure</label>
+      <label class="toggle"><input type="checkbox" id="ar_notifyhigh" ${chk(s.notify_high_score!==false)}> Alert on high-score find</label>
+    </div>
+
+    <h2 class="section">Document auto-selection <span class="muted" style="font-weight:normal;font-size:12px">— which docs get analyzed</span></h2>
+    <div style="display:flex;gap:14px;flex-wrap:wrap">
+      <label class="toggle"><input type="checkbox" id="ds_p1" ${chk(ds.auto_priority_1!==false)}> Priority 1 (scope/main)</label>
+      <label class="toggle"><input type="checkbox" id="ds_p2" ${chk(ds.auto_priority_2!==false)}> Priority 2 (instructions/pricing)</label>
+      <label class="toggle"><input type="checkbox" id="ds_p3" ${chk(ds.auto_priority_3)}> Priority 3 (amendments/exhibits)</label>
+      <label class="toggle"><input type="checkbox" id="ds_lowconf" ${chk(ds.analyze_all_when_low_confidence!==false)}> Analyze all when unsure</label>
+    </div>
+    <div class="row3">${numf('ds_maxdocs','Max docs / opportunity', ds.max_docs, '12')}${numf('ds_minrel','Min relevance', ds.min_relevance, '0')}${numf('ds_minconf','Min classification confidence', ds.min_confidence, '0')}</div>
+
+    <h2 class="section" style="color:var(--bad)">Auto-reject (No-Bid) rules</h2>
+    <label class="toggle"><input type="checkbox" id="rj_enabled" ${chk(rj.enabled)}> <b>Enable automatic No-Bid</b> — opportunities matching these are rejected with a stored reason</label>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin:6px 0">
+      <label class="toggle"><input type="checkbox" id="rj_deadpassed" ${chk(rj.reject_if_deadline_passed!==false)}> Reject if deadline passed</label>
+      <label class="toggle"><input type="checkbox" id="rj_hardgate" ${chk(rj.reject_on_hard_gate!==false)}> Reject on failed hard gate</label>
+    </div>
+    <div class="row3">
+      ${numf('rj_days','Reject if days-to-deadline below', rj.reject_if_days_below, 'e.g. 5 (time factor)')}
+      ${numf('rj_fit','Reject if Fit below', rj.reject_below_fit, 'e.g. 40')}
+      ${numf('rj_conf','Reject if Confidence below', rj.reject_below_confidence, 'e.g. 40')}
+    </div>
+    <div class="row2">${numf('rj_risk','Reject if Risk above', rj.reject_above_risk, 'e.g. 80')}${numf('rj_comp','Reject if Competition above', rj.reject_above_competition, 'e.g. 85')}</div>
+    <div class="field"><label>Reject these recommendations</label><div>${recBoxes('rj_rec', rj.reject_recommendations||['No-Bid'])}</div></div>
+
+    <h2 class="section" style="color:#0b6b34">Auto-approve → Pipeline (Lead)</h2>
+    <label class="toggle"><input type="checkbox" id="pl_enabled" ${chk(pl.enabled)}> <b>Enable automatic Pipeline movement</b></label>
+    <div class="field" style="margin-top:6px"><label>Mode</label>
+      <select id="pl_mode"><option value="human_approval" ${pl.mode!=='fully_automatic'?'selected':''}>Human approval required (safe default)</option>
+        <option value="fully_automatic" ${pl.mode==='fully_automatic'?'selected':''}>Fully automatic — move without me</option></select></div>
+    <div class="muted" style="font-size:12px;margin:-4px 0 8px">In "Human approval," qualifying opportunities are flagged <b>Awaiting Human Decision</b>. In "Fully automatic," they move straight to the Lead stage.</div>
+    <div class="row3">${numf('pl_fit','Min Fit', pl.min_fit, '68')}${numf('pl_win','Min Win %', pl.min_win, '0')}${numf('pl_conf','Min Confidence', pl.min_confidence, '70')}</div>
+    <div class="row3">${numf('pl_ready','Min Bid-readiness', pl.min_bid_readiness, '0')}${numf('pl_risk','Max Risk', pl.max_risk, '100')}${numf('pl_comp','Max Competition', pl.max_competition, '100')}</div>
+    <div class="row3">${numf('pl_subdep','Max Sub-dependency', pl.max_subdependency, '100')}${numf('pl_days','Min days to deadline', pl.min_days_remaining, '3')}
+      <label class="toggle"><input type="checkbox" id="pl_gate" ${chk(pl.block_on_hard_gate!==false)}> Block on hard-gate failure</label></div>
+    <div class="field"><label>Allowed recommendations</label><div>${recBoxes('pl_rec', pl.allowed_recommendations||['Strong Pursue','Pursue'])}</div></div>
+
+    <h2 class="section">Auto subcontractor research (runs once it's a Lead)</h2>
+    <label class="toggle"><input type="checkbox" id="pr_enabled" ${chk(pr.enabled)}> <b>Enable automatic partner research</b></label>
+    <div class="row3">${numf('pr_pergap','Companies per capability gap', pr.per_gap, '10')}${numf('pr_radius','Search radius (miles)', pr.radius_miles, '100')}${numf('pr_attach','Auto-attach top N', pr.attach_count, '3')}</div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap"><label class="toggle"><input type="checkbox" id="pr_backup" ${chk(pr.include_backup!==false)}> Include backup partners</label></div>
+
+    <h2 class="section" style="color:#0054d1">Auto-move → Development</h2>
+    <label class="toggle"><input type="checkbox" id="dv_enabled" ${chk(dv.enabled)}> <b>Enable automatic Development movement</b></label>
+    <label class="toggle"><input type="checkbox" id="dv_human" ${chk(dv.require_human_approval)}> Require human approval before Development</label>
+    <div class="row3">${numf('dv_fit','Min Fit', dv.min_fit, '75')}${numf('dv_win','Min Win %', dv.min_win, '55')}${numf('dv_conf','Min Confidence', dv.min_confidence, '70')}</div>
+    <div class="row3">${numf('dv_risk','Max Risk', dv.max_risk, '60')}${numf('dv_days','Min days to deadline', dv.min_days_remaining, '5')}${numf('dv_partners','Min partner candidates', dv.min_partner_coverage, '1')}</div>
+    <label class="toggle"><input type="checkbox" id="dv_reqpartner" ${chk(dv.require_partner_candidates!==false)}> Require identified partner candidates</label>
+    <div class="field"><label>Allowed recommendations</label><div>${recBoxes('dv_rec', dv.allowed_recommendations||['Strong Pursue','Pursue'])}</div></div>
+
+    <div style="display:flex;gap:10px;margin-top:16px;position:sticky;bottom:0;background:var(--panel);padding-top:12px;border-top:1px solid var(--line)">
+      <button class="btn primary" id="ar_save">Save automation rules</button>
+      <button class="btn" onclick="analyzeAllPending()">⚙ Analyze all pending now</button>
+      <span id="ar_status" class="muted" style="font-size:12px"></span>
+    </div></div>`;
+}
+function wireAutomationRules(){ const b=$('#ar_save'); if(b) b.onclick=saveAutomationRules; }
+function vals(cls){ return [...document.querySelectorAll('.'+cls+':checked')].map(x=>x.value); }
+function ni(id){ const el=$('#'+id); return (!el||el.value==='')?null:+el.value; }
+async function saveAutomationRules(){
+  const st=$('#ar_status'); st.textContent='Saving…';
+  const rules = {
+    doc_selection:{ auto_priority_1:$('#ds_p1').checked, auto_priority_2:$('#ds_p2').checked, auto_priority_3:$('#ds_p3').checked,
+      analyze_all_when_low_confidence:$('#ds_lowconf').checked, max_docs:ni('ds_maxdocs')??12, min_relevance:ni('ds_minrel')??0, min_confidence:ni('ds_minconf')??0,
+      always_solicitation:true, always_scope:true, always_amendments:true, always_evaluation:true, always_instructions:true, always_pricing:true, always_wage:true },
+    auto_analyze:true, auto_research_intel:true,
+    reject:{ enabled:$('#rj_enabled').checked, reject_if_deadline_passed:$('#rj_deadpassed').checked, reject_on_hard_gate:$('#rj_hardgate').checked,
+      reject_if_days_below:ni('rj_days'), reject_below_fit:ni('rj_fit'), reject_below_confidence:ni('rj_conf'),
+      reject_above_risk:ni('rj_risk'), reject_above_competition:ni('rj_comp'), reject_recommendations:vals('rj_rec') },
+    pipeline:{ enabled:$('#pl_enabled').checked, mode:$('#pl_mode').value,
+      min_fit:ni('pl_fit')??68, min_win:ni('pl_win')??0, min_confidence:ni('pl_conf')??70, min_bid_readiness:ni('pl_ready')??0,
+      max_risk:ni('pl_risk')??100, max_competition:ni('pl_comp')??100, max_subdependency:ni('pl_subdep')??100,
+      min_days_remaining:ni('pl_days')??3, block_on_hard_gate:$('#pl_gate').checked, allowed_recommendations:vals('pl_rec') },
+    partners:{ enabled:$('#pr_enabled').checked, per_gap:ni('pr_pergap')??10, radius_miles:ni('pr_radius')??100,
+      attach_count:ni('pr_attach')??3, include_backup:$('#pr_backup').checked, auto_attach:true },
+    development:{ enabled:$('#dv_enabled').checked, require_human_approval:$('#dv_human').checked,
+      min_fit:ni('dv_fit')??75, min_win:ni('dv_win')??55, min_confidence:ni('dv_conf')??70, max_risk:ni('dv_risk')??60,
+      min_days_remaining:ni('dv_days')??5, min_partner_coverage:ni('dv_partners')??1,
+      require_partner_candidates:$('#dv_reqpartner').checked, allowed_recommendations:vals('dv_rec') },
+  };
+  const body = { owner:SESSION.user.id, automation_rules:rules,
+    paused:$('#ar_paused').checked, max_analyses_per_run:ni('ar_maxanalyses')??3, high_score_threshold:ni('ar_highscore')??80,
+    notify_on_complete:$('#ar_notifycomplete').checked, notify_on_failure:$('#ar_notifyfail').checked, notify_high_score:$('#ar_notifyhigh').checked,
+    updated_at:new Date().toISOString() };
+  try{ await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify(body)});
+    st.textContent='✓ Automation rules saved.';
+  }catch(e){ st.textContent='Save failed: '+e.message; }
 }
 async function saveAutopilot() {
   const body = {
