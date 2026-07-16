@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r20-2026-07-15';
+const GOVCON_BUILD = 'r21-2026-07-15';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -599,12 +599,14 @@ function rvRenderDocs(){
   const host=$('#rvDocs'); if(!host) return;
   const docs=window._RV.docs;
   if(!docs.length){ host.innerHTML='<div class="muted" style="font-size:13px">No documents downloaded yet — click “Download / refresh documents”, or upload manually from the opportunity folder in the Document Editor.</div>'; rvSyncAnalyzeBtn(); return; }
+  const prioColor={1:'#0b6b34',2:'#7a5b00',3:'#555'};
   host.innerHTML=`<table class="matx"><thead><tr>
-      <th></th><th>Filename</th><th>Type</th><th>Amend #</th><th>Size</th><th>Downloaded</th><th>Text</th><th>Reviewed</th><th></th>
+      <th></th><th>Filename</th><th>Type</th><th title="Analysis priority: 1=scope/main, 2=instructions/pricing, 3=amendments/exhibits">Priority</th><th>Amend #</th><th>Size</th><th>Downloaded</th><th>Text</th><th>Reviewed</th><th></th>
     </tr></thead><tbody>${docs.map(dc=>`<tr>
       <td style="text-align:center"><input type="checkbox" class="rvsel" data-id="${dc.id}" ${dc.include_in_analysis?'checked':''} style="width:auto"></td>
-      <td style="padding:7px 8px;max-width:280px;word-break:break-word"><a href="#" class="rvopen" data-path="${esc(dc.stored_path)}">${esc(dc.original_filename)}</a>${dc.user_notes?`<div class="muted" style="font-size:11px">${esc(dc.user_notes)}</div>`:''}</td>
+      <td style="padding:7px 8px;max-width:280px;word-break:break-word"><a href="#" class="rvopen" data-path="${esc(dc.stored_path)}">${esc(dc.original_filename)}</a>${dc.auto_selected?' <span class="pill" title="Auto-selected by the priority engine">auto</span>':''}${dc.selection_reason?`<div class="muted" style="font-size:11px">${esc(dc.selection_reason)}</div>`:''}${dc.user_notes?`<div class="muted" style="font-size:11px">${esc(dc.user_notes)}</div>`:''}</td>
       <td><select class="rvtype" data-id="${dc.id}" style="border:none;background:transparent;font:inherit;padding:7px 4px">${DOC_TYPES.map(t=>`<option ${t===(dc.document_type||'Other')?'selected':''}>${t}</option>`).join('')}</select></td>
+      <td style="padding:7px 8px;text-align:center">${dc.analysis_priority?`<span class="pill" style="background:${prioColor[dc.analysis_priority]||'#555'};color:#fff">P${dc.analysis_priority}</span>`:''}${dc.relevance_score!=null?`<div class="muted" style="font-size:10px">rel ${dc.relevance_score}</div>`:''}</td>
       <td style="padding:7px 8px;text-align:center">${dc.amendment_number??''}</td>
       <td style="padding:7px 8px">${dc.file_size?(dc.file_size/1024).toFixed(0)+' KB':''}</td>
       <td style="padding:7px 8px">${fmtDate(dc.downloaded_at)}</td>
