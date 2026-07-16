@@ -154,6 +154,7 @@
     <nav class="nav" id="nav">
       <a data-view="dashboard" class="active"><span class="ic">▚</span>Dashboard</a>
       <a data-view="rfps"><span class="ic">▤</span>RFP Discovery</a>
+      <a data-view="research"><span class="ic">🔬</span>Research</a>
       <a data-view="autopilot"><span class="ic">✈</span>Autopilot</a>
       <a data-view="sources"><span class="ic">◎</span>Custom Sources</a>
       <a data-view="ai"><span class="ic">✦</span>AI Tools</a>
@@ -184,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r17-2026-07-15';
+const GOVCON_BUILD = 'r18-2026-07-15';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -281,13 +282,13 @@ async function boot(session) {
 $('#nav').addEventListener('click', e => {
   const a = e.target.closest('a[data-view]'); if (a) route(a.dataset.view);
 });
-const TITLES = {dashboard:'Dashboard',rfps:'RFP Discovery',autopilot:'Autopilot',sources:'Custom Sources',
+const TITLES = {dashboard:'Dashboard',rfps:'RFP Discovery',research:'Research',autopilot:'Autopilot',sources:'Custom Sources',
   ai:'AI Tools',pipeline:'Pipeline',awards:'Awards Research',partners:'Partner Network',analytics:'Analytics',
   editor:'Document Editor',createdoc:'Create & Send',profile:'Profile & Settings'};
 function route(view) {
   $$('#nav a[data-view]').forEach(a => a.classList.toggle('active', a.dataset.view===view));
   $('#viewTitle').textContent = TITLES[view] || view;
-  ({dashboard:renderDashboard,rfps:renderRfps,autopilot:renderAutopilot,sources:renderSources,
+  ({dashboard:renderDashboard,rfps:renderRfps,research:renderResearch,autopilot:renderAutopilot,sources:renderSources,
     ai:renderAi,pipeline:renderPipeline,awards:renderAwards,partners:renderPartners,analytics:renderAnalytics,
     editor:renderEditor,createdoc:renderCreateDoc,profile:renderProfile}[view]||renderDashboard)();
 }
@@ -419,6 +420,52 @@ async function bulkPipelineRfps() {
   RFP_SEL.clear();
   renderRfps();
 }
+/* ═══════════ RESEARCH WORKSPACE (dedicated nav) ═══════════
+   Every opportunity flows: Discover → RESEARCH → Human Review → Approve →
+   Pipeline. Research reuses the same review modal (openReview) — this tab is
+   the working queue of opportunities that still need research before they can
+   be approved into the Pipeline. */
+const RESEARCH_STAGES = ['Discovered','Documents Downloaded','Ready for Document Review','Documents Selected','Analysis Requested','Analysis Complete','Awaiting Human Decision'];
+const CHECKLIST_LABELS = [
+  ['contract_intelligence','Contract Intelligence'],['documents_downloaded','Documents Downloaded'],
+  ['documents_reviewed','Documents Reviewed'],['requirements_extracted','Requirements Extracted'],
+  ['incumbent_research','Incumbent Research'],['award_history','Award History'],
+  ['competition_analysis','Competition Analysis'],['capability_matrix','Capability Matrix'],
+  ['pricing_intelligence','Pricing Intelligence'],['partner_research','Partner Research'],
+  ['risk_assessment','Risk Assessment'],['win_probability','Win Probability'],
+  ['ai_recommendation','AI Recommendation'],['human_review','Human Review Completed'],
+];
+let RESEARCH_Q='';
+async function renderResearch(){
+  loading();
+  const uid=SESSION.user.id;
+  const rows=await api(`govcon_rfps?owner=eq.${uid}&select=*&order=deadline.asc.nullslast&limit=500`);
+  const inResearch=rows.filter(r=>RESEARCH_STAGES.includes(r.review_stage||'Discovered'));
+  const q=RESEARCH_Q.toLowerCase();
+  const shown=inResearch.filter(r=>!q||`${r.title} ${r.agency} ${r.category}`.toLowerCase().includes(q));
+  V().innerHTML=`
+    <div class="banner info">Research is the intelligence phase — every opportunity is fully researched here (contract intel, incumbent, competition, pricing, risk, win probability, partners) and passes a completion checklist <b>before</b> it can be approved into the Pipeline.</div>
+    <div class="card" style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <input id="rsQ" placeholder="Filter research queue…" value="${esc(RESEARCH_Q)}" style="flex:1;min-width:200px">
+      <span class="muted">${shown.length} in research · ${rows.filter(r=>r.review_stage==='Approved for Pipeline').length} approved</span>
+    </div>
+    <div id="rsList">${shown.map(researchCard).join('')||'<div class="card center muted">Nothing in research. Run Autopilot or add RFPs in Discovery — opportunities land here automatically.</div>'}</div>`;
+  $('#rsQ').oninput=e=>{ RESEARCH_Q=e.target.value; clearTimeout(window._rst); window._rst=setTimeout(renderResearch,250); };
+}
+function researchCard(r){
+  const sum=(r.details&&r.details.analysis_summary)||null;
+  return `<div class="rfp">
+    <div style="display:flex;align-items:flex-start;gap:9px">
+      <div class="t" style="cursor:pointer;flex:1" onclick="openReview('${r.id}')">${esc(r.title)}</div>
+      <span class="pill">${esc(r.review_stage||'Discovered')}</span>
+    </div>
+    <div class="m">${esc(r.agency||'—')} · deadline ${fmtDate(r.deadline)}${r.category?` · NAICS ${esc(r.category)}`:''}${r.place_of_performance_raw?` · ${esc(String(r.place_of_performance_raw).slice(0,40))}`:''}</div>
+    <div class="scores">
+      ${sum?`<span class="pill" style="background:${REC_COLOR[sum.recommendation]||'#555'};color:#fff">${esc(sum.recommendation||'')}</span><span class="pill">Fit ${sum.fit}</span><span class="pill">Conf ${sum.confidence}</span>`:'<span class="pill">not analyzed</span>'}
+    </div>
+    <div class="acts"><button class="btn sm primary" onclick="openReview('${r.id}')">Open research →</button></div></div>`;
+}
+
 /* ═══════════ RFP DISCOVERY REVIEW WORKSPACE ═══════════
    Discovery is the qualification workspace: enrich → download documents →
    read them → SELECT which ones Claude may scan → analyze → review scores,
@@ -427,13 +474,14 @@ const DOC_TYPES = ['Solicitation','RFQ','RFP','SOW','PWS','SOO','Amendment','Pri
 const DOC_REVIEW = ['Unreviewed','Reviewed','Relevant','Irrelevant','Needs Follow-Up'];
 
 async function openReview(id){
-  const [rfpRows, docs, analyses] = await Promise.all([
+  const [rfpRows, docs, analyses, research] = await Promise.all([
     api(`govcon_rfps?id=eq.${id}&select=*`),
     api(`govcon_source_documents?rfp_id=eq.${id}&owner=eq.${SESSION.user.id}&select=*&order=downloaded_at.desc.nullslast`),
     api(`govcon_opportunity_analysis?rfp_id=eq.${id}&owner=eq.${SESSION.user.id}&select=*&order=version.desc&limit=1`),
+    api(`govcon_research?rfp_id=eq.${id}&owner=eq.${SESSION.user.id}&select=*&limit=1`).catch(()=>[]),
   ]);
   const r = rfpRows[0]; if(!r) return toast('Opportunity not found');
-  window._RV = { rfp:r, docs:docs||[], analysis:(analyses||[])[0]||null };
+  window._RV = { rfp:r, docs:docs||[], analysis:(analyses||[])[0]||null, research:(research||[])[0]||null };
   const d = r.details||{};
   openModal(`
     <div class="shd">
@@ -494,6 +542,18 @@ async function openReview(id){
       </div>
       <div id="rvPartners"><div class="muted" style="font-size:13px">No partner research yet.</div></div>
 
+      <h2 class="section">Research intelligence</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Incumbent, award history, competition, pricing, risk, and win-probability — synthesized from real award data + your analysis. Nothing is invented; unknowns stay Unknown.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+        <button class="btn primary" id="rvGenIntel">🔬 Generate research intelligence</button>
+        <span class="muted" style="font-size:12px" id="rvIntelStatus"></span>
+      </div>
+      <div id="rvIntel"><div class="muted" style="font-size:13px">No intelligence generated yet.</div></div>
+
+      <h2 class="section">Research completion checklist</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">The approval button unlocks only when every required item is complete.</div>
+      <div id="rvChecklist"></div>
+
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;position:sticky;bottom:0;background:var(--panel);padding-top:12px;border-top:1px solid var(--line)">
         <button class="btn primary" id="rvApproveBtn" disabled>✔ Approve and Move to Pipeline</button>
         <button class="btn" id="rvNoBidBtn">Mark No-Bid</button>
@@ -503,7 +563,8 @@ async function openReview(id){
       </div>
       <div id="rvApproveBox"></div>
     </div>`);
-  rvRenderDocs(); rvRenderAnalysis(); rvRenderPartners();
+  rvRenderDocs(); rvRenderAnalysis(); rvRenderPartners(); rvRenderIntel();
+  $('#rvGenIntel').onclick = rvGenIntel;
   $('#rvFindPartners').onclick = rvFindPartners;
   $('#rvEnrich').onclick = rvEnrich;
   $('#rvDownload').onclick = rvDownload;
@@ -557,13 +618,14 @@ async function rvOpenDoc(path){
 }
 async function rvReload(){
   const id=window._RV.rfp.id;
-  const [rfpRows, docs, analyses] = await Promise.all([
+  const [rfpRows, docs, analyses, research] = await Promise.all([
     api(`govcon_rfps?id=eq.${id}&select=*`),
     api(`govcon_source_documents?rfp_id=eq.${id}&owner=eq.${SESSION.user.id}&select=*&order=downloaded_at.desc.nullslast`),
     api(`govcon_opportunity_analysis?rfp_id=eq.${id}&owner=eq.${SESSION.user.id}&select=*&order=version.desc&limit=1`),
+    api(`govcon_research?rfp_id=eq.${id}&owner=eq.${SESSION.user.id}&select=*&limit=1`).catch(()=>[]),
   ]);
-  window._RV={rfp:rfpRows[0]||window._RV.rfp, docs:docs||[], analysis:(analyses||[])[0]||null};
-  rvRenderDocs(); rvRenderAnalysis();
+  window._RV={rfp:rfpRows[0]||window._RV.rfp, docs:docs||[], analysis:(analyses||[])[0]||null, research:(research||[])[0]||null};
+  rvRenderDocs(); rvRenderAnalysis(); rvRenderIntel();
 }
 async function rvEnrich(){
   const st=$('#rvActStatus'); st.textContent='Pulling full detail from the source…';
@@ -599,7 +661,7 @@ function gateChip(g){
 async function rvRenderAnalysis(){
   const host=$('#rvAnalysis'); if(!host) return;
   const a=window._RV.analysis;
-  $('#rvApproveBtn').disabled = !a;
+  if(typeof rvUpdateApprove==='function') rvUpdateApprove();
   if(!a){ host.innerHTML='<div class="muted" style="font-size:13px">No analysis yet — select documents above and click Analyze.</div>'; return; }
   const warn=(a.completeness_warnings||[]);
   host.innerHTML=`
@@ -718,6 +780,104 @@ async function rvRenderPartners(){
     await api(`govcon_opportunity_partners?id=eq.${cb.dataset.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({selected_for_bid:cb.checked})});
     toast(cb.checked?'Attached to contract':'Detached');
   });
+}
+async function rvGenIntel(){
+  const btn=$('#rvGenIntel'), st=$('#rvIntelStatus');
+  btn.disabled=true; btn.textContent='Researching… (2–4 min)';
+  st.textContent='Pulling award history and synthesizing intelligence…';
+  try{
+    const r=await callFn('govcon-research-intelligence',{rfp_id:window._RV.rfp.id});
+    st.textContent=`✓ Intelligence generated${r.awards_found?` · ${r.awards_found} award(s) found`:''}.`;
+    await rvReload();
+  }catch(e){ st.textContent = /credit balance|billing/i.test(e.message)?'Claude is out of credit (console.anthropic.com → Plans & Billing).':'Failed: '+e.message; }
+  btn.disabled=false; btn.textContent='🔬 Generate research intelligence';
+}
+function intelBlock(title, rows){
+  const body=rows.filter(([_,v])=>v!==undefined&&v!==null&&v!=='').map(([k,v])=>`<div style="display:flex;gap:8px;padding:3px 0"><span class="muted" style="min-width:150px;font-size:12px">${esc(k)}</span><span style="flex:1">${Array.isArray(v)?v.map(esc).join(', '):esc(String(v))}</span></div>`).join('');
+  return `<details style="margin-bottom:8px;border:1px solid var(--line);border-radius:8px;padding:8px 12px">
+    <summary style="cursor:pointer;font-weight:700">${esc(title)}</summary><div style="margin-top:6px">${body||'<span class="muted">Unknown / not found</span>'}</div></details>`;
+}
+function scoreBar(label,val){ const v=Math.max(0,Math.min(100,val||0));
+  return `<div style="margin:4px 0"><div style="display:flex;justify-content:space-between;font-size:12px"><span>${esc(label)}</span><b>${v}</b></div>
+    <div style="height:6px;background:var(--line);border-radius:4px;overflow:hidden"><div style="height:100%;width:${v}%;background:var(--blue-500)"></div></div></div>`; }
+function rvRenderIntel(){
+  const host=$('#rvIntel'); if(!host) return;
+  const R=window._RV.research;
+  rvRenderChecklist();
+  if(!R){ host.innerHTML='<div class="muted" style="font-size:13px">No intelligence generated yet — click the button above.</div>'; return; }
+  const ci=R.contract_intelligence||{}, inc=R.incumbent||{}, aw=R.award_history||{}, comp=R.competition||{}, pr=R.pricing||{}, rk=R.risk||{}, wp=R.win_probability||{}, rec=R.recommendation||{};
+  host.innerHTML=`
+    <div class="scores" style="margin-bottom:8px">
+      ${rec.decision?`<span class="pill" style="background:${REC_COLOR[rec.decision]||'#555'};color:#fff">${esc(rec.decision)}</span>`:''}
+      <span class="pill">Win ${R.win_probability_score??'?'}%</span>
+      <span class="pill">Risk ${R.risk_score??'?'}</span>
+      <span class="pill">Competition ${R.competition_score??'?'}</span>
+      <span class="pill">Pricing: ${esc(R.pricing_position||'unknown')}</span>
+      <span class="pill">generated ${fmtDate(R.last_generated_at)}</span>
+    </div>
+    ${rec.why?`<div class="m" style="margin-bottom:8px"><b>Recommendation:</b> ${esc(rec.why)}</div>`:''}
+    ${intelBlock('1 · Contract Intelligence',[['Agency',ci.agency],['Office',ci.office],['Contract #',ci.contract_number],['NAICS',ci.naics],['PSC',ci.psc],['Set-aside',ci.set_aside],['Type',ci.contract_type],['Place of performance',ci.place_of_performance],['Response deadline',ci.response_deadline],['Question deadline',ci.question_deadline],['Est. value',ci.estimated_value],['Contracting officer',ci.contracting_officer],['CO email',ci.co_email],['Attachments',ci.attachments]])}
+    ${intelBlock('2 · Incumbent Research',[['Current incumbent',inc.current_incumbent],['Previous',inc.previous],['Years held',inc.years_held],['Recompetes',inc.recompetes],['Historical value',inc.historical_value],['Expiration',inc.contract_expiration],['Strengths',inc.strengths],['Weaknesses',inc.weaknesses],['Estimated pricing',inc.estimated_pricing],['Evidence',inc.evidence]])}
+    ${intelBlock('3 · Award History',[['Average value',aw.average_value],['Trend',aw.trend],['Historical bidders',aw.historical_bidders],['Award growth',aw.award_growth],['Modifications',aw.modifications],['Summary',aw.summary]])}
+    ${intelBlock('4 · Competition Analysis',[['Performers (est.)',comp.performers_estimate],['Local (est.)',comp.local_estimate],['Small business',comp.small_business],['8(a)',comp.eight_a],['HUBZone',comp.hubzone],['SDVOSB',comp.sdvosb],['WOSB',comp.wosb],['Market concentration',comp.market_concentration],['Barrier to entry',comp.barrier_to_entry],['Intensity',comp.intensity],['Competition score',comp.competition_score],['Evidence',comp.evidence]])}
+    ${intelBlock('7 · Pricing Intelligence',[['Labor',pr.labor],['Prevailing wage',pr.prevailing_wage],['Materials',pr.materials],['Equipment',pr.equipment],['Travel',pr.travel],['Insurance',pr.insurance],['Subcontract',pr.subcontract],['Overhead',pr.overhead],['Profit',pr.profit],['Estimated bid price',pr.estimated_bid_price],['Position',pr.position],['Basis',pr.basis]])}
+    ${intelBlock('8 · Risk Assessment',[['Technical',rk.technical],['Staffing',rk.staffing],['Compliance',rk.compliance],['Schedule',rk.schedule],['Financial',rk.financial],['Security',rk.security],['Partner',rk.partner],['Overall risk',rk.overall_score],['Notes',rk.notes]])}
+    <details style="margin-bottom:8px;border:1px solid var(--line);border-radius:8px;padding:8px 12px"><summary style="cursor:pointer;font-weight:700">9 · Win Probability Engine</summary><div style="margin-top:8px">
+      ${scoreBar('Technical fit',wp.technical_fit)}${scoreBar('Capability coverage',wp.capability_coverage)}${scoreBar('Past performance',wp.past_performance)}${scoreBar('Partner coverage',wp.partner_coverage)}${scoreBar('Pricing competitiveness',wp.pricing_competitiveness)}${scoreBar('Competition level',wp.competition_level)}${scoreBar('Barrier to entry',wp.barrier_to_entry)}${scoreBar('Location advantage',wp.location_advantage)}${scoreBar('Agency experience',wp.agency_experience)}
+      <div style="margin-top:6px;font-weight:800">Overall win probability: ${wp.overall??'?'}% · confidence ${wp.confidence??'?'}</div></div></details>
+    ${intelBlock('10 · AI Recommendation',[['Decision',rec.decision],['Strengths',rec.strengths],['Weaknesses',rec.weaknesses],['Risks',rec.risks],['Missing information',rec.missing_information],['Next steps',rec.next_steps]])}`;
+}
+function rvChecklistState(){
+  const R=window._RV.research;
+  // live-derive the items we can see client-side; merge with stored checklist
+  const docs=window._RV.docs, a=window._RV.analysis, r=window._RV.rfp;
+  const stored=(R&&R.checklist)||{};
+  return {
+    contract_intelligence: stored.contract_intelligence ?? !!(r.agency&&r.category),
+    documents_downloaded: stored.documents_downloaded ?? docs.length>0,
+    documents_reviewed: stored.documents_reviewed ?? docs.some(d=>d.include_in_analysis),
+    requirements_extracted: stored.requirements_extracted ?? !!a,
+    incumbent_research: stored.incumbent_research ?? !!(R&&R.incumbent&&Object.keys(R.incumbent).length),
+    award_history: stored.award_history ?? !!(R&&R.award_history&&Object.keys(R.award_history).length),
+    competition_analysis: stored.competition_analysis ?? !!(R&&R.competition&&Object.keys(R.competition).length),
+    capability_matrix: stored.capability_matrix ?? !!a,
+    pricing_intelligence: stored.pricing_intelligence ?? !!(R&&R.pricing&&Object.keys(R.pricing).length),
+    partner_research: stored.partner_research ?? true,
+    risk_assessment: stored.risk_assessment ?? !!(R&&R.risk&&Object.keys(R.risk).length),
+    win_probability: stored.win_probability ?? !!(R&&R.win_probability&&Object.keys(R.win_probability).length),
+    ai_recommendation: stored.ai_recommendation ?? !!(R&&R.recommendation&&R.recommendation.decision),
+    human_review: stored.human_review ?? false,
+  };
+}
+function rvRenderChecklist(){
+  const host=$('#rvChecklist'); if(!host) return;
+  const st=rvChecklistState();
+  const done=CHECKLIST_LABELS.filter(([k])=>st[k]).length, total=CHECKLIST_LABELS.length;
+  host.innerHTML=`<div style="margin-bottom:6px"><b>${done}/${total} complete</b></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px">
+    ${CHECKLIST_LABELS.map(([k,lbl])=>`<label class="toggle" style="display:flex;gap:8px;align-items:center;font-size:13px">
+      <input type="checkbox" ${st[k]?'checked':''} ${k==='human_review'?`class="rvchk-human"`:'disabled'} style="width:auto"> ${st[k]?'✓':''} ${esc(lbl)}</label>`).join('')}</div>`;
+  const hb=host.querySelector('.rvchk-human');
+  if(hb) hb.onchange=async ()=>{
+    let R=window._RV.research;
+    const cl={...(R&&R.checklist||{}), ...rvChecklistState(), human_review:hb.checked};
+    const complete=CHECKLIST_LABELS.every(([k])=>cl[k]);
+    if(!R){ // create the research row if intelligence was never generated but user ticks human review
+      await api('govcon_research',{method:'POST',prefer:'return=representation',body:JSON.stringify({owner:SESSION.user.id,rfp_id:window._RV.rfp.id,checklist:cl,research_complete:complete})}).then(x=>window._RV.research=x[0]).catch(()=>{});
+    } else {
+      await api(`govcon_research?id=eq.${R.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({checklist:cl,research_complete:complete})});
+      window._RV.research.checklist=cl; window._RV.research.research_complete=complete;
+    }
+    rvUpdateApprove();
+  };
+  rvUpdateApprove();
+}
+function rvUpdateApprove(){
+  const btn=$('#rvApproveBtn'); if(!btn) return;
+  const st=rvChecklistState();
+  const complete=CHECKLIST_LABELS.every(([k])=>st[k]);
+  btn.disabled=!complete;
+  btn.title=complete?'':'Complete the research checklist first (including Human Review).';
 }
 function rvApproveUI(){
   const a=window._RV.analysis; if(!a) return;
@@ -1330,6 +1490,9 @@ async function openLead(itemId) {
         <button class="btn sm" id="ld_findpartners">🔎 Find partners for this contract</button>
         <button class="btn sm" id="ld_wonwith">🏆 Mark Won With…</button>
       </div>
+
+      <h2 class="section">Research <span class="muted" style="font-weight:normal;font-size:13px">— carried over from qualification; proposal writers never repeat it</span></h2>
+      <div id="ld_research"><div class="muted" style="font-size:13px">Loading research…</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
         <label class="btn primary" style="cursor:pointer">⬆ Upload documents<input id="ld_docup" type="file" multiple accept=".pdf,.docx,.doc,.txt" hidden></label>
         <button class="btn" id="ld_extract">✦ Read documents &amp; build matrices</button>
@@ -1378,8 +1541,9 @@ async function openLead(itemId) {
   // subcontractors
   renderSubs(item.rfp_id, r);
   $('#subAdd').onclick = ()=>addSub(item.rfp_id, r);
-  // partner coverage
+  // partner coverage + carried-over research
   renderLeadPartners(r);
+  renderLeadResearch(r);
   $('#ld_findpartners').onclick = async ()=>{
     const b=$('#ld_findpartners'); b.disabled=true; b.textContent='Researching… (2–4 min)';
     try{ const res=await callFn('govcon-opportunity-partner-match',{rfp_id:r.id, search_radius_miles:+($('#ld_radius').value||100)||100, max_results_per_category:15});
@@ -1438,6 +1602,29 @@ async function saveLead(itemId, rfpId) {
     toast('Lead saved ✓');
   }
   renderPipeline();   // refresh the board behind the pop-up; pop-up stays open
+}
+async function renderLeadResearch(r){
+  const host=$('#ld_research'); if(!host) return;
+  try{
+    const rows=await api(`govcon_research?rfp_id=eq.${r.id}&owner=eq.${SESSION.user.id}&select=*&limit=1`);
+    const R=(rows||[])[0];
+    if(!R){ host.innerHTML='<div class="muted" style="font-size:13px">No research on file. Research is done in the <b>Research</b> tab before approval; open it there to generate intelligence.</div>'; return; }
+    const rec=R.recommendation||{}, inc=R.incumbent||{}, comp=R.competition||{}, pr=R.pricing||{}, rk=R.risk||{}, wp=R.win_probability||{};
+    host.innerHTML=`
+      <div class="scores" style="margin-bottom:8px">
+        ${rec.decision?`<span class="pill" style="background:${REC_COLOR[rec.decision]||'#555'};color:#fff">${esc(rec.decision)}</span>`:''}
+        <span class="pill">Win ${R.win_probability_score??'?'}%</span><span class="pill">Risk ${R.risk_score??'?'}</span>
+        <span class="pill">Competition ${R.competition_score??'?'}</span><span class="pill">Pricing: ${esc(R.pricing_position||'unknown')}</span>
+        <span class="pill">generated ${fmtDate(R.last_generated_at)}</span>
+      </div>
+      ${rec.why?`<div class="m" style="margin-bottom:6px">${esc(rec.why)}</div>`:''}
+      ${intelBlock('Incumbent',[['Current',inc.current_incumbent],['Years held',inc.years_held],['Strengths',inc.strengths],['Weaknesses',inc.weaknesses]])}
+      ${intelBlock('Competition',[['Intensity',comp.intensity],['Barrier',comp.barrier_to_entry],['Small business',comp.small_business],['Score',comp.competition_score]])}
+      ${intelBlock('Pricing',[['Estimated bid',pr.estimated_bid_price],['Position',pr.position],['Basis',pr.basis]])}
+      ${intelBlock('Risk',[['Overall',rk.overall_score],['Notes',rk.notes]])}
+      ${intelBlock('Win probability',[['Overall',wp.overall!=null?wp.overall+'%':null],['Confidence',wp.confidence]])}
+      ${(R.human_notes)?`<div class="m"><b>Notes:</b> ${esc(R.human_notes)}</div>`:''}`;
+  }catch(e){ host.innerHTML=`<div class="muted" style="font-size:13px">Research unavailable: ${esc(e.message.slice(0,80))} (run govcon_migration_11.sql)</div>`; }
 }
 async function renderLeadPartners(r){
   const host=$('#ld_partnercov'); if(!host) return;
