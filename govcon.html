@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r18-2026-07-15';
+const GOVCON_BUILD = 'r19-2026-07-15';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -445,6 +445,20 @@ async function renderResearch(){
   const shown=inResearch.filter(r=>!q||`${r.title} ${r.agency} ${r.category}`.toLowerCase().includes(q));
   V().innerHTML=`
     <div class="banner info">Research is the intelligence phase — every opportunity is fully researched here (contract intel, incumbent, competition, pricing, risk, win probability, partners) and passes a completion checklist <b>before</b> it can be approved into the Pipeline.</div>
+    <details class="card" style="margin-bottom:12px">
+      <summary style="cursor:pointer;font-weight:700">📖 Scoring key — how to read the numbers</summary>
+      <div style="margin-top:10px;font-size:13px;line-height:1.7">
+        <b>Fit score (0–100)</b> — how well the contract matches your capabilities, delivery model, eligibility, accessibility, competition, finances, timeline, and strategy. <b>80+</b> Strong Pursue · <b>68–79</b> Pursue · <b>55–67</b> Conditional · <b>40–54</b> Monitor/Team · <b>&lt;40</b> No-Bid. Hard-gate failures override the number.<br>
+        <b>Win probability (0–100)</b> — likelihood of winning, from technical fit, capability coverage, past performance, partner coverage, pricing, competition, barrier to entry, location, and agency experience. Higher is better.<br>
+        <b>Bid-readiness (0–100)</b> — how prepared you are to submit (registration, licenses, insurance/bonding, past performance, subcontractors, pricing, documents, time). <b>85+</b> ready · <b>70–84</b> minor actions · <b>50–69</b> major prep · <b>&lt;50</b> not ready.<br>
+        <b>Sub-dependency (0–100)</b> — how much execution depends on outside subcontractors. Higher = more dependency = needs stronger partner validation (not automatically bad).<br>
+        <b>Competition (0–100)</b> — how crowded the field is. Higher = more competitors. <b>Lower is better for you.</b><br>
+        <b>Risk (0–100)</b> — overall risk across technical, staffing, compliance, schedule, financial, security, and partner. <b>Lower is better.</b><br>
+        <b>Confidence (0–100)</b> — how complete the analysis is. Below 70 the analysis is labeled <b>Preliminary</b> and can't auto-generate a proposal.<br>
+        <b>Partner fit (0–100)</b> — a subcontractor's fit for a specific contract: service match, distance, licensing, experience, contactability, readiness, reliability, strategic value. <b>85+</b> Strong · <b>70–84</b> Recommended · <b>55–69</b> Contact &amp; Verify.<br>
+        <b>Recommendations:</b> Strong Pursue → Pursue → Conditional Pursue → Team With Prime → Subcontract Only → Monitor → No-Bid.
+      </div>
+    </details>
     <div class="card" style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <input id="rsQ" placeholder="Filter research queue…" value="${esc(RESEARCH_Q)}" style="flex:1;min-width:200px">
       <span class="muted">${shown.length} in research · ${rows.filter(r=>r.review_stage==='Approved for Pipeline').length} approved</span>
@@ -517,7 +531,8 @@ async function openReview(id){
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
         ${r.url?`<a class="btn sm" href="${esc(r.url)}" target="_blank">Open source notice ↗</a>`:''}
         <button class="btn sm" id="rvEnrich">↻ Pull latest full detail</button>
-        <button class="btn sm" id="rvDownload">⬇ Download / refresh documents</button>
+        <button class="btn sm" id="rvDownload">⬇ Download from SAM.gov</button>
+        <label class="btn sm" style="cursor:pointer">⬆ Upload documents<input id="rvUpload" type="file" multiple accept=".pdf,.docx,.doc,.txt,.xlsx,.csv" hidden></label>
         <span id="rvActStatus" class="muted" style="font-size:12px"></span>
       </div>
 
@@ -568,6 +583,7 @@ async function openReview(id){
   $('#rvFindPartners').onclick = rvFindPartners;
   $('#rvEnrich').onclick = rvEnrich;
   $('#rvDownload').onclick = rvDownload;
+  $('#rvUpload').onchange = e=>{ if(e.target.files.length) rvUploadDocs([...e.target.files]); };
   $('#rvSelAll').onclick = ()=>rvSelect(true);
   $('#rvSelNone').onclick = ()=>rvSelect(false);
   $('#rvAnalyze').onclick = rvAnalyze;
@@ -638,6 +654,36 @@ async function rvDownload(){
     st.textContent=`✓ ${r.saved||0} new file(s), ${r.duplicates||0} duplicate(s) skipped${(r.errors||[]).length?`, ${r.errors.length} error(s)`:''}.`;
     await rvReload();
   } catch(e){ st.textContent='Download failed: '+e.message; }
+}
+async function rvUploadDocs(files){
+  const r=window._RV.rfp, st=$('#rvActStatus'); st.textContent='Uploading…';
+  const folder=leadFolder(r);
+  let n=0;
+  for(const f of files){
+    try{
+      const name=safeName(f.name);
+      const path=`${edDir()}/${folder}/source_documents/${name}`;
+      const { error }=await sb.storage.from(DOCS_BUCKET).upload(path, f, {upsert:true, contentType:f.type||undefined});
+      if(error && !/exists/i.test(error.message)) throw error;
+      // classify by filename (suggestion only)
+      const low=name.toLowerCase();
+      const dtype=/amend/.test(low)?'Amendment':/sow|statement of work/.test(low)?'SOW':/pws/.test(low)?'PWS':/pric|schedule/.test(low)?'Pricing Schedule':/instruction/.test(low)?'Instructions to Offerors':/evaluat/.test(low)?'Evaluation Criteria':/wage/.test(low)?'Wage Determination':/solicit|rfq|rfp/.test(low)?'Solicitation':'Other';
+      // insert (or ignore if same path already tracked)
+      const existing=await api(`govcon_source_documents?rfp_id=eq.${r.id}&owner=eq.${SESSION.user.id}&stored_path=eq.${encodeURIComponent(path)}&select=id`);
+      if(!existing.length){
+        await api('govcon_source_documents',{method:'POST',prefer:'return=minimal',body:JSON.stringify({
+          owner:SESSION.user.id, rfp_id:r.id, original_filename:name, stored_path:path,
+          document_type:dtype, source_category:'source_documents', mime_type:f.type||null,
+          file_size:f.size, downloaded_at:new Date().toISOString(), extraction_status:'pending',
+        })});
+      }
+      n++;
+    }catch(e){ st.textContent='Upload failed: '+e.message; return; }
+  }
+  // move stage forward if it was still at Discovered
+  if(window._RV.rfp.review_stage==='Discovered') await api(`govcon_rfps?id=eq.${r.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({review_stage:'Documents Downloaded', documents_downloaded_at:new Date().toISOString()})});
+  st.textContent=`✓ Uploaded ${n} document(s). Tick the ones to analyze below.`;
+  await rvReload();
 }
 async function rvAnalyze(){
   const ids=rvChecked(); if(!ids.length) return;
@@ -2169,7 +2215,11 @@ async function renderProfile() {
       <div class="field"><label>Business size</label><input id="pf_size" value="${esc(p.business_size||'')}" placeholder="Small / Large"></div>
       <div class="field"><label>Certifications (comma-separated)</label><input id="pf_certs" value="${esc((p.certifications||[]).join(', '))}" placeholder="8(a), WOSB, HUBZone, SDVOSB"></div>
     </div>
-    <div class="field"><label>Capabilities statement</label><textarea id="pf_caps">${esc(p.capabilities||'')}</textarea></div>
+    <h2 class="section">Capabilities statement <span class="muted" style="font-weight:normal;font-size:13px">— the AI compares every solicitation against this</span></h2>
+    <div class="banner info" style="margin-bottom:8px">This is the single most important field for accurate scoring. Describe what your company can actually do, your tools, certifications, and real experience. The capability matrix, win probability, and recommendation are all measured against this text — the AI never invents capabilities you don't list here.</div>
+    <div class="field"><textarea id="pf_caps" style="min-height:180px" placeholder="e.g. Project management support; administrative and business-process documentation; SaaS implementation and workflow automation; document workflow and e-signature solutions; team, vendor, and subcontractor coordination; facilities and field-service contract coordination. Tools: Jira, Microsoft 365, Excel, QuickBooks Online. Certifications: Google Project Management (Coursera), QuickBooks ProAdvisor. Experience: one year operational leadership managing a service team of up to five.">${esc(p.capabilities||'')}</textarea></div>
+    <label class="btn" style="cursor:pointer;display:inline-flex;margin-bottom:6px">⬆ Import from a .txt / .docx / .pdf capability statement<input type="file" id="pf_capfile" accept=".txt,.pdf,.docx,.doc" hidden></label>
+    <span class="muted" style="font-size:12px" id="pf_capfile_status"></span>
 
     <h2 class="section">Company details (auto-fills proposal templates)</h2>
     <div class="muted" style="font-size:12px;margin:-6px 0 10px">These fill {{placeholders}} like address, FEIN, DUNS, phone, website, and signer when you generate a proposal.</div>
@@ -2238,6 +2288,13 @@ async function renderProfile() {
     <div id="scrapeBox" class="muted">Loading…</div>
   </div>`;
   $('#k_provider').onchange = (e)=>$('#k_otherBox').classList.toggle('hide', e.target.value!=='other');
+  if($('#pf_capfile')) $('#pf_capfile').onchange = async e=>{
+    const f=e.target.files[0]; if(!f) return; const st=$('#pf_capfile_status'); st.textContent='Reading…';
+    try{ const text=await extractFileText(f.name, f); const box=$('#pf_caps');
+      box.value=(box.value.trim()?box.value.trim()+'\n\n':'')+text.trim();
+      st.textContent='✓ Imported — review, then Save profile.';
+    }catch(err){ st.textContent='Could not read that file: '+err.message; }
+  };
   loadKeys();
   loadScraping();
 }
