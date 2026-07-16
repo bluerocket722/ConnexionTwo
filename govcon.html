@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r25-2026-07-16';
+const GOVCON_BUILD = 'r27-2026-07-16';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -322,7 +322,7 @@ async function renderDashboard() {
     api(`govcon_pipeline_items?owner=eq.${uid}&select=id,stage`),
     api(`govcon_proposals?owner=eq.${uid}&select=id,status`),
     api(`govcon_research?owner=eq.${uid}&select=rfp_id,win_probability_score,risk_score,competition_score,recommendation_label`).catch(()=>[]),
-    api(`govcon_run_logs?owner=eq.${uid}&fn=eq.govcon-auto-pilot-run&select=*&order=started_at.desc&limit=5`).catch(()=>[]),
+    api(`govcon_run_logs?owner=eq.${uid}&fn=eq.govcon-autopilot-run&select=*&order=started_at.desc&limit=5`).catch(()=>[]),
   ]);
   const rById={}; (research||[]).forEach(r=>rById[r.rfp_id]=r);
   const awarded = pipeline.filter(p=>p.stage==='awarded'||p.stage==='won').length;
@@ -338,11 +338,13 @@ async function renderDashboard() {
       win:rr.win_probability_score??null, risk:rr.risk_score??null, comp:rr.competition_score??null };
   });
   const key=DASH_SORT;
+  const STR_COLS=['title','agency','deadline','rec','stage'];
   rows.sort((a,b)=>{ let x=a[key],y=b[key];
-    if(key==='deadline'){ x=x||'9999'; y=y||'9999'; return (x<y?-1:x>y?1:0)*DASH_DIR; }
+    if(STR_COLS.includes(key)){ x=String(x||' ').toLowerCase(); y=String(y||' ').toLowerCase(); return (x<y?-1:x>y?1:0)*DASH_DIR; }
     x=x==null?-1:x; y=y==null?-1:y; return (x-y)*DASH_DIR; });
 
-  const th=(k,lbl)=>`<th style="cursor:pointer;white-space:nowrap" data-sort="${k}">${lbl}${DASH_SORT===k?(DASH_DIR>0?' ▲':' ▼'):''}</th>`;
+  // every column is sortable — active column shows ▲/▼, the rest show a dim ↕
+  const th=(k,lbl,left)=>`<th style="cursor:pointer;white-space:nowrap${left?';text-align:left':''}" data-sort="${k}" title="Click to sort by ${lbl}">${lbl}${DASH_SORT===k?(DASH_DIR>0?' ▲':' ▼'):' <span style="opacity:.35">↕</span>'}</th>`;
   V().innerHTML = `
     <div class="cards kpis">
       ${kpi('Total RFPs', rfps.length, `${analyzed} analyzed`)}
@@ -360,8 +362,8 @@ async function renderDashboard() {
     <h2 class="section">Opportunity scoreboard <span class="muted" style="font-weight:normal;font-size:13px">— click a header to sort</span></h2>
     <div class="card" style="overflow-x:auto">
       <table class="matx"><thead><tr>
-        <th style="text-align:left">Opportunity</th>${th('fit','Fit')}${th('win','Win%')}${th('risk','Risk')}${th('comp','Comp')}${th('conf','Conf')}
-        <th>Rec</th>${th('deadline','Deadline')}<th>Stage</th>
+        ${th('title','Opportunity',true)}${th('fit','Fit')}${th('win','Win%')}${th('risk','Risk')}${th('comp','Comp')}${th('conf','Conf')}
+        ${th('rec','Rec')}${th('deadline','Deadline')}${th('stage','Stage')}
       </tr></thead><tbody>${rows.slice(0,200).map(r=>`<tr>
         <td style="padding:7px 8px;max-width:280px"><a href="#" class="dashopen" data-id="${r.id}">${esc(String(r.title||'').slice(0,70))}</a>
           <div class="muted" style="font-size:11px">${esc(r.agency||'')}${r.naics?' · '+esc(r.naics):''}${r.pop?' · '+esc(String(r.pop).slice(0,30)):''}</div></td>
@@ -385,22 +387,22 @@ async function renderDashboard() {
       </div>`).join('') : '<p class="muted">No runs yet. Configure Autopilot and run it.</p>'}
     </div>`;
   document.querySelectorAll('[data-sort]').forEach(t=>t.onclick=()=>{ const k=t.dataset.sort;
-    if(DASH_SORT===k) DASH_DIR*=-1; else { DASH_SORT=k; DASH_DIR = (k==='deadline'||k==='risk'||k==='comp')?1:-1; } renderDashboard(); });
+    if(DASH_SORT===k) DASH_DIR*=-1; else { DASH_SORT=k; DASH_DIR = (k==='deadline'||k==='risk'||k==='comp'||k==='title'||k==='rec'||k==='stage')?1:-1; } renderDashboard(); });
   document.querySelectorAll('.dashopen').forEach(a=>a.onclick=e=>{e.preventDefault(); openReview(a.dataset.id);});
 }
 async function analyzeAllPending(){
   // status element differs by page (Dashboard vs Autopilot) → tolerate either, fall back to toast
   const say=(m)=>{ const st=$('#dashPendStatus')||$('#ar_status'); if(st) st.textContent=m; else toast(m, true); };
-  const deployHint='govcon-auto-pilot-run isn’t deployed yet — deploy the r23 function, then try again.';
+  const deployHint='govcon-autopilot-run isn’t deployed yet — deploy the r23 function, then try again.';
   say('Finding pending opportunities…');
   let pending=[];
-  try{ const r=await callFn('govcon-auto-pilot-run',{action:'list_pending'}); pending=r.pending||[]; }
+  try{ const r=await callFn('govcon-autopilot-run',{action:'list_pending'}); pending=r.pending||[]; }
   catch(e){ say(/Failed to fetch|HTTP 5|CORS/i.test(e.message)? deployHint : 'Could not list pending: '+e.message); return; }
   if(!pending.length){ say('✓ Nothing pending — all opportunities are analyzed.'); return; }
   let done=0, fail=0;
   for(const p of pending){
     say(`Analyzing ${done+1}/${pending.length}: ${String(p.title||'').slice(0,50)}…`);
-    try{ await callFn('govcon-auto-pilot-run',{action:'process_one', rfp_id:p.id}); done++; }
+    try{ await callFn('govcon-autopilot-run',{action:'process_one', rfp_id:p.id}); done++; }
     catch(e){ fail++; if(/Failed to fetch|HTTP 5|CORS/i.test(e.message)){ say(deployHint); return; } }
   }
   say(`✓ Analyzed ${done} opportunit${done===1?'y':'ies'}${fail?`, ${fail} failed`:''}.`);
@@ -690,7 +692,7 @@ async function openReview(id){
       <div id="rvIntel"><div class="muted" style="font-size:13px">No intelligence generated yet.</div></div>
 
       <h2 class="section">Research completion checklist</h2>
-      <div class="muted" style="font-size:12px;margin:-6px 0 10px">The approval button unlocks only when every required item is complete.</div>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Advisory only — approval is never blocked by an incomplete checklist, a warning, or a risk flag.</div>
       <div id="rvChecklist"></div>
 
       <div id="rvApproveWarn" class="muted" style="font-size:12px;color:var(--bad);margin-top:10px"></div>
@@ -865,6 +867,41 @@ function gateChip(g){
   const col={pass:'#0b6b34',warning:'#7a5b00',blocked:'#b3261e',fail:'#b3261e'}[g.status]||'#555';
   return `<span class="pill" title="${esc(g.reason)}${g.action?' — '+esc(g.action):''}" style="background:${col};color:#fff">${esc(g.gate)}: ${esc(g.status)}</span>`;
 }
+// ── eligibility & compliance calculation (bonding + FAR 52.219-14, spec §8) ──
+const ELIG_COLOR={ELIGIBLE:'#0b6b34',ELIGIBLE_WITH_ACTION:'#7a5b00',MANUAL_REVIEW:'#555',INELIGIBLE:'#b3261e'};
+function complianceCard(c){
+  if(!c) return '';
+  const row=(l,v)=>`<tr><td style="padding:5px 8px;white-space:nowrap;color:var(--muted)">${l}</td><td style="padding:5px 8px">${v||'—'}</td></tr>`;
+  const src=(c.source_documents||[]).map(s=>`<div class="m" style="font-size:12px">📄 <b>${esc(s.document||'')}</b>${s.page?` · p.${s.page}`:''} · rule: ${esc(s.rule||'')}${s.exact_language?`<br><i style="color:var(--muted)">“${esc(String(s.exact_language).slice(0,220))}”</i>`:''}</div>`).join('');
+  return `<div class="card" style="margin:10px 0;border-left:4px solid ${ELIG_COLOR[c.final_eligibility]||'#555'}">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      <b>Eligibility &amp; compliance calculation</b>
+      <span class="pill" style="background:${ELIG_COLOR[c.final_eligibility]||'#555'};color:#fff">Final: ${esc(c.final_eligibility||'—')}</span>
+      <span class="pill">Bonding: ${esc(c.bonding_status||'—')}</span>
+      <span class="pill">Ostensible risk: ${esc(c.ostensible_subcontractor_risk||'—')}</span>
+    </div>
+    <div style="overflow-x:auto"><table class="matx"><tbody>
+      ${row('Competition type', esc(c.competition_type))}
+      ${row('Assigned NAICS', esc(c.assigned_naics))}
+      ${row('Small-business eligibility', esc(c.small_business_eligibility))}
+      ${row('FAR 52.219-14 applies', c.far_52_219_14_applies===true?'Yes':c.far_52_219_14_applies===false?'No (not automatic on Full & Open)':'Unknown — verify the clause')}
+      ${row('Contract category', esc(String(c.contract_category||'').replace(/_/g,' ')))}
+      ${row('Applicable subcontracting limit', esc(c.applicable_subcontracting_limit))}
+      ${row('Estimated materials', esc(c.estimated_materials))}
+      ${row('Non-similarly-situated subcontracting', c.non_similarly_situated_pct!=null?c.non_similarly_situated_pct+'%':'Unknown — do not invent')}
+      ${row('Similarly-situated subcontracting', c.similarly_situated_pct!=null?c.similarly_situated_pct+'%':'Unknown')}
+      ${row('Prime management / self-performance role', esc(c.prime_management_role))}
+      ${row('Bond requirement', esc(c.bond_requirement))}
+      ${row('Bond due stage', esc(c.bond_due_stage))}
+      ${row('Bond deadline', esc(c.bond_deadline))}
+      ${row('Bonding status', `<b>${esc(c.bonding_status)}</b> — ${esc(c.bonding_explanation||'')}`)}
+      ${row('Subcontracting calculation', `${esc(c.subk_status||'')} · ${esc(c.subk_calculation||'')}<br>${esc(c.subk_explanation||'')}`)}
+      ${row('Ostensible-subcontractor risk', `<b>${esc(c.ostensible_subcontractor_risk)}</b>${(c.ostensible_reasons||[]).length?'<br>• '+c.ostensible_reasons.map(esc).join('<br>• '):''}`)}
+      ${row('Required actions', (c.required_actions||[]).length?('• '+c.required_actions.map(esc).join('<br>• ')):'None')}
+    </tbody></table></div>
+    ${src?`<div style="margin-top:6px"><b style="font-size:12px">Source documents</b>${src}</div>`:''}
+  </div>`;
+}
 async function rvRenderAnalysis(){
   const host=$('#rvAnalysis'); if(!host) return;
   const a=window._RV.analysis;
@@ -882,6 +919,7 @@ async function rvRenderAnalysis(){
     </div>
     <div class="m" style="margin-bottom:8px">${esc(a.recommendation_reason||'')}</div>
     <div class="scores" style="margin-bottom:8px">${(a.hard_gates||[]).map(gateChip).join(' ')}</div>
+    ${complianceCard((window._RV.rfp.details||{}).compliance || (a.decision_record||{}).compliance)}
     ${warn.length?`<div class="banner warn" style="margin:8px 0">Analysis may be incomplete:<br>${warn.map(esc).join('<br>')}</div>`:''}
     <div style="display:flex;gap:18px;flex-wrap:wrap;margin:8px 0">
       ${(a.top_strengths||[]).length?`<div style="flex:1;min-width:220px"><b>Strengths</b><ul style="margin:6px 0 0 18px">${a.top_strengths.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div>`:''}
@@ -1112,21 +1150,29 @@ function rvApproveUI(){
       <div class="field"><label>Initial stage</label><select id="rvStage">${['lead','qualified','proposal','development'].map(s=>`<option ${s===defStage?'selected':''}>${s}</option>`).join('')}</select></div>
       <div class="field"><label>Note / reason (optional)</label><input id="rvOverride" placeholder="Optional"></div>
     </div>
-    <div style="display:flex;gap:8px;margin-top:8px">
-      <button class="btn primary" id="rvApproveGo">Confirm — move to Pipeline</button>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn primary" id="rvApproveGo">✔ Approve to Pipeline</button>
+      <button class="btn" id="rvApproveRiskGo" style="background:#7a5b00;color:#fff">⚠ Approve With Risk</button>
+      <button class="btn" id="rvDeclineGo" style="color:var(--bad)">✕ Decline</button>
+      <button class="btn" id="rvManualGo">🔍 Request Manual Review</button>
       <button class="btn" onclick="$('#rvApproveBox').innerHTML=''">Cancel</button>
-    </div></div>`;
-  $('#rvApproveGo').onclick=rvApprove;
+    </div>
+    <div class="muted" style="font-size:11px;margin-top:6px">"Approve With Risk" records a manual override (who, when, why, and what the system recommended) while keeping the warnings visible. Warnings never disable approval.</div>
+    </div>`;
+  $('#rvApproveGo').onclick=()=>rvApprove('approve');
+  $('#rvApproveRiskGo').onclick=()=>rvApprove('approve_with_risk');
+  $('#rvDeclineGo').onclick=rvNoBid;
+  $('#rvManualGo').onclick=async ()=>{ try{ await callFn('govcon-pipeline-automation',{action:'manual_review', rfp_id:window._RV.rfp.id, reason:$('#rvOverride')?$('#rvOverride').value.trim():''}); toast('Marked for manual review'); $('#rvApproveBox').innerHTML=''; await rvReload(); }catch(e){ alert(e.message); } };
   $('#rvApproveBox').scrollIntoView({behavior:'smooth'});
 }
-async function rvApprove(){
-  const a=window._RV.analysis; const btn=$('#rvApproveGo'); btn.disabled=true;
+async function rvApprove(action){
+  const btn=$('#rvApproveGo'); btn.disabled=true; const rbtn=$('#rvApproveRiskGo'); if(rbtn) rbtn.disabled=true;
   try{
-    const r=await callFn('govcon-pipeline-automation',{action:'approve', rfp_id:window._RV.rfp.id,
+    const r=await callFn('govcon-pipeline-automation',{action:action||'approve', rfp_id:window._RV.rfp.id,
       stage:$('#rvStage')?$('#rvStage').value:undefined,
       override_reason:$('#rvOverride')?$('#rvOverride').value.trim():undefined});
-    toast(`Moved to Pipeline (${r.stage}) ✓`); $('#rvApproveBox').innerHTML=''; await rvReload();
-  }catch(e){ alert(e.message); btn.disabled=false; }
+    toast(`Moved to Pipeline (${r.stage})${action==='approve_with_risk'?' — override recorded':''} ✓`); $('#rvApproveBox').innerHTML=''; await rvReload();
+  }catch(e){ alert(e.message); btn.disabled=false; if(rbtn) rbtn.disabled=false; }
 }
 async function rvNoBid(){
   const reason=prompt('No-Bid reason (stored and used to improve future filtering):'); if(reason===null) return;
@@ -1270,14 +1316,14 @@ async function runAutopilotNow() {
   showApProgress('Starting…');
   try {
     // Non-blocking: the function creates a run and returns 202 immediately (spec §11)
-    const r = await callFn('govcon-auto-pilot-run', { action:'start' });
+    const r = await callFn('govcon-autopilot-run', { action:'start' });
     if (r.status==='already_running'){ showApProgress('A run is already in progress…'); pollApRun(r.run_id); }
     else { showApProgress('Queued — discovering opportunities…'); pollApRun(r.run_id); }
   } catch(e){
     // NO silent legacy fallback — show the real error (spec §10)
     const hint = e.kind==='cors_or_network'
-      ? 'Set "Verify JWT = OFF" for govcon-auto-pilot-run in Supabase (Edge Functions → govcon-auto-pilot-run → Settings) and confirm it deployed.'
-      : e.kind==='not_deployed' ? 'govcon-auto-pilot-run is not deployed.' : '';
+      ? 'Set "Verify JWT = OFF" for govcon-autopilot-run in Supabase (Edge Functions → govcon-autopilot-run → Settings) and confirm it deployed.'
+      : e.kind==='not_deployed' ? 'govcon-autopilot-run is not deployed.' : '';
     showApProgress(`Autopilot failed: ${e.message}${hint?'  ·  '+hint:''}`, true);
     btns.forEach(b=>b.disabled=false);
   }
@@ -1299,7 +1345,7 @@ async function pollApRun(runId){
   AP_POLL=setInterval(async ()=>{
     ticks++;
     try{
-      const r=await callFn('govcon-auto-pilot-run',{action:'run_status', run_id:runId});
+      const r=await callFn('govcon-autopilot-run',{action:'run_status', run_id:runId});
       const run=r.run;
       if(!run){ return; }
       const s=run.stats||{};
@@ -1334,10 +1380,13 @@ async function renderAutopilot() {
         </select></div>
       <div class="muted" style="font-size:12px;margin:-6px 0 10px">No mode ever runs the final analysis, moves opportunities into the Pipeline, generates proposals, or submits anything without your explicit click.</div>
       <div class="row2">
-        <div class="field"><label>Run every (hours) — 24 = once a day</label><input id="ap_interval" type="number" min="1" max="24" value="${s.interval_hours||6}"></div>
+        <div class="field"><label>Run every (hours) — set 1 for hourly discovery</label><input id="ap_interval" type="number" min="1" max="24" value="${s.interval_hours||6}"></div>
         <div class="field"><label>Max RFPs per run</label><input id="ap_max" type="number" value="${s.max_per_run||50}"></div>
       </div>
-      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Scheduled runs honor this interval once the pg_cron job is enabled (bottom of govcon_backend.sql). "Run now" works any time.</div>
+      <div class="field"><label>Auto-download documents in the background — every (minutes, 0 = off)</label>
+        <input id="ap_dlmins" type="number" min="0" max="240" value="${s.download_interval_minutes??5}">
+        <div class="muted" style="font-size:12px;margin-top:2px">A lightweight background job fetches attachments for newly discovered opportunities all day, so you never have to click Download. Needs the pg_cron job in <b>govcon_migration_13.sql</b> (runs every 5 minutes; each user is processed on their own interval).</div></div>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Scheduled runs honor these intervals once the pg_cron jobs are enabled (govcon_migration_13.sql). "Run now" works any time.</div>
       <div class="field"><label>Sources</label>
         <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;font-weight:600">
           <label class="toggle"><input type="checkbox" class="ap_src" value="sam.gov" ${srcChecked('sam.gov')}> SAM.gov</label>
@@ -1345,8 +1394,11 @@ async function renderAutopilot() {
           <label class="toggle"><input type="checkbox" class="ap_src" value="custom" ${srcChecked('custom')}> Custom Sources</label>
         </div>
       </div>
-      <div class="field"><label>Keywords (comma-separated — match your NAICS &amp; capabilities)</label>
-        <input id="ap_keywords" value="${esc((s.keywords||[]).join(', '))}" placeholder="cybersecurity, staffing, IT services"></div>
+      <div class="field"><label>Keywords (comma-separated — add as many as you want, up to 12 searched per run)</label>
+        <input id="ap_keywords" value="${esc((s.keywords||[]).join(', '))}" placeholder="janitorial, grounds maintenance, custodial, window cleaning, …"></div>
+      <div class="field"><label>NAICS codes to watch (comma-separated — more than 5 is fine, up to 12 searched per run)</label>
+        <input id="ap_naics" value="${esc((s.naics_codes||[]).join(', '))}" placeholder="561720, 561730, 236220, 238220, 561210, 561790, …">
+        <div class="muted" style="font-size:12px;margin-top:2px">Searched in addition to the NAICS codes on your company profile.</div></div>
 
       <h2 class="section" style="margin-top:8px">Bid window — only keep opportunities due within…</h2>
       <div class="row2">
@@ -1417,6 +1469,19 @@ function automationRulesCard(s){
       <div class="field"><label>Conflicting sources</label><select id="cp_conflict"><option value="hold_for_review" ${cp.conflict_action!=='auto_decline'?'selected':''}>Hold for review</option><option value="auto_decline" ${cp.conflict_action==='auto_decline'?'selected':''}>Auto-decline</option></select></div>
     </div>`;})()}
 
+    <h2 class="section">Certifications &amp; bonding <span class="muted" style="font-weight:normal;font-size:12px">— feeds the eligibility calculation</span></h2>
+    ${(()=>{const ct=R.certifications||{};return `
+    <div class="muted" style="font-size:12px;margin-bottom:6px">The company is a <b>Small Business Concern</b>. Enable a certification below only when actually obtained — restricted set-asides (8(a), HUBZone, WOSB, EDWOSB, SDVOSB, VOSB) stay INELIGIBLE until then.</div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin:6px 0">
+      <label class="toggle"><input type="checkbox" id="ct_8a" ${ct.has_8a?'checked':''}> 8(a)</label>
+      <label class="toggle"><input type="checkbox" id="ct_hub" ${ct.has_hubzone?'checked':''}> HUBZone</label>
+      <label class="toggle"><input type="checkbox" id="ct_wosb" ${ct.has_wosb?'checked':''}> WOSB</label>
+      <label class="toggle"><input type="checkbox" id="ct_edwosb" ${ct.has_edwosb?'checked':''}> EDWOSB</label>
+      <label class="toggle"><input type="checkbox" id="ct_sdvosb" ${ct.has_sdvosb?'checked':''}> SDVOSB</label>
+      <label class="toggle"><input type="checkbox" id="ct_vosb" ${ct.has_vosb?'checked':''}> VOSB</label>
+    </div>
+    <label class="toggle"><input type="checkbox" id="ct_bondunavail" ${R.bonding_unavailable?'checked':''}> A surety has DENIED coverage / bonds confirmed unobtainable <span class="muted" style="font-weight:normal;font-size:12px">— only this makes a required bond a hard blocker; otherwise required bonds are "Bonding Action Required" (commercial surety or SBA Surety Bond Guarantee Program)</span></label>`;})()}
+
     <h2 class="section">Document auto-selection <span class="muted" style="font-weight:normal;font-size:12px">— which docs get analyzed</span></h2>
     <div style="display:flex;gap:14px;flex-wrap:wrap">
       <label class="toggle"><input type="checkbox" id="ds_p1" ${chk(ds.auto_priority_1!==false)}> Priority 1 (scope/main)</label>
@@ -1482,6 +1547,9 @@ async function saveAutomationRules(){
       allow_total_small_business:$('#cp_tsb').checked, allow_full_and_open:$('#cp_fao').checked, allow_partial_small_business:$('#cp_psb').checked,
       auto_decline_disallowed_categories:$('#cp_auto').checked, unknown_action:$('#cp_unknown').value, conflict_action:$('#cp_conflict').value,
       skip_download_after_auto_decline:true, skip_analysis_after_auto_decline:true, skip_partner_research_after_auto_decline:true },
+    certifications:{ has_8a:$('#ct_8a').checked, has_hubzone:$('#ct_hub').checked, has_wosb:$('#ct_wosb').checked,
+      has_edwosb:$('#ct_edwosb').checked, has_sdvosb:$('#ct_sdvosb').checked, has_vosb:$('#ct_vosb').checked },
+    bonding_unavailable:$('#ct_bondunavail').checked,
     doc_selection:{ auto_priority_1:$('#ds_p1').checked, auto_priority_2:$('#ds_p2').checked, auto_priority_3:$('#ds_p3').checked,
       analyze_all_when_low_confidence:$('#ds_lowconf').checked, max_docs:ni('ds_maxdocs')??12, min_relevance:ni('ds_minrel')??0, min_confidence:ni('ds_minconf')??0,
       always_solicitation:true, always_scope:true, always_amendments:true, always_evaluation:true, always_instructions:true, always_pricing:true, always_wage:true },
@@ -1524,16 +1592,23 @@ async function saveAutopilot() {
     generation_mode: $('#ap_genmode').value,
     auto_add_pipeline: $('#ap_addpipe').checked, auto_prioritize: $('#ap_prio').checked,
     autopilot_mode: $('#ap_mode') ? $('#ap_mode').value : 'mode2_manual',
+    naics_codes: $('#ap_naics') ? $('#ap_naics').value.split(',').map(s=>s.trim()).filter(Boolean) : undefined,
+    download_interval_minutes: $('#ap_dlmins') ? Math.max(0, +$('#ap_dlmins').value||0) : undefined,
     updated_at: new Date().toISOString(),
   };
+  Object.keys(body).forEach(k=>body[k]===undefined&&delete body[k]);
   try {
     await api('govcon_autopilot_settings', {method:'POST', prefer:'resolution=merge-duplicates', body:JSON.stringify(body)});
     toast('Autopilot settings saved');
   } catch(e){
-    if (/autopilot_mode/.test(e.message)) {           // migration 9 not run yet — save the rest
-      delete body.autopilot_mode;
+    // graceful degrade when a migration hasn't been run yet — save what we can
+    let retried=false;
+    for (const col of ['naics_codes','download_interval_minutes','autopilot_mode']) {
+      if (new RegExp(col).test(e.message)) { delete body[col]; retried=true; }
+    }
+    if (retried) {
       await api('govcon_autopilot_settings', {method:'POST', prefer:'resolution=merge-duplicates', body:JSON.stringify(body)});
-      toast('Saved (mode needs govcon_migration_9.sql first)');
+      toast('Saved — run govcon_migration_13.sql to enable NAICS list & background downloads');
     } else throw e;
   }
 }
@@ -2278,9 +2353,11 @@ const PN_VIEWS = [
   ['Moving', p=>JSON.stringify([p.service_categories,p.capabilities]).toLowerCase().match(/moving|relocat/)],
 ];
 let PN_Q='', PN_STATE='', PN_STATUS='', PN_VIEW=-1;
+const PN_SEL = new Set();
 async function renderPartners() {
   loading();
   const mine = await api(`govcon_partners?owner=eq.${SESSION.user.id}&select=*&order=updated_at.desc.nullslast&limit=500`);
+  for (const id of [...PN_SEL]) if (!mine.some(p=>p.id===id)) PN_SEL.delete(id);   // prune stale
   let shown = mine.filter(p=>{
     if (PN_Q && !`${p.company_name} ${p.city||''} ${p.state||''} ${JSON.stringify(p.capabilities||[])} ${JSON.stringify(p.service_categories||[])} ${JSON.stringify(p.naics_codes||[])}`.toLowerCase().includes(PN_Q.toLowerCase())) return false;
     if (PN_STATE && (p.state||'').toUpperCase()!==PN_STATE.toUpperCase()) return false;
@@ -2294,6 +2371,7 @@ async function renderPartners() {
     <div class="card" style="margin-bottom:12px">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         <button class="btn primary" onclick="pnResearchUI()">🔎 Research Partners</button>
+        <button class="btn" onclick="pnYelpUI()">🗺 Import from Yelp</button>
         <button class="btn" onclick="pnDedupe()">Merge duplicates</button>
         <button class="btn" onclick="showAddPartner()">+ Add manually</button>
         <span style="flex:1"></span>
@@ -2302,6 +2380,15 @@ async function renderPartners() {
         <select id="pnStatus" style="width:auto"><option value="">All statuses</option>${PARTNER_STATUSES.map(s=>`<option ${s===PN_STATUS?'selected':''}>${s}</option>`).join('')}</select>
       </div>
       <div class="chips" style="margin-top:10px">${PN_VIEWS.map((v,i)=>`<span class="chip" data-view="${i}" style="cursor:pointer;${i===PN_VIEW?'background:var(--blue-500);color:#fff':''}">${v[0]}</span>`).join('')}${PN_VIEW>=0?'<span class="chip" data-view="-1" style="cursor:pointer">✕ clear view</span>':''}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
+        <label class="toggle" style="margin:0"><input type="checkbox" id="pnSelAll" ${shown.length&&shown.every(p=>PN_SEL.has(p.id))?'checked':''} style="width:auto"> Select all shown</label>
+        <span class="muted" style="font-size:12px"><b id="pnSelCount">${PN_SEL.size}</b> selected</span>
+        <span style="flex:1"></span>
+        <select id="pnBulkStatus" style="width:auto;font-size:12px"><option value="">Bulk: set status…</option>${PARTNER_STATUSES.map(s=>`<option>${s}</option>`).join('')}</select>
+        <button class="btn sm" onclick="pnBulk('dialer')">📞 Push to Dialer</button>
+        <button class="btn sm" onclick="pnBulk('archive')">Archive selected</button>
+        <button class="btn sm" style="color:var(--bad)" onclick="pnBulk('delete')">Delete selected</button>
+      </div>
     </div>
     <div id="addPartnerBox"></div>
     <div class="muted" style="margin-bottom:10px">${shown.length} of ${mine.length} partners</div>
@@ -2309,6 +2396,9 @@ async function renderPartners() {
   $('#pnQ').oninput = e=>{ PN_Q=e.target.value; clearTimeout(window._pt); window._pt=setTimeout(renderPartners,300); };
   $('#pnState').onchange = e=>{ PN_STATE=e.target.value; renderPartners(); };
   $('#pnStatus').onchange = e=>{ PN_STATUS=e.target.value; renderPartners(); };
+  $('#pnSelAll').onchange = e=>{ shown.forEach(p=>e.target.checked?PN_SEL.add(p.id):PN_SEL.delete(p.id)); renderPartners(); };
+  $('#pnBulkStatus').onchange = e=>{ if(e.target.value) pnBulk('status', e.target.value); };
+  document.querySelectorAll('.pnsel').forEach(c=>c.onchange=()=>{ c.checked?PN_SEL.add(c.dataset.id):PN_SEL.delete(c.dataset.id); const n=$('#pnSelCount'); if(n) n.textContent=PN_SEL.size; });
   document.querySelectorAll('[data-view]').forEach(c=>c.onclick=()=>{ PN_VIEW=+c.dataset.view; renderPartners(); });
   document.querySelectorAll('.pn-status').forEach(s=>s.onchange=async ()=>{
     await api(`govcon_partners?id=eq.${s.dataset.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({partner_status:s.value, ...(s.value==='Verified'?{verification_status:'User Confirmed',verification_date:new Date().toISOString()}:{})})});
@@ -2322,6 +2412,7 @@ function pnCard(p){
   const emails=(p.contact_emails||[]);
   return `<div class="rfp">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <input type="checkbox" class="pnsel" data-id="${p.id}" ${PN_SEL.has(p.id)?'checked':''} style="width:auto">
       <div class="t" style="cursor:pointer;flex:1" onclick="openPartner('${p.id}')">${esc(p.company_name)}</div>
       ${pnConfPill(p)}
       <select class="pn-status" data-id="${p.id}" style="width:auto;font-size:12px">${PARTNER_STATUSES.map(s=>`<option ${s===p.partner_status?'selected':''}>${s}</option>`).join('')}</select>
@@ -2370,6 +2461,71 @@ async function pnDedupe(){
   toast('Merging duplicates…', true);
   try{ const r=await callFn('govcon-partner-dedupe',{}); toast(`Scanned ${r.scanned}, merged ${r.merged} duplicate(s)`); renderPartners(); }
   catch(e){ toast('Dedupe failed: '+e.message); }
+}
+/* ── bulk operations on selected partners (mass select / edit / delete) ── */
+async function pnBulk(op, statusValue){
+  const ids=[...PN_SEL];
+  if(!ids.length) return toast('Select partners first (checkboxes on each card).');
+  if(op==='status'){
+    await api(`govcon_partners?id=in.(${ids.join(',')})&owner=eq.${SESSION.user.id}`,{method:'PATCH',prefer:'return=minimal',
+      body:JSON.stringify({partner_status:statusValue, ...(statusValue==='Verified'?{verification_status:'User Confirmed',verification_date:new Date().toISOString()}:{})})});
+    toast(`Status → ${statusValue} for ${ids.length} partner(s)`); renderPartners(); return;
+  }
+  if(op==='archive'){
+    if(!confirm(`Archive ${ids.length} partner(s)?`)) return;
+    await api(`govcon_partners?id=in.(${ids.join(',')})&owner=eq.${SESSION.user.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({partner_status:'Archived'})});
+    PN_SEL.clear(); toast('Archived'); renderPartners(); return;
+  }
+  if(op==='delete'){
+    if(!confirm(`PERMANENTLY delete ${ids.length} partner(s)? This cannot be undone.`)) return;
+    await api(`govcon_partners?id=in.(${ids.join(',')})&owner=eq.${SESSION.user.id}`,{method:'DELETE',prefer:'return=minimal'});
+    PN_SEL.clear(); toast('Deleted'); renderPartners(); return;
+  }
+  if(op==='dialer') return pushPartnersToDialer(ids);
+}
+/* ── Push to Dialer: send selected partners into the Blu Balances CRM
+      (crm_leads, same Supabase project) so the Auto Dialer can call them ── */
+async function pushPartnersToDialer(ids){
+  const rows=await api(`govcon_partners?id=in.(${ids.join(',')})&owner=eq.${SESSION.user.id}&select=*`);
+  const withPhone=rows.filter(p=>p.primary_phone||p.general_email);
+  if(!withPhone.length) return toast('None of the selected partners have a phone or email.');
+  if(!confirm(`Push ${withPhone.length} partner(s) to the dialer CRM?`)) return;
+  const crmHdr={'Content-Type':'application/json', apikey:SB_KEY, Authorization:`Bearer ${SB_KEY}`, Prefer:'return=minimal'};
+  let pushed=0, failed=0;
+  for(const p of withPhone){
+    const emails=(p.contact_emails||[]);
+    const lead={ business_name:p.company_name, contact_name:emails[0]?.contact_name||null,
+      phone:p.primary_phone||null, email:p.general_email||emails[0]?.email||null,
+      city:p.city||null, state:p.state||null, website:p.website||null,
+      industry:(p.service_categories||[])[0]||'GovCon subcontractor', dispo:'new', source:'govcon',
+      notes:`Pushed from ConnexionTwo GovCon — ${[...(p.service_categories||[]),...(p.capabilities||[])].slice(0,5).join(', ')||'partner'}${p.research_notes?'\n'+String(p.research_notes).slice(0,200):''}` };
+    try{ const r=await fetch(`${SB_URL}/rest/v1/crm_leads`,{method:'POST',headers:crmHdr,body:JSON.stringify(lead)});
+      r.ok?pushed++:failed++; }catch{ failed++; }
+  }
+  toast(`Dialer: ${pushed} pushed${failed?`, ${failed} failed`:''} — open the Blu Balances CRM → Auto Dialer to start calling.`);
+}
+/* ── Yelp business import (official Fusion API — needs a "yelp" API key) ── */
+function pnYelpUI(){
+  openModal(`<div class="shd"><h3>Import businesses from Yelp</h3><button class="sclose" onclick="closeModal()">×</button></div>
+    <div class="sbd">
+      <div class="muted" style="font-size:13px;margin-bottom:10px">Uses the official Yelp Fusion API (Yelp blocks HTML scraping). Add a free key under <b>Settings → API keys</b> with provider <b>yelp</b> — get one at business.yelp.com/data/products/fusion. Imported companies land in Partners; select them and use <b>Push to Dialer</b> to start calling.</div>
+      <div class="field"><label>Search term *</label><input id="yl_term" placeholder="e.g. commercial cleaning"></div>
+      <div class="field"><label>Location *</label><input id="yl_loc" placeholder="e.g. Cincinnati, OH"></div>
+      <div class="field"><label>Max results (≤50)</label><input id="yl_max" type="number" value="20" min="1" max="50"></div>
+      <button class="btn primary" id="yl_go">Import from Yelp</button>
+      <div id="yl_out"></div>
+    </div>`);
+  $('#yl_go').onclick=async ()=>{
+    const term=$('#yl_term').value.trim(), loc=$('#yl_loc').value.trim();
+    if(!term||!loc) return alert('Term and location are required');
+    const b=$('#yl_go'), out=$('#yl_out'); b.disabled=true; b.textContent='Importing…';
+    try{
+      const r=await callFn('govcon-yelp-import',{term, location:loc, limit:+$('#yl_max').value||20});
+      out.innerHTML=`<div class="banner info" style="margin-top:10px">✓ Yelp: ${r.found} found, ${r.imported} imported, ${r.skipped_duplicates} already stored.${(r.errors||[]).length?` ⚠ ${esc(r.errors[0])}`:''}</div>`;
+      renderPartners();
+    }catch(e){ out.innerHTML=`<div class="banner bad" style="margin-top:10px">${esc(e.message)}</div>`; }
+    b.disabled=false; b.textContent='Import from Yelp';
+  };
 }
 async function openPartner(id){
   const rows=await api(`govcon_partners?id=eq.${id}&owner=eq.${SESSION.user.id}&select=*`);
