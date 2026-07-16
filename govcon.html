@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r24-2026-07-15';
+const GOVCON_BUILD = 'r25-2026-07-16';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -240,12 +240,24 @@ async function apiPatchTolerant(path, obj) {
 }
 async function callFn(name, body) {
   const token = await freshToken();
-  const res = await fetch(FN(name), {
-    method:'POST', headers:{ apikey:SB_KEY, Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(FN(name), {
+      method:'POST', headers:{ apikey:SB_KEY, Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch(netErr){
+    // fetch itself failed = CORS preflight rejected or network down. Surface the
+    // real cause with the function name (no silent fallback — spec §10).
+    const e = new Error(`${name}: request blocked (CORS preflight or network). If this is a Supabase function, set "Verify JWT = OFF" for ${name} and confirm it's deployed.`);
+    e.kind='cors_or_network'; e.fn=name; throw e;
+  }
   const data = await res.json().catch(()=>({}));
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  if (!res.ok) {
+    const e = new Error(data.error || `${name}: HTTP ${res.status}`);
+    e.kind = res.status===401?'auth':res.status===404?'not_deployed':res.status>=500?'server':'http';
+    e.status=res.status; e.fn=name; throw e;
+  }
   return data;
 }
 
@@ -681,8 +693,9 @@ async function openReview(id){
       <div class="muted" style="font-size:12px;margin:-6px 0 10px">The approval button unlocks only when every required item is complete.</div>
       <div id="rvChecklist"></div>
 
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;position:sticky;bottom:0;background:var(--panel);padding-top:12px;border-top:1px solid var(--line)">
-        <button class="btn primary" id="rvApproveBtn" disabled>✔ Approve and Move to Pipeline</button>
+      <div id="rvApproveWarn" class="muted" style="font-size:12px;color:var(--bad);margin-top:10px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;position:sticky;bottom:0;background:var(--panel);padding-top:12px;border-top:1px solid var(--line)">
+        <button class="btn primary" id="rvApproveBtn">✔ Approve and Move to Pipeline</button>
         <button class="btn" id="rvNoBidBtn">Mark No-Bid</button>
         <button class="btn" id="rvArchiveBtn">Archive</button>
         <span style="flex:1"></span>
@@ -1069,28 +1082,35 @@ function rvRenderChecklist(){
 function rvUpdateApprove(){
   const btn=$('#rvApproveBtn'); if(!btn) return;
   const st=rvChecklistState();
-  const complete=CHECKLIST_LABELS.every(([k])=>st[k]);
-  btn.disabled=!complete;
-  btn.title=complete?'':'Complete the research checklist first (including Human Review).';
+  const incomplete=CHECKLIST_LABELS.filter(([k])=>!st[k]).length;
+  // Manual approval is NEVER blocked (spec §8) — the checklist is advisory.
+  btn.disabled=false;
+  btn.title = incomplete ? `${incomplete} research item(s) still open — you can still approve manually.` : 'Research complete.';
+  const warn=$('#rvApproveWarn');
+  if(warn) warn.textContent = incomplete ? `⚠ ${incomplete} research item(s) incomplete — approving is allowed but review first.` : '';
 }
 function rvApproveUI(){
-  const a=window._RV.analysis; if(!a) return;
-  const gates=a.hard_gates||[]; const blocked=gates.some(g=>g.status==='fail'||g.status==='blocked');
-  const needsOverride = a.recommendation==='No-Bid' || blocked;
-  const defStage={'Strong Pursue':'qualified'}[a.recommendation]||'lead';
+  const a=window._RV.analysis;   // may be null — manual approval allowed anyway (spec §8)
+  const gates=a?.hard_gates||[]; const blocked=gates.some(g=>g.status==='fail'||g.status==='blocked');
+  const rec=a?.recommendation||'(not analyzed)';
+  const defStage={'Strong Pursue':'qualified'}[rec]||'lead';
+  const warns=[];
+  if(!a) warns.push('No analysis has been run yet.');
+  if(a && a.analysis_confidence<70) warns.push(`Low confidence (${a.analysis_confidence}) — analysis is preliminary.`);
+  if(rec==='No-Bid') warns.push('AI recommendation is No-Bid.');
+  if(blocked) warns.push('A hard gate failed: '+gates.filter(g=>g.status!=='pass').map(g=>g.gate).join(', ')+'.');
   $('#rvApproveBox').innerHTML=`<div class="card" style="margin-top:10px;border:2px solid var(--blue-500)">
     <h3 style="margin:0 0 8px">Confirm: move to Pipeline</h3>
     <div class="m">${esc(window._RV.rfp.title)}</div>
-    <div class="scores" style="margin:8px 0">
-      <span class="pill" style="background:${REC_COLOR[a.recommendation]||'#555'};color:#fff">${esc(a.recommendation)}</span>
+    ${a?`<div class="scores" style="margin:8px 0">
+      <span class="pill" style="background:${REC_COLOR[rec]||'#555'};color:#fff">${esc(rec)}</span>
       <span class="pill">Fit ${a.fit_score}</span><span class="pill">Ready ${a.bid_readiness_score}</span>
-      <span class="pill">Sub-dep ${a.subcontractor_dependency_score}</span><span class="pill">Conf ${a.analysis_confidence}</span>
-    </div>
-    ${blocked?`<div class="banner warn">Blocked gates: ${gates.filter(g=>g.status!=='pass').map(g=>esc(g.gate)).join(', ')}</div>`:''}
-    ${(a.required_subcontractors||[]).length?`<div class="m">Required subcontractors: ${a.required_subcontractors.map(s=>esc(s.category||s)).join(', ')}</div>`:''}
+      <span class="pill">Sub-dep ${a.subcontractor_dependency_score}</span><span class="pill">Conf ${a.analysis_confidence}</span></div>`:''}
+    ${warns.length?`<div class="banner warn">You can still approve — just review these first:<br>• ${warns.map(esc).join('<br>• ')}</div>`:''}
+    <div class="m" style="font-size:12px;color:var(--muted)">Moving to the pipeline is for tracking/pursuit. It does not assert legal eligibility to submit, and it doesn't generate a proposal.</div>
     <div class="row2" style="margin-top:8px">
-      <div class="field"><label>Initial stage</label><select id="rvStage">${['lead','qualified','proposal'].map(s=>`<option ${s===defStage?'selected':''}>${s}</option>`).join('')}</select></div>
-      ${needsOverride?`<div class="field"><label>Override reason (required)</label><input id="rvOverride" placeholder="Why move a ${esc(a.recommendation)} / blocked opportunity?"></div>`:'<div></div>'}
+      <div class="field"><label>Initial stage</label><select id="rvStage">${['lead','qualified','proposal','development'].map(s=>`<option ${s===defStage?'selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="field"><label>Note / reason (optional)</label><input id="rvOverride" placeholder="Optional"></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:8px">
       <button class="btn primary" id="rvApproveGo">Confirm — move to Pipeline</button>
@@ -1243,25 +1263,56 @@ async function addToPipeline(rfpId) {
     toast('Added to pipeline');
   } catch(e){ if(/23505|duplicate/i.test(e.message)) toast('Already in pipeline'); else alert(e.message); }
 }
+let AP_POLL=null;
 async function runAutopilotNow() {
-  toast('Running Autopilot…', true);
+  const btns=[...document.querySelectorAll('button')].filter(b=>/Run Autopilot|Run now/.test(b.textContent));
+  btns.forEach(b=>b.disabled=true);
+  showApProgress('Starting…');
   try {
-    // New qualification-engine orchestrator: discover → enrich → download
-    // documents → flag ready for review. Never auto-analyzes or auto-pipelines.
-    const r = await callFn('govcon-autopilot-run', {});
-    let msg = `Autopilot (${r.mode}): found ${r.found}, new ${r.new}, merged ${r.merged}, excluded ${r.excluded}`;
-    if (r.files_downloaded != null) msg += `, ${r.files_downloaded} file(s) downloaded, ${r.ready_for_review||0} ready for review`;
-    if (r.errors?.length) msg += ` · ⚠ ${r.errors[0]}`;
-    toast(msg);
-    if (r.errors?.length) console.warn('Autopilot errors:', r.errors);
-    if ($('#rfpList')) renderRfps();
+    // Non-blocking: the function creates a run and returns 202 immediately (spec §11)
+    const r = await callFn('govcon-autopilot-run', { action:'start' });
+    if (r.status==='already_running'){ showApProgress('A run is already in progress…'); pollApRun(r.run_id); }
+    else { showApProgress('Queued — discovering opportunities…'); pollApRun(r.run_id); }
   } catch(e){
-    // orchestrator not deployed yet → fall back to the legacy autopilot
-    try { const r = await callFn('autopilot-run', {action:'run'});
-      toast(`Autopilot (legacy): ${r.new_rfps} new — deploy govcon-autopilot-run for the full workflow`);
-      if ($('#rfpList')) renderRfps();
-    } catch(e2){ toast('Autopilot failed: '+e.message); }
+    // NO silent legacy fallback — show the real error (spec §10)
+    const hint = e.kind==='cors_or_network'
+      ? 'Set "Verify JWT = OFF" for govcon-autopilot-run in Supabase (Edge Functions → govcon-autopilot-run → Settings) and confirm it deployed.'
+      : e.kind==='not_deployed' ? 'govcon-autopilot-run is not deployed.' : '';
+    showApProgress(`Autopilot failed: ${e.message}${hint?'  ·  '+hint:''}`, true);
+    btns.forEach(b=>b.disabled=false);
   }
+}
+function showApProgress(msg, done){
+  let p=$('#apProgress');
+  if(!p){ p=document.createElement('div'); p.id='apProgress';
+    p.style.cssText='position:fixed;right:18px;bottom:18px;max-width:380px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.2);padding:14px 16px;z-index:70;font-size:13px';
+    document.body.appendChild(p); }
+  p.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <b>Autopilot</b><button onclick="$('#apProgress').remove()" style="border:none;background:none;cursor:pointer;font-size:16px">×</button></div>
+    <div style="margin-top:6px">${esc(msg)}</div>
+    ${done?'':'<div style="margin-top:8px;height:5px;background:var(--line);border-radius:4px;overflow:hidden"><div id="apBar" style="height:100%;width:20%;background:var(--blue-500);transition:width .4s"></div></div>'}`;
+}
+async function pollApRun(runId){
+  clearInterval(AP_POLL);
+  const btns=[...document.querySelectorAll('button')].filter(b=>/Run Autopilot|Run now/.test(b.textContent));
+  let ticks=0;
+  AP_POLL=setInterval(async ()=>{
+    ticks++;
+    try{
+      const r=await callFn('govcon-autopilot-run',{action:'run_status', run_id:runId});
+      const run=r.run;
+      if(!run){ return; }
+      const s=run.stats||{};
+      const line = run.status==='ok'||run.status==='error'
+        ? `${run.status==='ok'?'✓ Done':'⚠ Finished with errors'} — found ${s.found??0}, new ${s.new??0}, declined ${s.declined??0}, analyzed ${s.analyzed??0}${(s.errors&&s.errors.length)?' · '+esc(s.errors[0]):''}`
+        : `Working… found ${s.found??0}, new ${s.new??0}, declined ${s.declined??0}, analyzed ${s.analyzed??0}`;
+      showApProgress(line, run.status==='ok'||run.status==='error');
+      const bar=$('#apBar'); if(bar) bar.style.width=Math.min(90, 20+ticks*8)+'%';
+      if(run.status==='ok'||run.status==='error'){ clearInterval(AP_POLL); btns.forEach(b=>b.disabled=false);
+        if($('#rfpList')) renderRfps(); if($('#rsList')) renderResearch(); if($('#views')&&$('#viewTitle')?.textContent==='Dashboard') renderDashboard(); }
+    }catch(e){ /* keep polling a few times */ if(ticks>40){ clearInterval(AP_POLL); btns.forEach(b=>b.disabled=false); } }
+    if(ticks>150){ clearInterval(AP_POLL); showApProgress('Run may be stalled — check the Autopilot logs.', true); btns.forEach(b=>b.disabled=false); }
+  }, 4000);
 }
 
 /* ═══════════════ AUTOPILOT SETTINGS ═══════════════ */
@@ -1351,6 +1402,21 @@ function automationRulesCard(s){
       <label class="toggle"><input type="checkbox" id="ar_notifyhigh" ${chk(s.notify_high_score!==false)}> Alert on high-score find</label>
     </div>
 
+    <h2 class="section" style="color:#0054d1">Competition eligibility &amp; auto-decline</h2>
+    <div class="muted" style="font-size:12px;margin-bottom:8px">Your policy allows generic <b>Total Small Business</b> set-asides and <b>Full and Open / Unrestricted / No Set-Aside</b>. Special socioeconomic set-asides (SDVOSB, WOSB, 8(a), HUBZone, …) are automatically declined unless you change these. "No Set-Aside" is treated as eligible, never a No-Bid.</div>
+    ${(()=>{const cp=(R.competition_policy)||{};return `
+    <label class="toggle"><input type="checkbox" id="cp_enabled" ${cp.enabled!==false?'checked':''}> Enable competition eligibility filter</label>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin:6px 0">
+      <label class="toggle"><input type="checkbox" id="cp_tsb" ${cp.allow_total_small_business!==false?'checked':''}> Allow Total Small Business</label>
+      <label class="toggle"><input type="checkbox" id="cp_fao" ${cp.allow_full_and_open!==false?'checked':''}> Allow Full &amp; Open / Unrestricted</label>
+      <label class="toggle"><input type="checkbox" id="cp_psb" ${cp.allow_partial_small_business?'checked':''}> Allow Partial Small Business</label>
+      <label class="toggle"><input type="checkbox" id="cp_auto" ${cp.auto_decline_disallowed_categories!==false?'checked':''}> Auto-decline disallowed categories</label>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Unknown category</label><select id="cp_unknown"><option value="hold_for_review" ${cp.unknown_action!=='auto_decline'?'selected':''}>Hold for review</option><option value="auto_decline" ${cp.unknown_action==='auto_decline'?'selected':''}>Auto-decline</option></select></div>
+      <div class="field"><label>Conflicting sources</label><select id="cp_conflict"><option value="hold_for_review" ${cp.conflict_action!=='auto_decline'?'selected':''}>Hold for review</option><option value="auto_decline" ${cp.conflict_action==='auto_decline'?'selected':''}>Auto-decline</option></select></div>
+    </div>`;})()}
+
     <h2 class="section">Document auto-selection <span class="muted" style="font-weight:normal;font-size:12px">— which docs get analyzed</span></h2>
     <div style="display:flex;gap:14px;flex-wrap:wrap">
       <label class="toggle"><input type="checkbox" id="ds_p1" ${chk(ds.auto_priority_1!==false)}> Priority 1 (scope/main)</label>
@@ -1410,7 +1476,12 @@ function vals(cls){ return [...document.querySelectorAll('.'+cls+':checked')].ma
 function ni(id){ const el=$('#'+id); return (!el||el.value==='')?null:+el.value; }
 async function saveAutomationRules(){
   const st=$('#ar_status'); st.textContent='Saving…';
+  const allowedCats=[]; if($('#cp_tsb').checked) allowedCats.push('TOTAL_SMALL_BUSINESS'); if($('#cp_fao').checked) allowedCats.push('FULL_AND_OPEN'); if($('#cp_psb').checked) allowedCats.push('PARTIAL_SMALL_BUSINESS');
   const rules = {
+    competition_policy:{ enabled:$('#cp_enabled').checked, allowed_categories:allowedCats,
+      allow_total_small_business:$('#cp_tsb').checked, allow_full_and_open:$('#cp_fao').checked, allow_partial_small_business:$('#cp_psb').checked,
+      auto_decline_disallowed_categories:$('#cp_auto').checked, unknown_action:$('#cp_unknown').value, conflict_action:$('#cp_conflict').value,
+      skip_download_after_auto_decline:true, skip_analysis_after_auto_decline:true, skip_partner_research_after_auto_decline:true },
     doc_selection:{ auto_priority_1:$('#ds_p1').checked, auto_priority_2:$('#ds_p2').checked, auto_priority_3:$('#ds_p3').checked,
       analyze_all_when_low_confidence:$('#ds_lowconf').checked, max_docs:ni('ds_maxdocs')??12, min_relevance:ni('ds_minrel')??0, min_confidence:ni('ds_minconf')??0,
       always_solicitation:true, always_scope:true, always_amendments:true, always_evaluation:true, always_instructions:true, always_pricing:true, always_wage:true },
