@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r23-2026-07-15';
+const GOVCON_BUILD = 'r24-2026-07-15';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -377,19 +377,22 @@ async function renderDashboard() {
   document.querySelectorAll('.dashopen').forEach(a=>a.onclick=e=>{e.preventDefault(); openReview(a.dataset.id);});
 }
 async function analyzeAllPending(){
-  const st=$('#dashPendStatus'); st.textContent='Finding pending opportunities…';
+  // status element differs by page (Dashboard vs Autopilot) → tolerate either, fall back to toast
+  const say=(m)=>{ const st=$('#dashPendStatus')||$('#ar_status'); if(st) st.textContent=m; else toast(m, true); };
+  const deployHint='govcon-autopilot-run isn’t deployed yet — deploy the r23 function, then try again.';
+  say('Finding pending opportunities…');
   let pending=[];
   try{ const r=await callFn('govcon-autopilot-run',{action:'list_pending'}); pending=r.pending||[]; }
-  catch(e){ st.textContent='Could not list pending: '+e.message; return; }
-  if(!pending.length){ st.textContent='✓ Nothing pending — all opportunities are analyzed.'; return; }
+  catch(e){ say(/Failed to fetch|HTTP 5|CORS/i.test(e.message)? deployHint : 'Could not list pending: '+e.message); return; }
+  if(!pending.length){ say('✓ Nothing pending — all opportunities are analyzed.'); return; }
   let done=0, fail=0;
   for(const p of pending){
-    st.textContent=`Analyzing ${done+1}/${pending.length}: ${String(p.title||'').slice(0,50)}…`;
+    say(`Analyzing ${done+1}/${pending.length}: ${String(p.title||'').slice(0,50)}…`);
     try{ await callFn('govcon-autopilot-run',{action:'process_one', rfp_id:p.id}); done++; }
-    catch(e){ fail++; }
+    catch(e){ fail++; if(/Failed to fetch|HTTP 5|CORS/i.test(e.message)){ say(deployHint); return; } }
   }
-  st.textContent=`✓ Analyzed ${done} opportunit${done===1?'y':'ies'}${fail?`, ${fail} failed`:''}.`;
-  renderDashboard();
+  say(`✓ Analyzed ${done} opportunit${done===1?'y':'ies'}${fail?`, ${fail} failed`:''}.`);
+  if($('#views')) renderDashboard();
 }
 const kpi = (l,v,s) => `<div class="card kpi"><div class="lbl">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
 
@@ -492,14 +495,22 @@ const CHECKLIST_LABELS = [
   ['risk_assessment','Risk Assessment'],['win_probability','Win Probability'],
   ['ai_recommendation','AI Recommendation'],['human_review','Human Review Completed'],
 ];
-let RESEARCH_Q='';
+let RESEARCH_Q='', RS_FROM='', RS_TO='', RS_SEL=new Set();
 async function renderResearch(){
   loading();
   const uid=SESSION.user.id;
   const rows=await api(`govcon_rfps?owner=eq.${uid}&select=*&order=deadline.asc.nullslast&limit=500`);
   const inResearch=rows.filter(r=>RESEARCH_STAGES.includes(r.review_stage||'Discovered'));
   const q=RESEARCH_Q.toLowerCase();
-  const shown=inResearch.filter(r=>!q||`${r.title} ${r.agency} ${r.category}`.toLowerCase().includes(q));
+  const shown=inResearch.filter(r=>{
+    if(q && !`${r.title} ${r.agency} ${r.category}`.toLowerCase().includes(q)) return false;
+    if(RS_FROM && (!r.deadline || r.deadline < RS_FROM)) return false;   // deadline within timeframe
+    if(RS_TO && (!r.deadline || r.deadline > RS_TO)) return false;
+    return true;
+  });
+  const shownIds=new Set(shown.map(r=>r.id));
+  for(const id of [...RS_SEL]) if(!inResearch.some(r=>r.id===id)) RS_SEL.delete(id);
+  const allSel=shown.length>0 && shown.every(r=>RS_SEL.has(r.id));
   V().innerHTML=`
     <div class="banner info">Research is the intelligence phase — every opportunity is fully researched here (contract intel, incumbent, competition, pricing, risk, win probability, partners) and passes a completion checklist <b>before</b> it can be approved into the Pipeline.</div>
     <details class="card" style="margin-bottom:12px">
@@ -516,17 +527,59 @@ async function renderResearch(){
         <b>Recommendations:</b> Strong Pursue → Pursue → Conditional Pursue → Team With Prime → Subcontract Only → Monitor → No-Bid.
       </div>
     </details>
-    <div class="card" style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-      <input id="rsQ" placeholder="Filter research queue…" value="${esc(RESEARCH_Q)}" style="flex:1;min-width:200px">
-      <span class="muted">${shown.length} in research · ${rows.filter(r=>r.review_stage==='Approved for Pipeline').length} approved</span>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <input id="rsQ" placeholder="Filter research queue…" value="${esc(RESEARCH_Q)}" style="flex:1;min-width:180px">
+        <label style="margin:0">Deadline from</label><input id="rsFrom" type="date" value="${RS_FROM}" style="width:auto">
+        <label style="margin:0">to</label><input id="rsTo" type="date" value="${RS_TO}" style="width:auto">
+        <button class="btn sm" id="rsClear">Clear</button>
+        <span class="muted">${shown.length} in research · ${rows.filter(r=>r.review_stage==='Approved for Pipeline').length} approved</span>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
+        <label class="toggle" style="margin:0"><input type="checkbox" id="rsAll" ${allSel?'checked':''}> Select all shown (${shown.length})</label>
+        <b id="rsCount" class="muted">${RS_SEL.size} selected</b>
+        <span style="flex:1"></span>
+        <button class="btn sm" id="rsBulkNobid" ${RS_SEL.size?'':'disabled'} style="color:var(--bad)">Mark No-Bid</button>
+        <button class="btn sm" id="rsBulkArchive" ${RS_SEL.size?'':'disabled'}>Archive selected</button>
+        <button class="btn sm" id="rsBulkDelete" ${RS_SEL.size?'':'disabled'} style="color:var(--bad)">Delete selected</button>
+        <button class="btn sm" id="rsBulkClear" ${RS_SEL.size?'':'disabled'}>Clear</button>
+      </div>
     </div>
-    <div id="rsList">${shown.map(researchCard).join('')||'<div class="card center muted">Nothing in research. Run Autopilot or add RFPs in Discovery — opportunities land here automatically.</div>'}</div>`;
+    <div id="rsList">${shown.map(researchCard).join('')||'<div class="card center muted">Nothing matches these filters.</div>'}</div>`;
   $('#rsQ').oninput=e=>{ RESEARCH_Q=e.target.value; clearTimeout(window._rst); window._rst=setTimeout(renderResearch,250); };
+  $('#rsFrom').onchange=e=>{ RS_FROM=e.target.value; renderResearch(); };
+  $('#rsTo').onchange=e=>{ RS_TO=e.target.value; renderResearch(); };
+  $('#rsClear').onclick=()=>{ RESEARCH_Q=RS_FROM=RS_TO=''; renderResearch(); };
+  $('#rsAll').onchange=e=>{ if(e.target.checked) shownIds.forEach(id=>RS_SEL.add(id)); else shownIds.forEach(id=>RS_SEL.delete(id)); renderResearch(); };
+  $('#rsList').addEventListener('change',e=>{ const cb=e.target.closest('.rssel'); if(!cb) return;
+    if(cb.checked) RS_SEL.add(cb.dataset.id); else RS_SEL.delete(cb.dataset.id);
+    $('#rsCount').textContent=`${RS_SEL.size} selected`;
+    ['rsBulkNobid','rsBulkArchive','rsBulkDelete','rsBulkClear'].forEach(b=>$('#'+b).disabled=!RS_SEL.size);
+  });
+  $('#rsBulkClear').onclick=()=>{ RS_SEL.clear(); renderResearch(); };
+  $('#rsBulkDelete').onclick=()=>rsBulk('delete');
+  $('#rsBulkArchive').onclick=()=>rsBulk('archive');
+  $('#rsBulkNobid').onclick=()=>rsBulk('nobid');
+}
+async function rsBulk(action){
+  const ids=[...RS_SEL]; if(!ids.length) return;
+  const verb={delete:'Delete',archive:'Archive',nobid:'Mark No-Bid on'}[action];
+  if(!confirm(`${verb} ${ids.length} opportunit${ids.length===1?'y':'ies'}?`)) return;
+  toast(`${verb}…`, true);
+  if(action==='delete'){
+    for(let i=0;i<ids.length;i+=50) await api(`govcon_rfps?id=in.(${ids.slice(i,i+50).join(',')})`,{method:'DELETE',prefer:'return=minimal'});
+  } else {
+    const patch = action==='archive' ? {review_stage:'Archived', archived_at:new Date().toISOString()}
+      : {review_stage:'Rejected / No-Bid', no_bid_reason:'Bulk No-Bid from Research'};
+    for(let i=0;i<ids.length;i+=50) await api(`govcon_rfps?id=in.(${ids.slice(i,i+50).join(',')})`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify(patch)});
+  }
+  toast(`${verb} ${ids.length} done`); RS_SEL.clear(); renderResearch();
 }
 function researchCard(r){
   const sum=(r.details&&r.details.analysis_summary)||null;
   return `<div class="rfp">
     <div style="display:flex;align-items:flex-start;gap:9px">
+      <input type="checkbox" class="rssel" data-id="${r.id}" ${RS_SEL.has(r.id)?'checked':''} style="width:auto;margin-top:4px">
       <div class="t" style="cursor:pointer;flex:1" onclick="openReview('${r.id}')">${esc(r.title)}</div>
       <span class="pill">${esc(r.review_stage||'Discovered')}</span>
     </div>
