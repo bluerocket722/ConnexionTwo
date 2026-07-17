@@ -322,7 +322,7 @@ async function renderDashboard() {
     api(`govcon_pipeline_items?owner=eq.${uid}&select=id,stage`),
     api(`govcon_proposals?owner=eq.${uid}&select=id,status`),
     api(`govcon_research?owner=eq.${uid}&select=rfp_id,win_probability_score,risk_score,competition_score,recommendation_label`).catch(()=>[]),
-    api(`govcon_run_logs?owner=eq.${uid}&fn=eq.govcon-autopilot-run&select=*&order=started_at.desc&limit=5`).catch(()=>[]),
+    api(`govcon_run_logs?owner=eq.${uid}&fn=eq.govcon-auto-pilot-run&select=*&order=started_at.desc&limit=5`).catch(()=>[]),
   ]);
   const rById={}; (research||[]).forEach(r=>rById[r.rfp_id]=r);
   const awarded = pipeline.filter(p=>p.stage==='awarded'||p.stage==='won').length;
@@ -393,16 +393,16 @@ async function renderDashboard() {
 async function analyzeAllPending(){
   // status element differs by page (Dashboard vs Autopilot) → tolerate either, fall back to toast
   const say=(m)=>{ const st=$('#dashPendStatus')||$('#ar_status'); if(st) st.textContent=m; else toast(m, true); };
-  const deployHint='govcon-autopilot-run isn’t deployed yet — deploy the r23 function, then try again.';
+  const deployHint='govcon-auto-pilot-run isn’t deployed yet — deploy the r23 function, then try again.';
   say('Finding pending opportunities…');
   let pending=[];
-  try{ const r=await callFn('govcon-autopilot-run',{action:'list_pending'}); pending=r.pending||[]; }
+  try{ const r=await callFn('govcon-auto-pilot-run',{action:'list_pending'}); pending=r.pending||[]; }
   catch(e){ say(/Failed to fetch|HTTP 5|CORS/i.test(e.message)? deployHint : 'Could not list pending: '+e.message); return; }
   if(!pending.length){ say('✓ Nothing pending — all opportunities are analyzed.'); return; }
   let done=0, fail=0;
   for(const p of pending){
     say(`Analyzing ${done+1}/${pending.length}: ${String(p.title||'').slice(0,50)}…`);
-    try{ await callFn('govcon-autopilot-run',{action:'process_one', rfp_id:p.id}); done++; }
+    try{ await callFn('govcon-auto-pilot-run',{action:'process_one', rfp_id:p.id}); done++; }
     catch(e){ fail++; if(/Failed to fetch|HTTP 5|CORS/i.test(e.message)){ say(deployHint); return; } }
   }
   say(`✓ Analyzed ${done} opportunit${done===1?'y':'ies'}${fail?`, ${fail} failed`:''}.`);
@@ -1316,14 +1316,14 @@ async function runAutopilotNow() {
   showApProgress('Starting…');
   try {
     // Non-blocking: the function creates a run and returns 202 immediately (spec §11)
-    const r = await callFn('govcon-autopilot-run', { action:'start' });
+    const r = await callFn('govcon-auto-pilot-run', { action:'start' });
     if (r.status==='already_running'){ showApProgress('A run is already in progress…'); pollApRun(r.run_id); }
     else { showApProgress('Queued — discovering opportunities…'); pollApRun(r.run_id); }
   } catch(e){
     // NO silent legacy fallback — show the real error (spec §10)
     const hint = e.kind==='cors_or_network'
-      ? 'Set "Verify JWT = OFF" for govcon-autopilot-run in Supabase (Edge Functions → govcon-autopilot-run → Settings) and confirm it deployed.'
-      : e.kind==='not_deployed' ? 'govcon-autopilot-run is not deployed.' : '';
+      ? 'Set "Verify JWT = OFF" for govcon-auto-pilot-run in Supabase (Edge Functions → govcon-auto-pilot-run → Settings) and confirm it deployed.'
+      : e.kind==='not_deployed' ? 'govcon-auto-pilot-run is not deployed.' : '';
     showApProgress(`Autopilot failed: ${e.message}${hint?'  ·  '+hint:''}`, true);
     btns.forEach(b=>b.disabled=false);
   }
@@ -1345,7 +1345,7 @@ async function pollApRun(runId){
   AP_POLL=setInterval(async ()=>{
     ticks++;
     try{
-      const r=await callFn('govcon-autopilot-run',{action:'run_status', run_id:runId});
+      const r=await callFn('govcon-auto-pilot-run',{action:'run_status', run_id:runId});
       const run=r.run;
       if(!run){ return; }
       const s=run.stats||{};
