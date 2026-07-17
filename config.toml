@@ -97,3 +97,11 @@ verify_jwt = false   # function verifies the user JWT itself; lets the CORS pref
 [functions.govcon-research-intelligence]
 entrypoint = "./functions/govcon-research-intelligence/govcon-research-intelligence.ts"
 verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-yelp-import]
+entrypoint = "./functions/govcon-yelp-import/govcon-yelp-import.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
+
+[functions.govcon-ai-config]
+entrypoint = "./functions/govcon-ai-config/govcon-ai-config.ts"
+verify_jwt = false   # function verifies the user JWT itself; lets the CORS preflight through
