@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ConnexionTwo Dialer</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Roboto',sans-serif;background:#0f1420;color:#e8eaed;min-height:100vh;display:flex;flex-direction:column}
+.nav{background:#161c2b;border-bottom:1px solid #2a3346;padding:0 20px;height:56px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100}
+.nav-logo{font-size:18px;font-weight:700;color:#e8eaed;white-space:nowrap}
+.nav-logo span{color:#3b82f6}
+.nav-actions{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:20px;border:none;font-family:'Roboto',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s}
+.btn-primary{background:#3b82f6;color:#fff}.btn-primary:hover{background:#2563eb}
+.btn-outline{background:transparent;color:#93b4f8;border:1px solid #39435a}.btn-outline:hover{background:#222b3d}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn-danger{background:#dc2626;color:#fff}.btn-danger:hover{background:#b91c1c}
+.btn-ghost{background:transparent;color:#93a0b4;border:none;padding:6px 10px;border-radius:8px}.btn-ghost:hover{background:#222b3d;color:#e8eaed}
+.btn-green{background:#16a34a;color:#fff}.btn-green:hover{background:#15803d}
+.btn-warn{background:#d97706;color:#fff}.btn-warn:hover{background:#b45309}
+.stats-bar{background:#161c2b;border-bottom:1px solid #2a3346;padding:12px 20px;display:flex;gap:12px;overflow-x:auto;flex-shrink:0}
+.stat-pill{display:flex;align-items:center;gap:8px;background:#1d2637;border-radius:16px;padding:6px 14px;cursor:pointer;transition:all .2s;white-space:nowrap;border:2px solid transparent}
+.stat-pill:hover{background:#222b3d}.stat-pill.active{border-color:#3b82f6}
+.stat-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.stat-label{font-size:12px;color:#93a0b4}.stat-count{font-size:13px;font-weight:500}
+.toolbar{padding:12px 20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex-shrink:0}
+.search-wrap{position:relative;flex:1;min-width:200px;max-width:380px}
+.search-wrap input{width:100%;background:#161c2b;border:1px solid #39435a;border-radius:20px;padding:8px 12px 8px 36px;color:#e8eaed;font-family:inherit;font-size:13px;outline:none}
+.search-wrap input:focus{border-color:#3b82f6}
+.search-wrap svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:.5}
+.sort-select{background:#161c2b;border:1px solid #39435a;border-radius:8px;padding:8px 12px;color:#e8eaed;font-family:inherit;font-size:13px;outline:none;cursor:pointer}
+.main{display:flex;flex:1;overflow:hidden}
+.table-area{flex:1;overflow-y:auto;padding:0 20px 20px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:#161c2b;position:sticky;top:0;z-index:10;padding:10px 12px;text-align:left;color:#93a0b4;font-weight:500;border-bottom:1px solid #2a3346;white-space:nowrap}
+tbody tr{border-bottom:1px solid #222b3d;cursor:pointer;transition:background .15s}
+tbody tr:hover{background:#1d2637}tbody tr.selected{background:#3b82f622}
+td{padding:10px 12px;vertical-align:middle;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dispo-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:500;color:#fff}
+.phone-link{color:#93b4f8;text-decoration:none}.phone-link:hover{text-decoration:underline}
+.side-panel{width:0;background:#161c2b;border-left:1px solid #2a3346;overflow:hidden;transition:width .25s ease;display:flex;flex-direction:column;flex-shrink:0}
+.side-panel.open{width:440px}
+.panel-header{padding:16px 20px;border-bottom:1px solid #2a3346;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0}
+.panel-name{font-size:16px;font-weight:500;line-height:1.3}.panel-sub{font-size:12px;color:#93a0b4;margin-top:2px}
+.panel-tabs{display:flex;border-bottom:1px solid #2a3346;flex-shrink:0;overflow-x:auto}
+.panel-tab{padding:10px 16px;font-size:13px;cursor:pointer;color:#93a0b4;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s}
+.panel-tab:hover{color:#e8eaed}.panel-tab.active{color:#93b4f8;border-bottom-color:#3b82f6}
+.panel-body{flex:1;overflow-y:auto;padding:16px}
+.panel-footer{padding:12px 16px;border-top:1px solid #2a3346;display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap}
+.field-group{margin-bottom:14px}
+.field-label{font-size:11px;color:#93a0b4;margin-bottom:4px;display:block;font-weight:500;text-transform:uppercase;letter-spacing:.5px}
+.field-input{width:100%;background:transparent;border:none;border-bottom:1px solid #39435a;padding:6px 2px;color:#e8eaed;font-family:inherit;font-size:14px;outline:none;transition:border-color .2s}
+.field-input:focus{border-bottom-color:#3b82f6}
+.field-input[type="date"]{color-scheme:dark}
+textarea.field-input{resize:vertical;min-height:80px;border:1px solid #39435a;border-radius:8px;padding:8px;background:#1d2637}
+textarea.field-input:focus{border-color:#3b82f6}
+select.field-input{background:#1d2637;border:1px solid #39435a;border-radius:8px;padding:6px 8px;cursor:pointer}
+.dispo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.dispo-btn{padding:8px 4px;border-radius:10px;border:2px solid transparent;font-size:12px;font-weight:500;cursor:pointer;text-align:center;transition:all .2s;color:#fff;opacity:.7}
+.dispo-btn:hover{opacity:1;transform:translateY(-1px)}
+.dispo-btn.active{opacity:1;border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.3)}
+.activity-item{display:flex;gap:10px;margin-bottom:14px}
+.activity-dot{width:8px;height:8px;border-radius:50%;background:#39435a;flex-shrink:0;margin-top:5px}
+.activity-dot.dispo{background:#3b82f6}.activity-dot.note{background:#16a34a}.activity-dot.contract{background:#d97706}
+.activity-text{font-size:13px}.activity-time{font-size:11px;color:#93a0b4;margin-top:2px}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:500;display:none;align-items:center;justify-content:center}
+.modal-backdrop.open{display:flex}
+.modal{background:#161c2b;border-radius:16px;width:90%;max-width:560px;max-height:90vh;overflow-y:auto;border:1px solid #39435a}
+.modal-lg{max-width:760px}
+.modal-header{padding:20px 20px 0;display:flex;justify-content:space-between;align-items:center}
+.modal-title{font-size:16px;font-weight:500}.modal-body{padding:20px}
+.modal-footer{padding:0 20px 20px;display:flex;justify-content:flex-end;gap:10px}
+.drop-zone{border:2px dashed #39435a;border-radius:12px;padding:36px 20px;text-align:center;cursor:pointer;transition:all .2s}
+.drop-zone:hover,.drop-zone.drag-over{border-color:#3b82f6;background:#3b82f610}
+.drop-zone p{color:#93a0b4;font-size:14px;margin-top:8px}
+.toast-container{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:2000}
+.toast{background:#1d2637;border-radius:10px;padding:12px 18px;font-size:14px;box-shadow:0 4px 16px rgba(0,0,0,.4);border-left:3px solid #3b82f6;animation:slideIn .25s ease;max-width:340px}
+.toast.success{border-left-color:#16a34a}.toast.error{border-left-color:#dc2626}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:none;opacity:1}}
+.empty-state{text-align:center;padding:60px 20px;color:#93a0b4}
+.spinner{width:32px;height:32px;border:3px solid #2a3346;border-top-color:#3b82f6;border-radius:50%;animation:spin .8s linear infinite;margin:40px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.solic-card{background:#1d2637;border:1px solid #2a3346;border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;transition:all .15s}
+.solic-card:hover{border-color:#3b82f6}
+.solic-title{font-size:14px;font-weight:500;color:#e8eaed}
+.solic-meta{font-size:12px;color:#93a0b4;margin-top:3px}
+.doc-row{display:flex;align-items:center;gap:8px;padding:7px 10px;background:#1d2637;border-radius:8px;margin-bottom:6px;font-size:13px}
+.doc-row a{color:#93b4f8;cursor:pointer;flex:1;word-break:break-word}
+.pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;background:#222b3d;color:#c0c8d6}
+/* AUTO DIALER */
+#dialer-overlay{position:fixed;inset:0;background:#0b0f18;z-index:900;display:none;flex-direction:column;overflow:hidden}
+#dialer-overlay.open{display:flex}
+.d-header{background:#161c2b;border-bottom:1px solid #2a3346;padding:0 16px;height:52px;display:flex;align-items:center;gap:10px;flex-shrink:0;overflow:hidden}
+.d-logo{font-size:14px;font-weight:600;color:#93a0b4;white-space:nowrap}.d-logo span{color:#3b82f6}
+.d-sep{color:#2a3346;font-size:18px}
+.d-progress-text{font-size:13px;font-weight:500;white-space:nowrap}
+.d-stats-bar{display:flex;gap:6px;flex:1;overflow-x:auto;padding:0 4px}
+.d-stat{display:flex;align-items:center;gap:5px;background:#1d2637;border-radius:12px;padding:3px 10px;font-size:12px;white-space:nowrap;flex-shrink:0}
+.d-stat-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.d-body{display:flex;flex:1;overflow:hidden}
+.d-lead{flex:0 0 360px;padding:20px;overflow-y:auto;border-right:1px solid #2a3346;background:#0f1420}
+.d-controls{flex:1;padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:18px;min-width:0}
+.d-biz-name{font-size:22px;font-weight:500;line-height:1.2;margin-bottom:4px}
+.d-info-row{display:flex;align-items:flex-start;gap:8px;padding:3px 0;font-size:13px;color:#c0c8d6}
+.d-info-icon{color:#93a0b4;width:18px;text-align:center;flex-shrink:0;margin-top:1px}
+.d-section-label{font-size:10px;color:#93a0b4;font-weight:500;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+.d-phone-edit{width:100%;background:#1d2637;border:2px solid #39435a;border-radius:10px;padding:12px;color:#93b4f8;font-family:inherit;font-size:20px;font-weight:300;outline:none;text-align:center;margin-bottom:10px;transition:border-color .2s}
+.d-phone-edit:focus{border-color:#3b82f6}.d-phone-edit:disabled{opacity:.35}
+.d-call-btn{width:100%;padding:18px;border-radius:14px;border:none;font-size:17px;font-weight:500;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:10px;font-family:inherit}
+.d-call-btn.ready{background:#16a34a;color:#fff}.d-call-btn.ready:hover{background:#15803d;transform:translateY(-1px)}
+.d-call-btn.calling{background:#1d2637;color:#93a0b4;cursor:default}
+.d-call-btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
+.d-timer{font-size:30px;font-weight:300;color:#39435a;text-align:center;font-family:monospace;letter-spacing:3px;margin-top:8px;transition:color .3s}
+.d-timer.active{color:#fbbf24}
+.d-dispo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.d-dispo-btn{padding:10px 4px;border-radius:10px;border:2px solid transparent;font-size:12px;font-weight:500;cursor:pointer;text-align:center;transition:all .2s;color:#fff;opacity:.75;font-family:inherit}
+.d-dispo-btn:hover{opacity:1;transform:translateY(-1px)}.d-dispo-btn.set{opacity:1;border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.25)}
+.d-auto-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.d-toggle{width:38px;height:22px;border-radius:11px;border:none;cursor:pointer;position:relative;transition:background .2s;background:#2a3346;flex-shrink:0}
+.d-toggle.on{background:#3b82f6}
+.d-toggle::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:3px;left:3px;transition:left .2s}
+.d-toggle.on::after{left:19px}
+.d-countdown{font-size:12px;color:#fbbf24;min-height:18px;text-align:center;margin-top:4px}
+.d-footer{background:#161c2b;border-top:1px solid #2a3346;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.d-prog-bar{flex:1;height:5px;background:#2a3346;border-radius:3px;overflow:hidden}
+.d-prog-fill{height:100%;background:#3b82f6;border-radius:3px;transition:width .3s}
+.d-notes-box{background:#1d2637;border-radius:8px;padding:10px;font-size:13px;color:#c0c8d6;line-height:1.5;max-height:120px;overflow-y:auto;word-break:break-word}
+.d-quick-note{width:100%;background:#1d2637;border:1px solid #39435a;border-radius:8px;padding:8px;color:#e8eaed;font-family:inherit;font-size:13px;outline:none;resize:vertical;min-height:68px;transition:border-color .2s}
+.d-quick-note:focus{border-color:#3b82f6}
+.d-delay-input{width:44px;background:#1d2637;border:1px solid #39435a;border-radius:6px;color:#e8eaed;text-align:center;padding:3px 4px;font-size:12px;outline:none}
+.d-end-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:16px;color:#93a0b4;text-align:center;padding:40px}
+/* dialer solicitation slide-in */
+#d-solic-drawer{position:fixed;top:52px;bottom:0;right:0;width:0;background:#161c2b;border-left:1px solid #2a3346;z-index:950;overflow:hidden;transition:width .25s ease;display:flex;flex-direction:column}
+#d-solic-drawer.open{width:min(460px,92vw)}
+#login-overlay{position:fixed;inset:0;background:#0a1020;display:flex;align-items:center;justify-content:center;z-index:1500}
+#login-overlay .login-card{background:#111827;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:40px 36px;width:100%;max-width:420px}
+#login-overlay h1{font-size:26px;font-weight:700;margin-bottom:8px}
+#login-overlay h1 span{color:#3b82f6}
+#login-overlay .login-sub{color:#9ca3af;font-size:15px;margin-bottom:28px}
+#login-overlay .lo-label{color:#d1d5db;font-size:14px;font-weight:500;margin-bottom:6px;display:block;margin-top:14px}
+#login-overlay .lo-input{background:#1f2937;border:1px solid rgba(255,255,255,.12);color:#fff;border-radius:8px;padding:12px 14px;font-size:15px;width:100%;outline:none}
+#login-overlay .lo-input:focus{border-color:#3b82f6}
+#login-overlay .login-btn{width:100%;background:#3b82f6;color:#fff;border:none;border-radius:10px;padding:13px;font-size:16px;font-weight:600;cursor:pointer;margin-top:18px}
+#login-overlay .login-btn:hover{background:#2563eb}
+#login-overlay .login-err{color:#f87171;font-size:13px;margin-top:12px;text-align:center;min-height:20px}
+@media(max-width:768px){.side-panel.open{width:100vw;position:fixed;inset:0;z-index:200}.stats-bar{display:none}.d-body{flex-direction:column}.d-lead{flex:0 0 auto;border-right:none;border-bottom:1px solid #2a3346;max-height:42vh}}
+</style>
+</head>
+<body>
+<div id="login-overlay">
+  <div class="login-card">
+    <h1><span>Connexion</span>Two Dialer</h1>
+    <p class="login-sub">Sign in with your ConnexionTwo GovCon account.</p>
+    <label class="lo-label">Email</label>
+    <input class="lo-input" id="lo-email" type="email" placeholder="you@example.com" onkeydown="if(event.key==='Enter')doLogin()">
+    <label class="lo-label">Password</label>
+    <input class="lo-input" id="lo-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-err" id="lo-err"></div>
+  </div>
+</div>
+
+<nav class="nav">
+  <div class="nav-logo"><span>Connexion</span>Two <span style="color:#93a0b4;font-weight:400">Dialer</span></div>
+  <div class="nav-actions">
+    <button class="btn btn-green btn-sm" onclick="openDialerSetup()">📞 Auto Dialer</button>
+    <button class="btn btn-outline btn-sm" onclick="openSolicModal()">📋 Solicitations</button>
+    <button class="btn btn-outline btn-sm" onclick="openImportModal()">⬆ Import CSV</button>
+    <button class="btn btn-primary btn-sm" onclick="openAddModal()">+ Add Lead</button>
+  </div>
+</nav>
+
+<div class="stats-bar" id="stats-bar"></div>
+
+<div class="toolbar">
+  <div class="search-wrap">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="search-input" placeholder="Search leads…" oninput="applyFilter()">
+  </div>
+  <select class="sort-select" id="sort-select" onchange="applyFilter()">
+    <option value="business_name">Name A–Z</option>
+    <option value="created_at_desc">Newest</option>
+    <option value="updated_at_desc">Recently Updated</option>
+  </select>
+  <span style="margin-left:auto;font-size:13px;color:#93a0b4" id="lead-count"></span>
+</div>
+
+<div class="main">
+  <div class="table-area" id="table-area"><div class="spinner"></div></div>
+  <div class="side-panel" id="side-panel">
+    <div class="panel-header">
+      <div><div class="panel-name" id="panel-name">—</div><div class="panel-sub" id="panel-sub"></div></div>
+      <button class="btn-ghost" onclick="closePanel()" style="font-size:18px;line-height:1">✕</button>
+    </div>
+    <div class="panel-tabs" id="panel-tabs">
+      <div class="panel-tab active" onclick="switchTab('info')">Info</div>
+      <div class="panel-tab" onclick="switchTab('dispo')">Dispo</div>
+      <div class="panel-tab" onclick="switchTab('contract')">Contract</div>
+      <div class="panel-tab" onclick="switchTab('activity')">Activity</div>
+    </div>
+    <div class="panel-body" id="panel-body"></div>
+    <div class="panel-footer" id="panel-footer"></div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ADD/EDIT LEAD MODAL -->
+<div class="modal-backdrop" id="add-modal">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="add-modal-title">Add Lead</div><button class="btn-ghost" onclick="closeAddModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="field-group"><label class="field-label">Business Name *</label><input class="field-input" id="m-business_name"></div>
+        <div class="field-group"><label class="field-label">Contact Name</label><input class="field-input" id="m-contact_name"></div>
+      </div>
+      <div class="grid-2">
+        <div class="field-group"><label class="field-label">Phone</label><input class="field-input" id="m-phone" type="tel"></div>
+        <div class="field-group"><label class="field-label">Email</label><input class="field-input" id="m-email" type="email"></div>
+      </div>
+      <div class="field-group"><label class="field-label">Address</label><input class="field-input" id="m-address"></div>
+      <div class="grid-3">
+        <div class="field-group"><label class="field-label">City</label><input class="field-input" id="m-city"></div>
+        <div class="field-group"><label class="field-label">State</label><input class="field-input" id="m-state"></div>
+        <div class="field-group"><label class="field-label">Industry</label><input class="field-input" id="m-industry"></div>
+      </div>
+      <div class="field-group"><label class="field-label">Dispo</label><select class="field-input" id="m-dispo"></select></div>
+      <div class="field-group"><label class="field-label">Notes</label><textarea class="field-input" id="m-notes"></textarea></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeAddModal()">Cancel</button><button class="btn btn-primary" onclick="saveLeadModal()">Save Lead</button></div>
+  </div>
+</div>
+
+<!-- IMPORT CSV MODAL -->
+<div class="modal-backdrop" id="import-modal">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Import CSV</div><button class="btn-ghost" onclick="document.getElementById('import-modal').classList.remove('open')">✕</button></div>
+    <div class="modal-body">
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('csv-file-input').click()"
+        ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleDrop(event)">
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#93a0b4" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <p>Click or drop a CSV — columns are read by header name</p>
+        <p style="font-size:11px;margin-top:6px;color:#5f6b80">Recognized headers: Title/Business · Name/Contact · Phone · Email · Address · City · State · Industry · Dispo · Notes · Website · Rating · Reviews</p>
+      </div>
+      <input type="file" id="csv-file-input" accept=".csv" style="display:none" onchange="handleCSVFile(event)">
+      <div id="import-status" style="margin-top:12px;font-size:13px;color:#93a0b4;line-height:1.6"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('import-modal').classList.remove('open')">Close</button>
+      <button class="btn btn-primary" id="import-submit-btn" onclick="submitImportedLeads()" style="display:none">⬆ Import Leads</button>
+    </div>
+  </div>
+</div>
+
+<!-- SOLICITATIONS MODAL (main CRM) -->
+<div class="modal-backdrop" id="solic-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header"><div class="modal-title">📋 GovCon Solicitations</div><button class="btn-ghost" onclick="document.getElementById('solic-modal').classList.remove('open')">✕</button></div>
+    <div class="modal-body">
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input class="field-input" id="solic-q" placeholder="Search title, agency, NAICS…" style="flex:1;border:1px solid #39435a;border-radius:8px;padding:8px 10px" onkeydown="if(event.key==='Enter')solicSearch()">
+        <button class="btn btn-primary btn-sm" onclick="solicSearch()">Search</button>
+      </div>
+      <div id="solic-results"><div class="empty-state" style="padding:24px">Search your saved solicitations to open their downloaded documents.</div></div>
+      <div id="solic-docs"></div>
+    </div>
+  </div>
+</div>
+
+<!-- DIALER SETUP MODAL -->
+<div class="modal-backdrop" id="dialer-setup-modal">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">📞 Auto Dialer Setup</div><button class="btn-ghost" onclick="document.getElementById('dialer-setup-modal').classList.remove('open')">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:#93a0b4;margin-bottom:14px">Queue leads to call by disposition:</p>
+      <div id="dialer-dispo-checks"></div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid #2a3346">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:#93a0b4">
+          <input type="checkbox" id="dialer-use-filter" style="width:14px;height:14px" onchange="updateDialerCount()"> Use current table filter instead
+        </label>
+      </div>
+      <div style="margin-top:14px;font-size:13px;color:#93a0b4">Queue size: <strong id="dialer-queue-count" style="color:#e8eaed;font-size:15px">0</strong> leads</div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="document.getElementById('dialer-setup-modal').classList.remove('open')">Cancel</button><button class="btn btn-green" onclick="startDialerSession()" id="dialer-start-btn" disabled>Start Session</button></div>
+  </div>
+</div>
+
+<!-- DIALER OVERLAY -->
+<div id="dialer-overlay">
+  <div class="d-header">
+    <div class="d-logo">📞 <span>ConnexionTwo</span> Dialer</div>
+    <div class="d-sep">|</div>
+    <div class="d-progress-text" id="d-progress-text">—</div>
+    <div class="d-stats-bar" id="d-stats-bar"></div>
+    <button class="btn btn-outline btn-sm" onclick="toggleSolicDrawer()">📋 Solicitations</button>
+    <button class="btn btn-danger btn-sm" onclick="endDialerSession()">End</button>
+  </div>
+  <div class="d-body">
+    <div class="d-lead" id="d-lead-panel"></div>
+    <div class="d-controls" id="d-controls-panel"></div>
+  </div>
+  <div class="d-footer">
+    <button class="btn btn-ghost btn-sm" onclick="dialerPrev()">← Prev</button>
+    <button class="btn btn-ghost btn-sm" onclick="dialerSkip()">Skip →</button>
+    <div class="d-prog-bar"><div class="d-prog-fill" id="d-prog-fill" style="width:0%"></div></div>
+    <span id="d-footer-remaining" style="font-size:12px;color:#93a0b4;white-space:nowrap"></span>
+  </div>
+</div>
+
+<!-- SOLICITATION DRAWER (inside dialer, slides from right) -->
+<div id="d-solic-drawer">
+  <div style="padding:14px 16px;border-bottom:1px solid #2a3346;display:flex;align-items:center;gap:8px">
+    <b style="flex:1">📋 Solicitations</b>
+    <button class="btn-ghost" onclick="toggleSolicDrawer()" style="font-size:16px">✕</button>
+  </div>
+  <div style="padding:12px 16px;display:flex;gap:8px;border-bottom:1px solid #2a3346">
+    <input class="field-input" id="dsolic-q" placeholder="Search…" style="flex:1;border:1px solid #39435a;border-radius:8px;padding:7px 9px" onkeydown="if(event.key==='Enter')solicSearch(true)">
+    <button class="btn btn-primary btn-sm" onclick="solicSearch(true)">Go</button>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:12px 16px">
+    <div id="dsolic-results"><div class="empty-state" style="padding:20px">Search to open contract documents while you call.</div></div>
+    <div id="dsolic-docs"></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════ CONFIG — same Supabase project as ConnexionTwo GovCon ═══════════════ */
+const SUPABASE_URL = "https://rfdvogakvyodixgpvqvz.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E";
+const AUTH_URL = SUPABASE_URL + "/auth/v1";
+const GOV_BUCKET = "documents";
+
+const db  = path => `${SUPABASE_URL}/rest/v1/${path}`;
+const hdr = extra => ({ "Content-Type":"application/json", apikey:SUPABASE_KEY, Authorization:`Bearer ${SUPABASE_KEY}`, Prefer:"return=representation", ...extra });
+// GovCon tables/storage are owner-scoped (RLS = auth.uid()), so they need the
+// signed-in USER's token — captured at login.
+const govToken = () => localStorage.getItem('crm_token') || SUPABASE_KEY;
+const govHdr = extra => ({ "Content-Type":"application/json", apikey:SUPABASE_KEY, Authorization:`Bearer ${govToken()}`, ...extra });
+
+const $  = (s,r=document) => r.querySelector(s);
+const $$ = (s,r=document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const normalizePhone = p => (p||"").replace(/\D/g,"");
+
+const DISPOS = {
+  new:{label:"New",color:"#5f6b80"}, no_pick_up:{label:"No Pick Up",color:"#78716c"},
+  voicemail:{label:"Voicemail",color:"#7c3aed"}, call_back:{label:"Call Back",color:"#16a34a"},
+  gate_keeper:{label:"Gate Keeper",color:"#dc2626"}, follow_up:{label:"Follow Up",color:"#d97706"},
+  email:{label:"Email Sent",color:"#3b82f6"}, text:{label:"Text Sent",color:"#1d4ed8"},
+  appointment:{label:"Appointment",color:"#16a34a"}, teaming:{label:"Teaming Interest",color:"#0891b2"},
+  quote_requested:{label:"Quote Requested",color:"#0d9488"}, not_interested:{label:"Not Interested",color:"#0f766e"},
+  dnc:{label:"DNC",color:"#374151"}, bad_number:{label:"Bad Number",color:"#92400e"},
+};
+const CONNECTED_DISPOS = new Set(['call_back','gate_keeper','follow_up','appointment','teaming','quote_requested','not_interested']);
+const VOICEMAIL_DISPOS = new Set(['voicemail']);
+const NO_ANSWER_DISPOS = new Set(['no_pick_up','bad_number']);
+
+/* ── CSV header → field mapping (reads by header NAME, any column order) ── */
+const HEADER_MAP = {
+  title:'business_name', business:'business_name', 'business name':'business_name', company:'business_name', 'company name':'business_name',
+  name:'contact_name', contact:'contact_name', 'contact name':'contact_name', 'first name':'contact_name',
+  phone:'phone', 'phone number':'phone', tel:'phone', telephone:'phone', 'cell':'phone',
+  email:'email', 'e-mail':'email', 'email address':'email',
+  address:'address', street:'address', 'street address':'address', location:'address',
+  city:'city', state:'state', county:'county', zip:'postal', 'zip code':'postal',
+  industry:'industry', category:'industry', type:'industry', trade:'industry',
+  dispo:'dispo', disposition:'dispo', status:'dispo',
+  notes:'notes', note:'notes', comments:'notes',
+  website:'website', site:'website', url:'website', web:'website',
+  rating:'rating', reviews:'reviews', 'review count':'reviews',
+};
+function mapHeaders(cols){ return cols.map(c => HEADER_MAP[String(c||'').trim().toLowerCase().replace(/[^a-z0-9 ]/g,'').trim()] || null); }
+function normDispo(v){
+  if(!v) return 'new';
+  const k = String(v).toLowerCase().trim().replace(/\s+/g,'_');
+  if(DISPOS[k]) return k;
+  const alias={emailed:'email',emailsent:'email',called:'no_pick_up',vm:'voicemail',callback:'call_back',appt:'appointment',notinterested:'not_interested'};
+  return alias[k.replace(/_/g,'')] || 'new';
+}
+
+/* ═══════════════ AUTH ═══════════════ */
+async function doLogin(){
+  const email=$('#lo-email').value.trim(), pass=$('#lo-pass').value;
+  $('#lo-err').textContent='';
+  try{
+    const res=await fetch(`${AUTH_URL}/token?grant_type=password`,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY},body:JSON.stringify({email,password:pass})});
+    const data=await res.json();
+    if(!res.ok){ $('#lo-err').textContent=data.error_description||data.msg||'Login failed'; return; }
+    localStorage.setItem('crm_token',data.access_token);
+    $('#login-overlay').style.display='none';
+    loadLeads();
+  }catch(e){ $('#lo-err').textContent='Network error'; }
+}
+async function checkSession(){
+  const token=localStorage.getItem('crm_token'); if(!token) return false;
+  try{ const res=await fetch(`${AUTH_URL}/user`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${token}`}}); return res.ok; }catch(e){ return false; }
+}
+
+/* ═══════════════ STATE ═══════════════ */
+let allLeads=[], filteredLeads=[], currentLead=null, currentTab='info', activeDispo=null, editingLead=null;
+let parsedImportData=[];
+
+function showToast(msg,type='info'){ const c=$('#toast-container'); const t=document.createElement('div'); t.className=`toast ${type}`; t.textContent=msg; c.appendChild(t); setTimeout(()=>t.remove(),3600); }
+
+/* ═══════════════ LOAD + TABLE ═══════════════ */
+async function loadLeads(){
+  try{
+    const PAGE=1000; let arr=[], page=0;
+    while(true){
+      const res=await fetch(db(`crm_leads?select=*&order=created_at.desc&limit=${PAGE}&offset=${page*PAGE}`),{headers:hdr()});
+      if(!res.ok) throw new Error(await res.text());
+      const batch=await res.json(); arr=arr.concat(batch);
+      if(batch.length<PAGE) break; page++;
+    }
+    allLeads=arr; buildStats(); applyFilter();
+  }catch(e){ console.error(e); $('#table-area').innerHTML=`<div class="empty-state"><p>Could not load leads — check console</p></div>`; }
+}
+function buildStats(){
+  const counts={}; allLeads.forEach(l=>counts[l.dispo]=(counts[l.dispo]||0)+1);
+  const all=`<div class="stat-pill ${!activeDispo?'active':''}" onclick="filterDispo(null)"><span class="stat-dot" style="background:#3b82f6"></span><span class="stat-label">All</span><span class="stat-count">${allLeads.length}</span></div>`;
+  $('#stats-bar').innerHTML=all+Object.entries(DISPOS).map(([k,d])=>{const n=counts[k]||0;return `<div class="stat-pill ${activeDispo===k?'active':''}" onclick="filterDispo('${k}')"><span class="stat-dot" style="background:${d.color}"></span><span class="stat-label">${d.label}</span><span class="stat-count">${n}</span></div>`;}).join('');
+}
+function filterDispo(k){ activeDispo=k; buildStats(); applyFilter(); }
+function applyFilter(){
+  const q=($('#search-input').value||'').toLowerCase(), sort=$('#sort-select').value;
+  let leads=allLeads.filter(l=>{
+    if(activeDispo && l.dispo!==activeDispo) return false;
+    if(!q) return true;
+    return [l.business_name,l.contact_name,l.phone,l.email,l.address,l.city,l.state,l.notes,l.solicitation_title].join(' ').toLowerCase().includes(q);
+  });
+  leads.sort((a,b)=>{ if(sort==='business_name') return (a.business_name||'').localeCompare(b.business_name||''); if(sort==='created_at_desc') return new Date(b.created_at)-new Date(a.created_at); if(sort==='updated_at_desc') return new Date(b.updated_at||0)-new Date(a.updated_at||0); return 0; });
+  filteredLeads=leads; $('#lead-count').textContent=`${leads.length} lead${leads.length!==1?'s':''}`; renderTable();
+}
+function renderTable(){
+  const area=$('#table-area');
+  if(!filteredLeads.length){ area.innerHTML=`<div class="empty-state"><p>No leads found</p></div>`; return; }
+  const rows=filteredLeads.map(l=>{ const d=DISPOS[l.dispo]||DISPOS.new; const loc=[l.city,l.state].filter(Boolean).join(', ')||'—'; const sel=currentLead?.id===l.id?'selected':'';
+    return `<tr class="${sel}" onclick="openLead('${l.id}')"><td style="font-weight:500;white-space:normal">${esc(l.business_name)}${l.rfp_id?' <span class="pill">📋 contract</span>':''}</td><td>${esc(l.contact_name||'—')}</td><td>${l.email?`<a class="phone-link" href="mailto:${esc(l.email)}" onclick="event.stopPropagation()">${esc(l.email)}</a>`:'—'}</td><td><a class="phone-link" href="tel:${esc(l.phone)}" onclick="event.stopPropagation()">${esc(l.phone||'—')}</a></td><td>${esc(loc)}</td><td><span class="dispo-badge" style="background:${d.color}">${d.label}</span></td><td style="color:#93a0b4;font-size:12px">${l.updated_at?new Date(l.updated_at).toLocaleDateString():'—'}</td></tr>`;
+  }).join('');
+  area.innerHTML=`<table><thead><tr><th>Business</th><th>Contact</th><th>Email</th><th>Phone</th><th>Location</th><th>Dispo</th><th>Updated</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+/* ═══════════════ SIDE PANEL ═══════════════ */
+async function openLead(id){
+  const lead=allLeads.find(l=>l.id===id); if(!lead) return;
+  currentLead=lead; currentTab='info';
+  $('#side-panel').classList.add('open');
+  $('#panel-name').textContent=lead.business_name;
+  const d=DISPOS[lead.dispo]||DISPOS.new;
+  $('#panel-sub').innerHTML=`<span class="dispo-badge" style="background:${d.color}">${d.label}</span>`;
+  updateTabUI(); renderTable(); renderTab();
+}
+function closePanel(){ $('#side-panel').classList.remove('open'); currentLead=null; renderTable(); }
+function switchTab(t){ currentTab=t; updateTabUI(); renderTab(); }
+function updateTabUI(){ $$('.panel-tab').forEach((t,i)=>t.classList.toggle('active',['info','dispo','contract','activity'][i]===currentTab)); }
+async function renderTab(){
+  if(!currentLead) return;
+  if(currentTab==='info') renderInfoTab();
+  else if(currentTab==='dispo') renderDispoTab();
+  else if(currentTab==='contract') renderContractTab();
+  else if(currentTab==='activity') await renderActivityTab();
+}
+function renderInfoTab(){
+  const l=currentLead;
+  $('#panel-body').innerHTML=`
+    <div class="field-group"><label class="field-label">Business Name</label><input class="field-input" id="e-business_name" value="${esc(l.business_name)}"></div>
+    <div class="grid-2"><div class="field-group"><label class="field-label">Contact</label><input class="field-input" id="e-contact_name" value="${esc(l.contact_name||'')}"></div><div class="field-group"><label class="field-label">Phone</label><input class="field-input" id="e-phone" value="${esc(l.phone||'')}"></div></div>
+    <div class="field-group"><label class="field-label">Email</label><input class="field-input" id="e-email" type="email" value="${esc(l.email||'')}"></div>
+    <div class="field-group"><label class="field-label">Address</label><input class="field-input" id="e-address" value="${esc(l.address||'')}"></div>
+    <div class="grid-3"><div class="field-group"><label class="field-label">City</label><input class="field-input" id="e-city" value="${esc(l.city||'')}"></div><div class="field-group"><label class="field-label">State</label><input class="field-input" id="e-state" value="${esc(l.state||'')}"></div><div class="field-group"><label class="field-label">Industry</label><input class="field-input" id="e-industry" value="${esc(l.industry||'')}"></div></div>
+    <div class="field-group"><label class="field-label">Website</label><input class="field-input" id="e-website" value="${esc(l.website||'')}"></div>`;
+  $('#panel-footer').innerHTML=`<button class="btn btn-primary btn-sm" onclick="saveCurrentLead()">Save</button><button class="btn btn-danger btn-sm" onclick="deleteLead()">Delete</button>`;
+}
+function renderDispoTab(){
+  $('#panel-body').innerHTML=`<div class="dispo-grid">${Object.entries(DISPOS).map(([k,d])=>`<button class="dispo-btn ${currentLead.dispo===k?'active':''}" style="background:${d.color}" onclick="setDispo('${k}')">${d.label}</button>`).join('')}</div><div class="field-group" style="margin-top:16px"><label class="field-label">Note (optional)</label><textarea class="field-input" id="dispo-note"></textarea></div>`;
+  $('#panel-footer').innerHTML='';
+}
+async function renderActivityTab(){
+  $('#panel-body').innerHTML=`<div class="spinner"></div>`;
+  $('#panel-footer').innerHTML=`<textarea class="field-input" id="act-note" placeholder="Add a note…" style="flex:1;min-height:60px"></textarea><button class="btn btn-primary btn-sm" onclick="addActivity()">Add</button>`;
+  try{
+    const res=await fetch(db(`crm_activity?lead_id=eq.${currentLead.id}&order=created_at.desc&limit=60`),{headers:hdr()});
+    const acts=res.ok?await res.json():[];
+    if(!acts.length){ $('#panel-body').innerHTML=`<p style="color:#93a0b4;font-size:13px">No activity yet.</p>`; return; }
+    $('#panel-body').innerHTML=acts.map(a=>{
+      const isDispo=a.activity_type==='dispo_change', isContract=!!a.rfp_id;
+      const text=isDispo?`Dispo: <b>${DISPOS[a.old_dispo]?.label||a.old_dispo}</b> → <b>${DISPOS[a.new_dispo]?.label||a.new_dispo}</b>${a.body?`<br><em>${esc(a.body)}</em>`:''}`:esc(a.body);
+      return `<div class="activity-item"><div class="activity-dot ${isContract?'contract':isDispo?'dispo':'note'}"></div><div><div class="activity-text">${isContract?'📋 ':''}${text}</div><div class="activity-time">${new Date(a.created_at).toLocaleString()}</div></div></div>`;
+    }).join('');
+  }catch(e){ $('#panel-body').innerHTML=`<p style="color:#dc2626">Error loading activity</p>`; }
+}
+async function setDispo(newDispo){
+  if(!currentLead) return; const old=currentLead.dispo, note=$('#dispo-note')?.value||''; if(old===newDispo) return;
+  try{
+    await fetch(db(`crm_leads?id=eq.${currentLead.id}`),{method:'PATCH',headers:hdr(),body:JSON.stringify({dispo:newDispo,last_contacted_at:new Date().toISOString()})});
+    await fetch(db('crm_activity'),{method:'POST',headers:hdr(),body:JSON.stringify({lead_id:currentLead.id,activity_type:'dispo_change',old_dispo:old,new_dispo:newDispo,body:note||null,rfp_id:currentLead.rfp_id||null})});
+    currentLead.dispo=newDispo; const i=allLeads.findIndex(l=>l.id===currentLead.id); if(i>=0)allLeads[i].dispo=newDispo;
+    const d=DISPOS[newDispo]; $('#panel-sub').innerHTML=`<span class="dispo-badge" style="background:${d.color}">${d.label}</span>`;
+    buildStats(); renderDispoTab(); renderTable(); showToast(`Dispo → ${d.label}`,'success');
+  }catch(e){ showToast('Failed to update dispo','error'); }
+}
+async function saveCurrentLead(){
+  if(!currentLead) return; const g=id=>$('#'+id).value.trim()||null;
+  const payload={business_name:g('e-business_name'),contact_name:g('e-contact_name'),phone:g('e-phone'),email:g('e-email'),address:g('e-address'),city:g('e-city'),state:g('e-state'),industry:g('e-industry'),website:g('e-website')};
+  if(!payload.business_name){ showToast('Business name required','error'); return; }
+  try{ await fetch(db(`crm_leads?id=eq.${currentLead.id}`),{method:'PATCH',headers:hdr(),body:JSON.stringify(payload)});
+    Object.assign(currentLead,payload); const i=allLeads.findIndex(l=>l.id===currentLead.id); if(i>=0)Object.assign(allLeads[i],payload);
+    $('#panel-name').textContent=payload.business_name; buildStats(); applyFilter(); showToast('Saved','success');
+  }catch(e){ showToast('Save failed','error'); }
+}
+async function addActivity(){
+  const note=$('#act-note')?.value?.trim(); if(!note||!currentLead) return;
+  try{ await fetch(db('crm_activity'),{method:'POST',headers:hdr(),body:JSON.stringify({lead_id:currentLead.id,activity_type:'note',body:note,rfp_id:currentLead.rfp_id||null})});
+    $('#act-note').value=''; await renderActivityTab(); showToast('Note added','success'); }catch(e){ showToast('Failed','error'); }
+}
+async function deleteLead(){
+  if(!currentLead) return; if(!confirm(`Delete "${currentLead.business_name}"?`)) return;
+  try{ await fetch(db(`crm_leads?id=eq.${currentLead.id}`),{method:'DELETE',headers:hdr()}); allLeads=allLeads.filter(l=>l.id!==currentLead.id); closePanel(); buildStats(); applyFilter(); showToast('Deleted','success'); }catch(e){ showToast('Delete failed','error'); }
+}
+
+/* ═══════════════ ADD MODAL ═══════════════ */
+function openAddModal(){
+  editingLead=null; $('#add-modal-title').textContent='Add Lead';
+  ['business_name','contact_name','phone','email','address','city','state','industry','notes'].forEach(f=>{const el=$('#m-'+f); if(el)el.value='';});
+  const sel=$('#m-dispo'); sel.innerHTML=Object.entries(DISPOS).map(([k,d])=>`<option value="${k}">${d.label}</option>`).join(''); sel.value='new';
+  $('#add-modal').classList.add('open');
+}
+function closeAddModal(){ $('#add-modal').classList.remove('open'); }
+async function saveLeadModal(){
+  const g=id=>$('#'+id)?.value?.trim()||null;
+  const payload={business_name:g('m-business_name'),contact_name:g('m-contact_name'),phone:g('m-phone'),email:g('m-email'),address:g('m-address'),city:g('m-city'),state:g('m-state'),industry:g('m-industry'),dispo:$('#m-dispo').value,notes:g('m-notes'),source:'manual'};
+  if(!payload.business_name){ showToast('Business name required','error'); return; }
+  try{ const res=await fetch(db('crm_leads'),{method:'POST',headers:hdr(),body:JSON.stringify(payload)});
+    if(!res.ok) throw new Error(await res.text()); const [nl]=await res.json(); allLeads.unshift(nl);
+    closeAddModal(); buildStats(); applyFilter(); showToast('Lead added','success'); openLead(nl.id);
+  }catch(e){ showToast('Failed to add lead','error'); }
+}
+
+/* ═══════════════ CSV IMPORT (reads by header name) ═══════════════ */
+function openImportModal(){ $('#import-modal').classList.add('open'); $('#import-status').textContent=''; $('#csv-file-input').value=''; $('#import-submit-btn').style.display='none'; parsedImportData=[]; }
+function handleDrop(e){ e.preventDefault(); $('#drop-zone').classList.remove('drag-over'); const f=e.dataTransfer?.files?.[0]; if(f) processCSVFile(f); }
+function handleCSVFile(e){ const f=e.target.files?.[0]; if(f) processCSVFile(f); }
+function processCSVFile(file){ const r=new FileReader(); r.onload=e=>previewCSV(e.target.result); r.readAsText(file); }
+function parseCSVLine(line){ const out=[]; let cur='',q=false; for(let i=0;i<line.length;i++){const c=line[i]; if(c==='"'){ if(q&&line[i+1]==='"'){cur+='"';i++;} else q=!q; } else if(c===','&&!q){out.push(cur);cur='';} else cur+=c;} out.push(cur); return out.map(s=>s.trim()); }
+function previewCSV(text){
+  const status=$('#import-status');
+  const lines=text.split(/\r?\n/).filter(l=>l.trim()); if(!lines.length){ status.textContent='Empty file.'; return; }
+  const header=parseCSVLine(lines[0]); const fields=mapHeaders(header);
+  if(!fields.includes('business_name')){ status.innerHTML='⚠ No <b>Title/Business/Company</b> column found. First column must be the business name.'; }
+  parsedImportData=[];
+  for(const line of lines.slice(1)){
+    if(!line.trim()) continue; const cols=parseCSVLine(line); const row={};
+    fields.forEach((f,i)=>{ if(f && cols[i]!=null && cols[i]!=='') row[f]=cols[i]; });
+    if(!row.business_name) continue;
+    if(row.dispo) row.dispo=normDispo(row.dispo); else row.dispo='new';
+    if(row.rating!=null) row.rating=parseFloat(row.rating)||null;
+    if(row.reviews!=null) row.reviews=parseInt(row.reviews)||null;
+    row.source='csv_import'; parsedImportData.push(row);
+  }
+  if(!parsedImportData.length){ status.textContent='No valid rows found.'; return; }
+  const mapped=header.map((h,i)=>fields[i]?`${esc(h)}→${fields[i]}`:`${esc(h)}(skipped)`).join(' · ');
+  status.innerHTML=`✅ Parsed <b style="color:#e8eaed">${parsedImportData.length} rows</b>.<br><span style="font-size:11px">${mapped}</span><br>Click <b style="color:#3b82f6">Import Leads</b>.`;
+  $('#import-submit-btn').style.display='inline-flex';
+}
+async function submitImportedLeads(){
+  if(!parsedImportData.length){ showToast('Upload a CSV first','error'); return; }
+  const btn=$('#import-submit-btn'); btn.disabled=true; btn.textContent='Importing…';
+  const status=$('#import-status');
+  // dedupe against existing phones
+  const byPhone={}; allLeads.forEach(l=>{const n=normalizePhone(l.phone); if(n.length>=7)byPhone[n]=l.id;});
+  let inserted=0,skipped=0,errors=0; const toInsert=[];
+  for(const row of parsedImportData){ const n=normalizePhone(row.phone); if(n.length>=7&&byPhone[n]){skipped++;continue;} toInsert.push(row); }
+  const BATCH=50;
+  for(let i=0;i<toInsert.length;i+=BATCH){
+    const batch=toInsert.slice(i,i+BATCH);
+    try{ const res=await fetch(db('crm_leads'),{method:'POST',headers:{...hdr(),Prefer:'return=minimal'},body:JSON.stringify(batch)}); res.ok?inserted+=batch.length:errors+=batch.length; }
+    catch{ errors+=batch.length; }
+    status.innerHTML=`Inserted ${inserted}/${toInsert.length}…`;
+  }
+  status.innerHTML=`✅ ${inserted} imported${skipped?` · ⏭ ${skipped} duplicate phones skipped`:''}${errors?` · ❌ ${errors} errors`:''}`;
+  btn.style.display='none'; btn.disabled=false; btn.textContent='⬆ Import Leads'; parsedImportData=[];
+  await loadLeads();
+}
+
+/* ═══════════════ GOVCON BRIDGE — solicitations + saved documents ═══════════════ */
+async function govApi(path){ const r=await fetch(db(path),{headers:govHdr()}); if(!r.ok) throw new Error('GovCon '+r.status+': '+(await r.text()).slice(0,120)); return r.json(); }
+async function signGovDoc(storedPath){
+  const r=await fetch(`${SUPABASE_URL}/storage/v1/object/sign/${GOV_BUCKET}/${storedPath}`,{method:'POST',headers:govHdr(),body:JSON.stringify({expiresIn:3600})});
+  if(!r.ok) throw new Error('sign '+r.status); const j=await r.json(); const rel=j.signedURL||j.signedUrl||''; return `${SUPABASE_URL}/storage/v1${rel}`;
+}
+let SOLIC_RESULTS=[];
+function openSolicModal(){ $('#solic-modal').classList.add('open'); $('#solic-docs').innerHTML=''; setTimeout(()=>$('#solic-q')?.focus(),50); }
+function toggleSolicDrawer(){ $('#d-solic-drawer').classList.toggle('open'); }
+async function solicSearch(inDialer){
+  const q=(inDialer?$('#dsolic-q'):$('#solic-q')).value.trim();
+  const resEl=inDialer?$('#dsolic-results'):$('#solic-results'); const docsEl=inDialer?$('#dsolic-docs'):$('#solic-docs');
+  docsEl.innerHTML=''; resEl.innerHTML='<div class="spinner"></div>';
+  try{
+    let path=`govcon_rfps?select=id,title,agency,category,deadline,set_aside,url,review_stage&order=deadline.asc.nullslast&limit=40`;
+    if(q){ const t=q.replace(/[(),*]/g,''); path+=`&or=(title.ilike.*${encodeURIComponent(t)}*,agency.ilike.*${encodeURIComponent(t)}*,category.ilike.*${encodeURIComponent(t)}*)`; }
+    SOLIC_RESULTS=await govApi(path);
+    if(!SOLIC_RESULTS.length){ resEl.innerHTML='<div class="empty-state" style="padding:20px">No solicitations found. (Make sure you signed in with the account that owns your GovCon data.)</div>'; return; }
+    resEl.innerHTML=SOLIC_RESULTS.map(r=>`<div class="solic-card" onclick="openSolicitation('${r.id}',${inDialer?'true':'false'})">
+      <div class="solic-title">${esc(r.title||'Untitled')}</div>
+      <div class="solic-meta">${esc(r.agency||'—')}${r.category?' · NAICS '+esc(r.category):''}${r.deadline?' · due '+new Date(r.deadline).toLocaleDateString():''}${r.set_aside?' · '+esc(r.set_aside):''}</div>
+      <div class="solic-meta"><span class="pill">${esc(r.review_stage||'Discovered')}</span></div>
+    </div>`).join('');
+  }catch(e){ resEl.innerHTML=`<div class="empty-state" style="padding:20px;color:#dc2626">${esc(e.message)}</div>`; }
+}
+async function openSolicitation(rfpId,inDialer){
+  const r=SOLIC_RESULTS.find(x=>x.id===rfpId)||{}; const docsEl=inDialer?$('#dsolic-docs'):$('#solic-docs');
+  docsEl.innerHTML='<div class="spinner"></div>';
+  try{
+    const docs=await govApi(`govcon_source_documents?rfp_id=eq.${rfpId}&select=id,original_filename,document_type,stored_path,downloaded_at&order=downloaded_at.desc.nullslast&limit=100`);
+    const linkBtn = currentLead||(inDialer&&dialerQueue[dialerIndex])
+      ? `<button class="btn btn-outline btn-sm" onclick="linkLeadToSolic('${rfpId}',${inDialer?'true':'false'})">🔗 Link this call to “${esc((r.title||'').slice(0,30))}”</button>` : '';
+    const docRows = docs.length ? docs.map(d=>`<div class="doc-row"><span>📄</span><a onclick="openGovDoc('${encodeURIComponent(d.stored_path)}')">${esc(d.original_filename)}</a><span class="pill">${esc(d.document_type||'doc')}</span></div>`).join('')
+      : '<div class="empty-state" style="padding:16px">No documents downloaded for this solicitation yet.</div>';
+    docsEl.innerHTML=`<div style="margin:12px 0 8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${esc(r.title||'')}</b>${r.url?` <a class="phone-link" href="${esc(r.url)}" target="_blank">source ↗</a>`:''} ${linkBtn}</div>${docRows}`;
+  }catch(e){ docsEl.innerHTML=`<div class="empty-state" style="color:#dc2626;padding:16px">${esc(e.message)}</div>`; }
+}
+async function openGovDoc(pathEnc){
+  try{ const url=await signGovDoc(decodeURIComponent(pathEnc)); window.open(url,'_blank'); }
+  catch(e){ showToast('Could not open document: '+e.message,'error'); }
+}
+async function linkLeadToSolic(rfpId,inDialer){
+  const lead = inDialer ? dialerQueue[dialerIndex] : currentLead; if(!lead) return;
+  const r=SOLIC_RESULTS.find(x=>x.id===rfpId)||{};
+  try{
+    await fetch(db(`crm_leads?id=eq.${lead.id}`),{method:'PATCH',headers:hdr(),body:JSON.stringify({rfp_id:rfpId,solicitation_title:r.title||null})});
+    lead.rfp_id=rfpId; lead.solicitation_title=r.title||null;
+    const i=allLeads.findIndex(l=>l.id===lead.id); if(i>=0){allLeads[i].rfp_id=rfpId; allLeads[i].solicitation_title=r.title||null;}
+    showToast('Call linked to solicitation ✓','success');
+    if(!inDialer && currentTab==='contract') renderContractTab();
+    if(inDialer) renderDialerLead();
+  }catch(e){ showToast('Link failed','error'); }
+}
+
+/* ── Contract tab (side panel) ── */
+async function renderContractTab(){
+  const l=currentLead;
+  const body=$('#panel-body'); $('#panel-footer').innerHTML='';
+  body.innerHTML=`
+    <div class="field-group"><label class="field-label">Linked solicitation</label>
+      <div id="c-linked" style="font-size:13px">${l.rfp_id?`<b>${esc(l.solicitation_title||l.rfp_id)}</b>`:'<span class="muted" style="color:#93a0b4">Not linked</span>'}</div></div>
+    <button class="btn btn-outline btn-sm" onclick="openSolicModal()">🔎 Find / link a solicitation</button>
+    <div id="c-docs" style="margin-top:14px"></div>
+    <div class="field-group" style="margin-top:14px"><label class="field-label">Contract note (saved to the solicitation)</label>
+      <textarea class="d-quick-note" id="c-note" placeholder="Notes about this company for this contract…"></textarea>
+      <button class="btn btn-primary btn-sm" style="margin-top:6px" onclick="saveContractNote(false)" ${l.rfp_id?'':'disabled'}>Save contract note</button>
+      ${l.rfp_id?'':'<div style="font-size:11px;color:#93a0b4;margin-top:4px">Link a solicitation first to attach contract notes.</div>'}</div>
+    <div id="c-notes" style="margin-top:10px"></div>`;
+  if(l.rfp_id){
+    try{ const docs=await govApi(`govcon_source_documents?rfp_id=eq.${l.rfp_id}&select=id,original_filename,document_type,stored_path&order=downloaded_at.desc.nullslast&limit=50`);
+      $('#c-docs').innerHTML = docs.length ? `<div class="field-label">Contract documents</div>`+docs.map(d=>`<div class="doc-row"><span>📄</span><a onclick="openGovDoc('${encodeURIComponent(d.stored_path)}')">${esc(d.original_filename)}</a></div>`).join('') : '';
+    }catch(e){ $('#c-docs').innerHTML=`<div style="font-size:12px;color:#dc2626">${esc(e.message)}</div>`; }
+    try{ const notes=await fetch(db(`crm_activity?lead_id=eq.${l.id}&rfp_id=eq.${l.rfp_id}&order=created_at.desc&limit=20`),{headers:hdr()}).then(r=>r.json());
+      $('#c-notes').innerHTML=(notes||[]).map(n=>`<div class="activity-item"><div class="activity-dot contract"></div><div><div class="activity-text">${esc(n.body||'')}</div><div class="activity-time">${new Date(n.created_at).toLocaleString()}</div></div></div>`).join('');
+    }catch(e){}
+  }
+}
+async function saveContractNote(inDialer){
+  const lead = inDialer ? dialerQueue[dialerIndex] : currentLead; if(!lead||!lead.rfp_id){ showToast('Link a solicitation first','error'); return; }
+  const el = inDialer ? $('#d-contract-note') : $('#c-note'); const note=(el?.value||'').trim(); if(!note) return;
+  try{
+    await fetch(db('crm_activity'),{method:'POST',headers:hdr(),body:JSON.stringify({lead_id:lead.id,activity_type:'note',body:'[Contract] '+note,rfp_id:lead.rfp_id})});
+    if(el) el.value=''; showToast('Contract note saved ✓','success');
+    if(!inDialer) renderContractTab();
+  }catch(e){ showToast('Failed to save note','error'); }
+}
+
+/* ═══════════════ AUTO DIALER SESSION ═══════════════ */
+let dialerQueue=[], dialerIndex=0, dialerStats={called:0,connected:0,voicemail:0,noAnswer:0,appointments:0};
+let callStartTime=null, callTimerInt=null, autoAdvanceOn=true, autoAdvanceSec=3, autoAdvanceTmo=null, countdownInt=null;
+let autoDialOn=false, autoDialDelaySec=2, autoDialTmo=null;
+
+function openDialerSetup(){
+  const counts={}; allLeads.forEach(l=>counts[l.dispo]=(counts[l.dispo]||0)+1);
+  const defaultOn=new Set(['new','no_pick_up','voicemail','call_back','follow_up']);
+  $('#dialer-dispo-checks').innerHTML=Object.entries(DISPOS).map(([k,d])=>{const n=counts[k]||0,ck=defaultOn.has(k)&&n>0;
+    return `<label style="display:flex;align-items:center;gap:10px;padding:5px 0;cursor:pointer;font-size:13px;${n===0?'opacity:.4':''}"><input type="checkbox" class="dd-check" value="${k}" ${ck?'checked':''} ${n===0?'disabled':''} onchange="updateDialerCount()" style="width:14px;height:14px"><span class="dispo-badge" style="background:${d.color}">${d.label}</span><span style="color:#93a0b4">${n}</span></label>`;}).join('');
+  $('#dialer-use-filter').checked=false; updateDialerCount(); $('#dialer-setup-modal').classList.add('open');
+}
+function dialerSelection(){
+  if($('#dialer-use-filter').checked) return [...filteredLeads];
+  const sel=new Set($$('.dd-check:checked').map(el=>el.value));
+  return allLeads.filter(l=>sel.has(l.dispo));
+}
+function updateDialerCount(){ const n=dialerSelection().length; $('#dialer-queue-count').textContent=n; $('#dialer-start-btn').disabled=n===0; }
+function startDialerSession(){
+  dialerQueue=dialerSelection(); if(!dialerQueue.length){ showToast('No leads to dial','error'); return; }
+  dialerIndex=0; dialerStats={called:0,connected:0,voicemail:0,noAnswer:0,appointments:0};
+  $('#dialer-setup-modal').classList.remove('open'); $('#dialer-overlay').classList.add('open'); renderDialerLead();
+}
+function renderDialerStats(){
+  $('#d-stats-bar').innerHTML=[['Called',dialerStats.called,'#3b82f6'],['Conn',dialerStats.connected,'#16a34a'],['VM',dialerStats.voicemail,'#7c3aed'],['NA',dialerStats.noAnswer,'#78716c'],['Appt',dialerStats.appointments,'#fbbf24']].map(([l,v,c])=>`<div class="d-stat"><div class="d-stat-dot" style="background:${c}"></div><span style="color:#93a0b4">${l}:</span><b>${v}</b></div>`).join('');
+}
+function renderDialerLead(){
+  clearDialerTimers();
+  if(dialerIndex>=dialerQueue.length){
+    $('#d-lead-panel').innerHTML=''; $('#d-controls-panel').innerHTML=`<div class="d-end-screen"><div style="font-size:52px">🎉</div><div style="font-size:20px;color:#e8eaed;font-weight:500">Session Complete</div><div>Called ${dialerStats.called} · ${dialerStats.appointments} appointment(s)</div><button class="btn btn-primary" onclick="endDialerSession()">Back to CRM</button></div>`;
+    $('#d-progress-text').textContent='Done'; $('#d-prog-fill').style.width='100%'; renderDialerStats(); return;
+  }
+  const lead=dialerQueue[dialerIndex], d=DISPOS[lead.dispo]||DISPOS.new, loc=[lead.city,lead.state].filter(Boolean).join(', ');
+  $('#d-progress-text').textContent=`Lead ${dialerIndex+1} of ${dialerQueue.length}`;
+  $('#d-prog-fill').style.width=(dialerIndex/dialerQueue.length*100)+'%';
+  $('#d-footer-remaining').textContent=`${dialerQueue.length-dialerIndex-1} remaining`;
+  renderDialerStats();
+  $('#d-lead-panel').innerHTML=`
+    <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="dispo-badge" style="background:${d.color}">${d.label}</span>${(lead.call_count||0)>0?`<span class="pill">📞 ${lead.call_count}×</span>`:''}${lead.rfp_id?`<span class="pill">📋 ${esc((lead.solicitation_title||'contract').slice(0,24))}</span>`:''}</div>
+    <div class="d-biz-name">${esc(lead.business_name)}</div>
+    <div style="margin-top:10px"><div class="d-section-label">Contact</div><input id="dl-contact" class="d-phone-edit" style="font-size:15px" value="${esc(lead.contact_name||'')}" placeholder="Contact name"></div>
+    <div style="margin-top:8px"><div class="d-section-label">Email</div><input id="dl-email" class="d-phone-edit" style="font-size:15px" value="${esc(lead.email||'')}" placeholder="Email"></div>
+    ${loc?`<div class="d-info-row"><span class="d-info-icon">📍</span>${esc(loc)}</div>`:''}
+    ${lead.address?`<div class="d-info-row"><span class="d-info-icon">🏠</span>${esc(lead.address)}</div>`:''}
+    ${lead.industry?`<div class="d-info-row"><span class="d-info-icon">🏷</span>${esc(lead.industry)}</div>`:''}
+    ${lead.website?`<div class="d-info-row"><span class="d-info-icon">🌐</span><a href="${esc(lead.website)}" target="_blank" style="color:#93b4f8;word-break:break-all">${esc(lead.website)}</a></div>`:''}
+    <button onclick="saveDialerLeadEdits()" style="margin-top:12px;width:100%;background:#3b82f6;border:none;color:#fff;border-radius:8px;padding:8px;font-size:13px;cursor:pointer;font-weight:500">💾 Save contact</button>
+    ${lead.notes?`<div style="margin-top:14px"><div class="d-section-label">Notes</div><div class="d-notes-box">${esc(lead.notes)}</div></div>`:''}
+    <div style="margin-top:14px"><div class="d-section-label">Call note (copious welcome)</div><textarea id="d-quick-note" class="d-quick-note" placeholder="What happened on this call…"></textarea></div>
+    <div style="margin-top:12px"><div class="d-section-label">Solicitation</div>
+      <button class="btn btn-outline btn-sm" onclick="toggleSolicDrawer()" style="width:100%">📋 ${lead.rfp_id?'View / change contract':'Find & link a solicitation'}</button>
+      <textarea id="d-contract-note" class="d-quick-note" style="margin-top:8px" placeholder="${lead.rfp_id?'Contract note (saved to the solicitation)…':'Link a solicitation to add contract notes'}" ${lead.rfp_id?'':'disabled'}></textarea>
+      <button class="btn btn-primary btn-sm" style="margin-top:6px;width:100%" onclick="saveContractNote(true)" ${lead.rfp_id?'':'disabled'}>Save contract note</button>
+    </div>`;
+  const phones=[lead.phone].filter(Boolean);
+  const phoneCtl=`<input type="tel" id="d-phone-select" class="d-phone-edit" value="${esc(lead.phone||'')}" placeholder="No phone" ${!lead.phone?'disabled':''}>`;
+  $('#d-controls-panel').innerHTML=`
+    <div><div class="d-section-label">Number to dial</div>${phoneCtl}
+      <button class="d-call-btn ready" id="d-call-btn" onclick="dialerCall()" ${!lead.phone?'disabled':''}>📞 Call Now</button>
+      <div class="d-timer" id="d-timer">—</div><div class="d-countdown" id="d-auto-dial-cd"></div></div>
+    <div><div class="d-section-label">Disposition</div><div class="d-dispo-grid">${Object.entries(DISPOS).filter(([k])=>k!=='new').map(([k,dsp])=>`<button class="d-dispo-btn" style="background:${dsp.color}" id="d-dispo-${k}" onclick="dialerSetDispo('${k}')">${dsp.label}</button>`).join('')}</div><div class="d-countdown" id="d-countdown"></div></div>
+    <div><div class="d-section-label">Session settings</div>
+      <div class="d-auto-row"><button class="d-toggle ${autoDialOn?'on':''}" onclick="dialerToggleAutoDial()"></button><span style="font-size:13px;color:#93a0b4">Auto-dial</span>${autoDialOn?`<span style="font-size:12px;color:#93a0b4">after <input type="number" value="${autoDialDelaySec}" min="1" max="15" class="d-delay-input" oninput="autoDialDelaySec=Math.max(1,parseInt(this.value)||2)">s</span>`:''}</div>
+      <div class="d-auto-row"><button class="d-toggle ${autoAdvanceOn?'on':''}" onclick="dialerToggleAuto()"></button><span style="font-size:13px;color:#93a0b4">Auto-advance</span>${autoAdvanceOn?`<span style="font-size:12px;color:#93a0b4">after <input type="number" value="${autoAdvanceSec}" min="1" max="15" class="d-delay-input" oninput="autoAdvanceSec=Math.max(1,parseInt(this.value)||3)">s</span>`:''}</div></div>`;
+  if(autoDialOn&&lead.phone){ let rem=autoDialDelaySec; const cd=$('#d-auto-dial-cd'); const tick=()=>{if(cd)cd.textContent=rem>0?`Auto-dialing in ${rem}s…`:'';rem--;}; tick(); const iv=setInterval(()=>{tick();if(rem<0)clearInterval(iv);},1000); autoDialTmo=setTimeout(()=>{clearInterval(iv);if(cd)cd.textContent='';dialerCall();},autoDialDelaySec*1000); }
+}
+function dialerToggleAutoDial(){ if(autoDialTmo){clearTimeout(autoDialTmo);autoDialTmo=null;} const cd=$('#d-auto-dial-cd'); if(cd)cd.textContent=''; autoDialOn=!autoDialOn; renderDialerLead(); }
+function dialerToggleAuto(){ autoAdvanceOn=!autoAdvanceOn; renderDialerLead(); }
+async function saveDialerLeadEdits(){
+  const lead=dialerQueue[dialerIndex]; if(!lead) return;
+  const patch={contact_name:($('#dl-contact')?.value||'').trim()||null,email:($('#dl-email')?.value||'').trim()||null};
+  try{ await fetch(db(`crm_leads?id=eq.${lead.id}`),{method:'PATCH',headers:hdr(),body:JSON.stringify(patch)}); Object.assign(lead,patch); const i=allLeads.findIndex(l=>l.id===lead.id); if(i>=0)Object.assign(allLeads[i],patch); showToast('Saved','success'); }catch{ showToast('Save failed','error'); }
+}
+async function dialerCall(){
+  if(autoDialTmo){clearTimeout(autoDialTmo);autoDialTmo=null;} const cd=$('#d-auto-dial-cd'); if(cd)cd.textContent='';
+  const lead=dialerQueue[dialerIndex]; if(!lead) return;
+  const phone=($('#d-phone-select')?.value||lead.phone||'').trim(); if(!phone) return;
+  const a=document.createElement('a'); a.href='tel:'+phone.replace(/\D/g,''); document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  callStartTime=Date.now(); dialerStats.called++; renderDialerStats();
+  const btn=$('#d-call-btn'); if(btn){btn.className='d-call-btn calling';btn.textContent='📞 In Call…';}
+  const te=$('#d-timer'); if(te){te.className='d-timer active';te.textContent='0:00';}
+  callTimerInt=setInterval(()=>{const s=Math.floor((Date.now()-callStartTime)/1000);const el=$('#d-timer');if(el)el.textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;},1000);
+  const today=new Date().toISOString().split('T')[0];
+  try{ await fetch(db(`crm_leads?id=eq.${lead.id}`),{method:'PATCH',headers:hdr(),body:JSON.stringify({last_called_date:today,last_contacted_at:new Date().toISOString(),call_count:(lead.call_count||0)+1})});
+    lead.call_count=(lead.call_count||0)+1; const i=allLeads.findIndex(l=>l.id===lead.id); if(i>=0)allLeads[i].call_count=lead.call_count; }catch{}
+}
+async function dialerSetDispo(newDispo){
+  const lead=dialerQueue[dialerIndex]; if(!lead) return;
+  if(autoDialTmo){clearTimeout(autoDialTmo);autoDialTmo=null;} if(autoAdvanceTmo){clearTimeout(autoAdvanceTmo);autoAdvanceTmo=null;} if(countdownInt){clearInterval(countdownInt);countdownInt=null;}
+  if(callTimerInt){clearInterval(callTimerInt);callTimerInt=null;} callStartTime=null;
+  const btn=$('#d-call-btn'); if(btn){btn.className='d-call-btn ready';btn.textContent='📞 Call Now';} const te=$('#d-timer'); if(te){te.className='d-timer';te.textContent='—';}
+  $$('.d-dispo-btn').forEach(b=>b.classList.remove('set')); const db2=$('#d-dispo-'+newDispo); if(db2)db2.classList.add('set');
+  if(CONNECTED_DISPOS.has(newDispo))dialerStats.connected++; if(VOICEMAIL_DISPOS.has(newDispo))dialerStats.voicemail++; if(NO_ANSWER_DISPOS.has(newDispo))dialerStats.noAnswer++; if(newDispo==='appointment')dialerStats.appointments++;
+  renderDialerStats();
+  const old=lead.dispo, note=($('#d-quick-note')?.value||'').trim();
+  try{
+    await fetch(db(`crm_leads?id=eq.${lead.id}`),{method:'PATCH',headers:hdr(),body:JSON.stringify({dispo:newDispo,last_contacted_at:new Date().toISOString()})});
+    await fetch(db('crm_activity'),{method:'POST',headers:hdr(),body:JSON.stringify({lead_id:lead.id,activity_type:'dispo_change',old_dispo:old,new_dispo:newDispo,body:note?`[Dialer] ${note}`:'[Dialer]',rfp_id:lead.rfp_id||null})});
+    if(note){ const merged=lead.notes?lead.notes+'\n'+note:note; await fetch(db(`crm_leads?id=eq.${lead.id}`),{method:'PATCH',headers:hdr(),body:JSON.stringify({notes:merged})}); lead.notes=merged; }
+    lead.dispo=newDispo; const i=allLeads.findIndex(l=>l.id===lead.id); if(i>=0)allLeads[i].dispo=newDispo;
+  }catch{ showToast('Failed to save dispo','error'); }
+  if(autoAdvanceOn){ let rem=autoAdvanceSec; const cd=$('#d-countdown'); if(cd)cd.textContent=`Advancing in ${rem}s…`; countdownInt=setInterval(()=>{rem--;const el=$('#d-countdown');if(el)el.textContent=rem>0?`Advancing in ${rem}s…`:'';if(rem<=0)clearInterval(countdownInt);},1000); autoAdvanceTmo=setTimeout(()=>dialerNext(),autoAdvanceSec*1000); }
+}
+function dialerNext(){ clearDialerTimers(); dialerIndex++; renderDialerLead(); }
+function dialerPrev(){ if(dialerIndex<=0)return; clearDialerTimers(); dialerIndex--; renderDialerLead(); }
+function dialerSkip(){ clearDialerTimers(); dialerIndex++; renderDialerLead(); }
+function clearDialerTimers(){ [autoDialTmo,autoAdvanceTmo].forEach(t=>t&&clearTimeout(t)); [callTimerInt,countdownInt].forEach(i=>i&&clearInterval(i)); autoDialTmo=autoAdvanceTmo=callTimerInt=countdownInt=null; callStartTime=null; }
+function endDialerSession(){ clearDialerTimers(); $('#dialer-overlay').classList.remove('open'); $('#d-solic-drawer').classList.remove('open'); buildStats(); applyFilter(); showToast(`Session ended — ${dialerStats.called} calls · ${dialerStats.appointments} appointment(s)`,'success'); }
+
+/* close modals on backdrop click */
+['add-modal','import-modal','solic-modal','dialer-setup-modal'].forEach(id=>{const el=$('#'+id); if(el)el.addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.classList.remove('open');});});
+
+/* ═══════════════ INIT ═══════════════ */
+(async function(){
+  const authed=await checkSession();
+  if(authed){ $('#login-overlay').style.display='none'; loadLeads(); }
+})();
+</script>
+</body>
+</html>
