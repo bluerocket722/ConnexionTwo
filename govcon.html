@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r27-2026-07-16';
+const GOVCON_BUILD = 'r28-2026-07-17';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -322,7 +322,7 @@ async function renderDashboard() {
     api(`govcon_pipeline_items?owner=eq.${uid}&select=id,stage`),
     api(`govcon_proposals?owner=eq.${uid}&select=id,status`),
     api(`govcon_research?owner=eq.${uid}&select=rfp_id,win_probability_score,risk_score,competition_score,recommendation_label`).catch(()=>[]),
-    api(`govcon_run_logs?owner=eq.${uid}&fn=eq.govcon-auto-pilot-run&select=*&order=started_at.desc&limit=5`).catch(()=>[]),
+    api(`govcon_run_logs?owner=eq.${uid}&fn=eq.govcon-autopilot-run&select=*&order=started_at.desc&limit=5`).catch(()=>[]),
   ]);
   const rById={}; (research||[]).forEach(r=>rById[r.rfp_id]=r);
   const awarded = pipeline.filter(p=>p.stage==='awarded'||p.stage==='won').length;
@@ -393,16 +393,16 @@ async function renderDashboard() {
 async function analyzeAllPending(){
   // status element differs by page (Dashboard vs Autopilot) → tolerate either, fall back to toast
   const say=(m)=>{ const st=$('#dashPendStatus')||$('#ar_status'); if(st) st.textContent=m; else toast(m, true); };
-  const deployHint='govcon-auto-pilot-run isn’t deployed yet — deploy the r23 function, then try again.';
+  const deployHint='govcon-autopilot-run isn’t deployed yet — deploy the r23 function, then try again.';
   say('Finding pending opportunities…');
   let pending=[];
-  try{ const r=await callFn('govcon-auto-pilot-run',{action:'list_pending'}); pending=r.pending||[]; }
+  try{ const r=await callFn('govcon-autopilot-run',{action:'list_pending'}); pending=r.pending||[]; }
   catch(e){ say(/Failed to fetch|HTTP 5|CORS/i.test(e.message)? deployHint : 'Could not list pending: '+e.message); return; }
   if(!pending.length){ say('✓ Nothing pending — all opportunities are analyzed.'); return; }
   let done=0, fail=0;
   for(const p of pending){
     say(`Analyzing ${done+1}/${pending.length}: ${String(p.title||'').slice(0,50)}…`);
-    try{ await callFn('govcon-auto-pilot-run',{action:'process_one', rfp_id:p.id}); done++; }
+    try{ await callFn('govcon-autopilot-run',{action:'process_one', rfp_id:p.id}); done++; }
     catch(e){ fail++; if(/Failed to fetch|HTTP 5|CORS/i.test(e.message)){ say(deployHint); return; } }
   }
   say(`✓ Analyzed ${done} opportunit${done===1?'y':'ies'}${fail?`, ${fail} failed`:''}.`);
@@ -1316,14 +1316,14 @@ async function runAutopilotNow() {
   showApProgress('Starting…');
   try {
     // Non-blocking: the function creates a run and returns 202 immediately (spec §11)
-    const r = await callFn('govcon-auto-pilot-run', { action:'start' });
+    const r = await callFn('govcon-autopilot-run', { action:'start' });
     if (r.status==='already_running'){ showApProgress('A run is already in progress…'); pollApRun(r.run_id); }
     else { showApProgress('Queued — discovering opportunities…'); pollApRun(r.run_id); }
   } catch(e){
     // NO silent legacy fallback — show the real error (spec §10)
     const hint = e.kind==='cors_or_network'
-      ? 'Set "Verify JWT = OFF" for govcon-auto-pilot-run in Supabase (Edge Functions → govcon-auto-pilot-run → Settings) and confirm it deployed.'
-      : e.kind==='not_deployed' ? 'govcon-auto-pilot-run is not deployed.' : '';
+      ? 'Set "Verify JWT = OFF" for govcon-autopilot-run in Supabase (Edge Functions → govcon-autopilot-run → Settings) and confirm it deployed.'
+      : e.kind==='not_deployed' ? 'govcon-autopilot-run is not deployed.' : '';
     showApProgress(`Autopilot failed: ${e.message}${hint?'  ·  '+hint:''}`, true);
     btns.forEach(b=>b.disabled=false);
   }
@@ -1345,7 +1345,7 @@ async function pollApRun(runId){
   AP_POLL=setInterval(async ()=>{
     ticks++;
     try{
-      const r=await callFn('govcon-auto-pilot-run',{action:'run_status', run_id:runId});
+      const r=await callFn('govcon-autopilot-run',{action:'run_status', run_id:runId});
       const run=r.run;
       if(!run){ return; }
       const s=run.stats||{};
@@ -1428,8 +1428,109 @@ async function renderAutopilot() {
         <button class="btn" onclick="runAutopilotNow()">✈ Run now</button>
       </div>
     </div>
+    ${aiProviderCard(s)}
     ${automationRulesCard(s)}`;
   wireAutomationRules();
+  wireAiProvider();
+  aiRefreshStatus();
+}
+// ── AI Provider & Document Analysis (spec: choose provider + model) ──────────
+const ANTHROPIC_MODELS = [['claude-opus-4-8','Claude Opus 4.8 — deepest analysis (current default)'],['claude-sonnet-5','Claude Sonnet 5 — balanced'],['claude-haiku-4-5-20251001','Claude Haiku 4.5 — fastest / lowest cost']];
+const GEMINI_MODELS = [['gemini-2.5-flash-lite','Gemini 2.5 Flash-Lite — low-cost document extraction (default)'],['gemini-2.5-flash','Gemini 2.5 Flash — stronger analysis & review']];
+function aiProviderCard(s){
+  const prov = s.ai_provider || 'anthropic';
+  const am = s.anthropic_model || 'claude-opus-4-8';
+  const gm = s.gemini_model || 'gemini-2.5-flash-lite';
+  const dm = s.ai_document_mode || 'automatic';
+  const opt = (arr,sel)=>arr.map(([v,l])=>`<option value="${v}" ${v===sel?'selected':''}>${esc(l)}</option>`).join('');
+  const card = (p,label,desc)=>`<label class="toggle" style="flex:1;min-width:200px;border:2px solid ${prov===p?'var(--blue-500)':'var(--line)'};border-radius:10px;padding:10px;cursor:pointer;display:flex;gap:8px;align-items:flex-start">
+    <input type="radio" name="ai_provider" value="${p}" ${prov===p?'checked':''} style="margin-top:3px">
+    <span><b>${label}</b><br><span class="muted" style="font-size:12px">${desc}</span></span></label>`;
+  return `<div class="card" style="margin-top:16px">
+    <h2 class="section" style="margin-top:0">🤖 AI Provider &amp; Document Analysis <span class="muted" style="font-weight:normal;font-size:13px">— the model only EXTRACTS facts; eligibility, scoring, bonding &amp; FAR rules stay deterministic</span></h2>
+
+    <div class="field"><label>Primary provider</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">${card('anthropic','Anthropic (Claude)','Current, proven integration')}${card('gemini','Google Gemini','Low-cost native PDF extraction')}</div></div>
+
+    <div class="row2">
+      <div class="field"><label>Anthropic model</label><select id="ai_anthropic_model">${opt(ANTHROPIC_MODELS,am)}</select></div>
+      <div class="field"><label>Google Gemini model</label><select id="ai_gemini_model">${opt(GEMINI_MODELS,gm)}</select></div>
+    </div>
+
+    <div class="field"><label>Document processing mode</label>
+      <select id="ai_document_mode">
+        <option value="automatic" ${dm==='automatic'?'selected':''}>Automatic — native PDF when possible, extracted text otherwise (recommended)</option>
+        <option value="native_document" ${dm==='native_document'?'selected':''}>Native PDF / document analysis</option>
+        <option value="extracted_text" ${dm==='extracted_text'?'selected':''}>Extracted text only</option>
+      </select>
+      <div class="muted" style="font-size:12px;margin-top:2px">Native mode sends the actual PDF/image to Gemini (or Claude). Oversized files fall back to text automatically — one big attachment never stops the analysis.</div></div>
+
+    <h2 class="section">Fallback provider</h2>
+    <label class="toggle"><input type="checkbox" id="ai_fallback_enabled" ${s.fallback_enabled?'checked':''}> Enable automatic fallback <span class="muted" style="font-weight:normal;font-size:12px">— only on a technical failure of the primary provider, never to change an answer</span></label>
+    <div class="row2" style="margin-top:6px">
+      <div class="field"><label>Fallback provider</label><select id="ai_fallback_provider">
+        <option value="">— none —</option>
+        <option value="anthropic" ${s.fallback_provider==='anthropic'?'selected':''}>Anthropic</option>
+        <option value="gemini" ${s.fallback_provider==='gemini'?'selected':''}>Google Gemini</option></select></div>
+      <div class="field"><label>Fallback model</label><input id="ai_fallback_model" value="${esc(s.fallback_model||'')}" placeholder="e.g. claude-opus-4-8 or gemini-2.5-flash"></div>
+    </div>
+
+    <div class="row3">
+      <div class="field"><label>Timeout (seconds)</label><input id="ai_timeout" type="number" min="10" max="300" value="${s.ai_timeout_seconds??90}"></div>
+      <div class="field"><label>Max retries</label><input id="ai_retries" type="number" min="0" max="5" value="${s.ai_max_retries??2}"></div>
+      <div class="field"><label>Temperature (Gemini)</label><input id="ai_temp" type="number" min="0" max="2" step="0.1" value="${s.ai_temperature??0.1}"></div>
+    </div>
+    <div class="field"><label>Manual-review confidence threshold (0–1)</label><input id="ai_mrconf" type="number" min="0" max="1" step="0.05" value="${s.ai_manual_review_confidence??0.80}"></div>
+
+    <h2 class="section">Connection status</h2>
+    <div id="ai_status" class="muted" style="font-size:13px;display:flex;gap:16px;flex-wrap:wrap"><span>Anthropic: checking…</span><span>Gemini: checking…</span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="btn" id="ai_test_anthropic">Test Anthropic Connection</button>
+      <button class="btn" id="ai_test_gemini">Test Gemini Connection</button>
+      <button class="btn primary" id="ai_save">Save AI Settings</button>
+      <span id="ai_savestatus" class="muted" style="font-size:12px"></span>
+    </div>
+    <div class="muted" style="font-size:11px;margin-top:8px">Keys are stored ONLY as Supabase Edge Function secrets (ANTHROPIC_API_KEY, GEMINI_API_KEY) and never sent to the browser. This panel only shows whether each secret is configured.</div>
+  </div>`;
+}
+function wireAiProvider(){
+  const b=$('#ai_save'); if(b) b.onclick=saveAiSettings;
+  const ta=$('#ai_test_anthropic'); if(ta) ta.onclick=()=>aiTest('anthropic');
+  const tg=$('#ai_test_gemini'); if(tg) tg.onclick=()=>aiTest('gemini');
+}
+async function aiRefreshStatus(){
+  const el=$('#ai_status'); if(!el) return;
+  try{ const r=await callFn('govcon-ai-config',{action:'status'});
+    const pill=(name,ok)=>`<span><b>${name}:</b> <span class="pill ${ok?'low':'high'}" style="color:#fff;background:${ok?'#0b6b34':'#b3261e'}">${ok?'Configured':'API key missing'}</span></span>`;
+    el.innerHTML = pill('Anthropic', r.anthropic?.configured) + pill('Gemini', r.gemini?.configured);
+  }catch(e){ el.innerHTML=`<span class="muted">Could not check status: ${esc(e.message)}</span>`; }
+}
+async function aiTest(provider){
+  const st=$('#ai_savestatus'); if(st) st.textContent=`Testing ${provider}…`;
+  const model = provider==='gemini' ? ($('#ai_gemini_model')?.value) : ($('#ai_anthropic_model')?.value);
+  try{ const r=await callFn('govcon-ai-config',{action:'test', provider, model});
+    if(st) st.textContent = r.ok && r.connected ? `✓ ${provider} connected (${r.model}, ${r.latency_ms}ms)` : `✕ ${provider}: ${r.error||('code '+(r.error_code||'unknown'))}`;
+  }catch(e){ if(st) st.textContent=`✕ ${provider}: ${e.message}`; }
+}
+async function saveAiSettings(){
+  const st=$('#ai_savestatus'); if(st) st.textContent='Saving…';
+  const provider=(document.querySelector('input[name="ai_provider"]:checked')||{}).value||'anthropic';
+  const body={ owner:SESSION.user.id,
+    ai_provider:provider,
+    anthropic_model:$('#ai_anthropic_model').value,
+    gemini_model:$('#ai_gemini_model').value,
+    ai_document_mode:$('#ai_document_mode').value,
+    fallback_enabled:$('#ai_fallback_enabled').checked,
+    fallback_provider:$('#ai_fallback_provider').value||null,
+    fallback_model:$('#ai_fallback_model').value.trim()||null,
+    ai_timeout_seconds:Math.max(10,Math.min(300,+$('#ai_timeout').value||90)),
+    ai_max_retries:Math.max(0,Math.min(5,+$('#ai_retries').value||2)),
+    ai_temperature:Math.max(0,Math.min(2,+$('#ai_temp').value||0.1)),
+    ai_manual_review_confidence:Math.max(0,Math.min(1,+$('#ai_mrconf').value||0.8)),
+    updated_at:new Date().toISOString() };
+  try{ await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify(body)});
+    if(st) st.textContent='✓ AI settings saved.';
+  }catch(e){ if(st) st.textContent=/column|ai_provider|does not exist/.test(e.message)?'Run govcon_migration_14.sql first, then save.':'Save failed: '+e.message; }
 }
 // ── comprehensive automation control panel (spec §1,§9,§15,§16,§17,§20) ──
 function automationRulesCard(s){
