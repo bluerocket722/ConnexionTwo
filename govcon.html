@@ -1437,18 +1437,19 @@ async function renderAutopilot() {
 // ── AI Provider & Document Analysis (spec: choose provider + model) ──────────
 const ANTHROPIC_MODELS = [['claude-opus-4-8','Claude Opus 4.8 — deepest analysis (current default)'],['claude-sonnet-5','Claude Sonnet 5 — balanced'],['claude-haiku-4-5-20251001','Claude Haiku 4.5 — fastest / lowest cost']];
 const GEMINI_MODELS = [
-  ['gemini-2.5-flash-lite','Gemini 2.5 Flash-Lite — low-cost document extraction (default)'],
-  ['gemini-2.5-flash','Gemini 2.5 Flash — stronger analysis & review'],
-  ['gemini-2.5-pro','Gemini 2.5 Pro — deepest analysis'],
-  ['gemini-flash-lite-latest','Gemini Flash-Lite (latest alias) — auto-tracks newest lite'],
-  ['gemini-flash-latest','Gemini Flash (latest alias) — auto-tracks newest flash'],
-  ['gemini-2.0-flash','Gemini 2.0 Flash'],
-  ['gemini-2.0-flash-lite','Gemini 2.0 Flash-Lite'],
+  ['gemini-flash-lite-latest','Gemini Flash-Lite (latest) — low-cost, always current (recommended)'],
+  ['gemini-flash-latest','Gemini Flash (latest) — stronger, always current'],
+  ['gemini-pro-latest','Gemini Pro (latest) — deepest analysis'],
+  ['gemini-2.5-flash','Gemini 2.5 Flash — pinned version'],
+  ['gemini-2.5-pro','Gemini 2.5 Pro — pinned version'],
+  ['gemini-2.0-flash','Gemini 2.0 Flash — pinned version'],
+  ['gemini-2.0-flash-lite','Gemini 2.0 Flash-Lite — pinned version'],
+  ['gemini-2.5-flash-lite','Gemini 2.5 Flash-Lite (retired for new keys — auto-heals)'],
 ];
 function aiProviderCard(s){
   const prov = s.ai_provider || 'anthropic';
   const am = s.anthropic_model || 'claude-opus-4-8';
-  const gm = s.gemini_model || 'gemini-2.5-flash-lite';
+  const gm = s.gemini_model || 'gemini-flash-lite-latest';
   const dm = s.ai_document_mode || 'automatic';
   const opt = (arr,sel)=>arr.map(([v,l])=>`<option value="${v}" ${v===sel?'selected':''}>${esc(l)}</option>`).join('');
   const card = (p,label,desc)=>`<label class="toggle" style="flex:1;min-width:200px;border:2px solid ${prov===p?'var(--blue-500)':'var(--line)'};border-radius:10px;padding:10px;cursor:pointer;display:flex;gap:8px;align-items:flex-start">
@@ -1517,7 +1518,13 @@ async function aiTest(provider){
   const st=$('#ai_savestatus'); if(st) st.textContent=`Testing ${provider}…`;
   const model = provider==='gemini' ? ($('#ai_gemini_model')?.value) : ($('#ai_anthropic_model')?.value);
   try{ const r=await callFn('govcon-ai-config',{action:'test', provider, model});
-    if(st) st.textContent = r.ok && r.connected ? `✓ ${provider} connected (${r.model}, ${r.latency_ms}ms)` : `✕ ${provider}: ${r.error||('code '+(r.error_code||'unknown'))}`;
+    if(st){
+      if(r.ok && r.connected){
+        st.textContent = r.healed
+          ? `✓ ${provider} connected via ${r.model} (${r.latency_ms}ms) — “${r.requested_model}” is retired; pick ${r.model} in the dropdown & Save.`
+          : `✓ ${provider} connected (${r.model}, ${r.latency_ms}ms)`;
+      } else st.textContent = `✕ ${provider}: ${r.error||('code '+(r.error_code||'unknown'))}`;
+    }
   }catch(e){ if(st) st.textContent=`✕ ${provider}: ${e.message}`; }
 }
 async function saveAiSettings(){
