@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r28-2026-07-17';
+const GOVCON_BUILD = 'r29-2026-07-17';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -322,7 +322,7 @@ async function renderDashboard() {
     api(`govcon_pipeline_items?owner=eq.${uid}&select=id,stage`),
     api(`govcon_proposals?owner=eq.${uid}&select=id,status`),
     api(`govcon_research?owner=eq.${uid}&select=rfp_id,win_probability_score,risk_score,competition_score,recommendation_label`).catch(()=>[]),
-    api(`govcon_run_logs?owner=eq.${uid}&fn=eq.govcon-auto-pilot-run&select=*&order=started_at.desc&limit=5`).catch(()=>[]),
+    api(`govcon_run_logs?owner=eq.${uid}&fn=eq.govcon-autopilot-run&select=*&order=started_at.desc&limit=5`).catch(()=>[]),
   ]);
   const rById={}; (research||[]).forEach(r=>rById[r.rfp_id]=r);
   const awarded = pipeline.filter(p=>p.stage==='awarded'||p.stage==='won').length;
@@ -393,16 +393,16 @@ async function renderDashboard() {
 async function analyzeAllPending(){
   // status element differs by page (Dashboard vs Autopilot) → tolerate either, fall back to toast
   const say=(m)=>{ const st=$('#dashPendStatus')||$('#ar_status'); if(st) st.textContent=m; else toast(m, true); };
-  const deployHint='govcon-auto-pilot-run isn’t deployed yet — deploy the r23 function, then try again.';
+  const deployHint='govcon-autopilot-run isn’t deployed yet — deploy the r23 function, then try again.';
   say('Finding pending opportunities…');
   let pending=[];
-  try{ const r=await callFn('govcon-auto-pilot-run',{action:'list_pending'}); pending=r.pending||[]; }
+  try{ const r=await callFn('govcon-autopilot-run',{action:'list_pending'}); pending=r.pending||[]; }
   catch(e){ say(/Failed to fetch|HTTP 5|CORS/i.test(e.message)? deployHint : 'Could not list pending: '+e.message); return; }
   if(!pending.length){ say('✓ Nothing pending — all opportunities are analyzed.'); return; }
   let done=0, fail=0;
   for(const p of pending){
     say(`Analyzing ${done+1}/${pending.length}: ${String(p.title||'').slice(0,50)}…`);
-    try{ await callFn('govcon-auto-pilot-run',{action:'process_one', rfp_id:p.id}); done++; }
+    try{ await callFn('govcon-autopilot-run',{action:'process_one', rfp_id:p.id}); done++; }
     catch(e){ fail++; if(/Failed to fetch|HTTP 5|CORS/i.test(e.message)){ say(deployHint); return; } }
   }
   say(`✓ Analyzed ${done} opportunit${done===1?'y':'ies'}${fail?`, ${fail} failed`:''}.`);
@@ -448,10 +448,12 @@ async function renderRfps() {
         <label class="toggle" style="margin:0"><input type="checkbox" id="selAllRfps" ${allShownSelected?'checked':''}> Select all shown (${shown.length})</label>
         <b id="rfpSelCount" class="muted">${RFP_SEL.size} selected</b>
         <span style="flex:1"></span>
+        <button class="btn sm primary" id="bulkDlResearch" ${RFP_SEL.size?'':'disabled'}>⬇ Download + 🔬 Research selected</button>
         <button class="btn sm" id="bulkPipe" ${RFP_SEL.size?'':'disabled'}>+ Pipeline selected</button>
         <button class="btn sm" id="bulkDel" style="color:var(--bad)" ${RFP_SEL.size?'':'disabled'}>Delete selected</button>
         <button class="btn sm" id="bulkClear" ${RFP_SEL.size?'':'disabled'}>Clear selection</button>
       </div>
+      <div id="bulkStatus" class="muted" style="font-size:12px;margin-top:6px"></div>
     </div>
     <div id="addRfpBox"></div>
     <div class="muted" style="margin-bottom:10px">${shown.length} of ${rfps.length} opportunities · sorted by due date</div>
@@ -470,11 +472,32 @@ async function renderRfps() {
     const cb = e.target.closest('.selrfp'); if (!cb) return;
     if (cb.checked) RFP_SEL.add(cb.dataset.id); else RFP_SEL.delete(cb.dataset.id);
     $('#rfpSelCount').textContent = `${RFP_SEL.size} selected`;
-    ['bulkPipe','bulkDel','bulkClear'].forEach(b=>$('#'+b).disabled = !RFP_SEL.size);
+    ['bulkDlResearch','bulkPipe','bulkDel','bulkClear'].forEach(b=>$('#'+b).disabled = !RFP_SEL.size);
   });
   $('#bulkClear').onclick = () => { RFP_SEL.clear(); renderRfps(); };
   $('#bulkDel').onclick = bulkDeleteRfps;
   $('#bulkPipe').onclick = bulkPipelineRfps;
+  $('#bulkDlResearch').onclick = bulkDownloadResearch;
+}
+// Bulk: download documents THEN run the full research chain (analyze → research
+// → scoring → rules) for every selected solicitation, one at a time, with live
+// progress. Reuses the existing edge functions.
+async function bulkDownloadResearch(){
+  const ids=[...RFP_SEL]; if(!ids.length) return;
+  const st=$('#bulkStatus'); const btn=$('#bulkDlResearch'); btn.disabled=true;
+  let dl=0, done=0, fail=0;
+  for(let n=0;n<ids.length;n++){
+    const id=ids[n];
+    st.textContent=`(${n+1}/${ids.length}) downloading documents…`;
+    try{ const d=await callFn('govcon-download-documents',{rfp_id:id}); dl+=d.saved||0; }
+    catch(e){ /* keep going — a source with no attachments still gets researched */ }
+    st.textContent=`(${n+1}/${ids.length}) researching…`;
+    try{ await callFn('govcon-autopilot-run',{action:'process_one', rfp_id:id}); done++; }
+    catch(e){ fail++; if(/Failed to fetch|CORS|HTTP 5/i.test(e.message)){ st.textContent='govcon-autopilot-run isn’t reachable — deploy/rename it (see Autopilot → Test). '+e.message; btn.disabled=false; return; } }
+  }
+  st.textContent=`✓ ${dl} document(s) downloaded · ${done} researched${fail?` · ${fail} failed`:''}. Open any opportunity to review.`;
+  btn.disabled=false; RFP_SEL.clear();
+  setTimeout(renderRfps, 1500);
 }
 async function bulkDeleteRfps() {
   const ids = [...RFP_SEL];
@@ -1316,14 +1339,14 @@ async function runAutopilotNow() {
   showApProgress('Starting…');
   try {
     // Non-blocking: the function creates a run and returns 202 immediately (spec §11)
-    const r = await callFn('govcon-auto-pilot-run', { action:'start' });
+    const r = await callFn('govcon-autopilot-run', { action:'start' });
     if (r.status==='already_running'){ showApProgress('A run is already in progress…'); pollApRun(r.run_id); }
     else { showApProgress('Queued — discovering opportunities…'); pollApRun(r.run_id); }
   } catch(e){
     // NO silent legacy fallback — show the real error (spec §10)
     const hint = e.kind==='cors_or_network'
-      ? 'Set "Verify JWT = OFF" for govcon-auto-pilot-run in Supabase (Edge Functions → govcon-auto-pilot-run → Settings) and confirm it deployed.'
-      : e.kind==='not_deployed' ? 'govcon-auto-pilot-run is not deployed.' : '';
+      ? 'Set "Verify JWT = OFF" for govcon-autopilot-run in Supabase (Edge Functions → govcon-autopilot-run → Settings) and confirm it deployed.'
+      : e.kind==='not_deployed' ? 'govcon-autopilot-run is not deployed.' : '';
     showApProgress(`Autopilot failed: ${e.message}${hint?'  ·  '+hint:''}`, true);
     btns.forEach(b=>b.disabled=false);
   }
@@ -1345,7 +1368,7 @@ async function pollApRun(runId){
   AP_POLL=setInterval(async ()=>{
     ticks++;
     try{
-      const r=await callFn('govcon-auto-pilot-run',{action:'run_status', run_id:runId});
+      const r=await callFn('govcon-autopilot-run',{action:'run_status', run_id:runId});
       const run=r.run;
       if(!run){ return; }
       const s=run.stats||{};
@@ -1423,10 +1446,12 @@ async function renderAutopilot() {
       <label class="toggle"><input type="checkbox" id="ap_addpipe" ${s.auto_add_pipeline!==false?'checked':''}> Auto-add qualifying RFPs to Pipeline</label>
       <label class="toggle"><input type="checkbox" id="ap_prio" ${s.auto_prioritize!==false?'checked':''}> Auto-prioritize by win probability &amp; deadline</label>
 
-      <div style="display:flex;gap:10px;margin-top:16px">
+      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
         <button class="btn primary" onclick="saveAutopilot()">Save settings</button>
         <button class="btn" onclick="runAutopilotNow()">✈ Run now</button>
+        <button class="btn" onclick="testAutopilot()">🧪 Test autopilot</button>
       </div>
+      <div id="autopilotTest" style="margin-top:12px"></div>
     </div>
     ${aiProviderCard(s)}
     ${automationRulesCard(s)}`;
@@ -1692,6 +1717,49 @@ async function saveAutomationRules(){
     st.textContent='✓ Automation rules saved.';
   }catch(e){ st.textContent='Save failed: '+e.message; }
 }
+// End-to-end "is the autopilot working?" check: reachability + boot + logic +
+// last run + pending backlog — all without kicking a full run.
+async function testAutopilot(){
+  const box=$('#autopilotTest'); if(!box) return;
+  box.innerHTML='<div class="banner info">Testing…</div>';
+  const rows=[]; const line=(ok,label,detail)=>rows.push(`<div style="display:flex;gap:8px;align-items:center;padding:3px 0"><span>${ok===true?'✅':ok===false?'❌':'⚠️'}</span><b>${esc(label)}</b><span class="muted" style="font-size:12px">${esc(detail||'')}</span></div>`);
+  // 1) reachable + boots + compliance logic passes (proves the function + rules)
+  let reachable=false;
+  try{
+    const r=await callFn('govcon-autopilot-run',{action:'compliance_selftest'});
+    reachable=true;
+    const passed=(r.tests||[]).filter(t=>t.pass).length, total=(r.tests||[]).length;
+    line(true,'Function reachable & booting','govcon-autopilot-run responded');
+    line(r.ok===true,'Compliance engine',`${passed}/${total} rule tests passed`);
+  }catch(e){
+    line(false,'Function reachable', /Failed to fetch|CORS|not_deployed/i.test(e.message)?'NOT reachable — deploy/rename the function to exactly govcon-autopilot-run, Verify JWT off':e.message);
+  }
+  // 2) AI provider configured
+  try{ const s=await callFn('govcon-ai-config',{action:'status'}); line(s.anthropic?.configured||s.gemini?.configured, 'AI provider key', `Anthropic ${s.anthropic?.configured?'✓':'—'} · Gemini ${s.gemini?.configured?'✓':'—'}`); }
+  catch(e){ line('warn','AI provider key','could not check'); }
+  // 3) settings enabled + SAM key present
+  try{
+    const [set,keys]=await Promise.all([
+      api(`govcon_autopilot_settings?owner=eq.${SESSION.user.id}&select=enabled,interval_hours,download_interval_minutes`),
+      api(`govcon_api_keys?owner=eq.${SESSION.user.id}&provider=eq.sam.gov&select=id`).catch(()=>[]),
+    ]);
+    const st=set[0]||{};
+    line(!!st.enabled,'Autopilot enabled', st.enabled?`every ${st.interval_hours||6}h`:'toggle "Enable Autopilot" on');
+    line((keys||[]).length>0,'SAM.gov API key', (keys||[]).length?'stored':'add one under Settings → API keys to discover');
+  }catch(e){ line('warn','Settings','could not read settings'); }
+  // 4) last run + pending backlog
+  try{
+    const runs=await api(`govcon_run_logs?owner=eq.${SESSION.user.id}&fn=eq.govcon-autopilot-run&select=status,started_at,error&order=started_at.desc&limit=1`);
+    const lr=runs[0];
+    line(lr?(lr.status!=='error'):'warn','Last run', lr?`${lr.status} · ${fmtDate(lr.started_at)}${lr.error?' · '+esc(String(lr.error).slice(0,60)):''}`:'no runs yet — click Run now');
+  }catch(e){}
+  if(reachable){
+    try{ const p=await callFn('govcon-autopilot-run',{action:'list_pending'}); line('warn','Pending to research', `${(p.pending||[]).length} opportunit${(p.pending||[]).length===1?'y':'ies'} awaiting analysis`); }catch(e){}
+  }
+  const allGood = !rows.some(r=>r.includes('❌'));
+  box.innerHTML=`<div class="card" style="border-left:4px solid ${allGood?'var(--good,#0b6b34)':'var(--bad)'}">${rows.join('')}
+    <div class="muted" style="font-size:12px;margin-top:8px">${allGood?'Autopilot looks healthy. Use “Run now” or the daily/hourly cron (govcon_migration_13.sql) to process opportunities.':'Fix the ❌ items above, then re-test.'}</div></div>`;
+}
 async function saveAutopilot() {
   const body = {
     owner: SESSION.user.id,
@@ -1847,16 +1915,69 @@ async function runAi(toolId) {
 const STAGES = [['lead','Lead'],['qualified','Qualified'],['in_development','In Development'],['submitted','Submitted'],['awarded','Awarded'],['lost','Lost']];
 let PIPE_VIEW = 'board';   // 'board' | 'grid'
 let PIPE_ITEMS = [];
+let PIPE_DOCS = {};   // rfp_id -> [documents]
 async function renderPipeline() {
   loading();
   PIPE_ITEMS = await api(`govcon_pipeline_items?owner=eq.${SESSION.user.id}&select=*,govcon_rfps(id,title,agency,deadline,win_probability,url,description)&order=stage_updated_at.desc`);
+  // pull downloaded documents for every opportunity in the pipeline so the
+  // cards can show a clickable doc count and the side viewer can list them.
+  PIPE_DOCS = {};
+  const rids = PIPE_ITEMS.map(i=>i.rfp_id).filter(Boolean);
+  if (rids.length) {
+    for (let n=0;n<rids.length;n+=60){
+      const chunk = rids.slice(n,n+60);
+      const docs = await api(`govcon_source_documents?owner=eq.${SESSION.user.id}&rfp_id=in.(${chunk.join(',')})&select=id,rfp_id,original_filename,document_type,stored_path&order=downloaded_at.desc.nullslast`).catch(()=>[]);
+      (docs||[]).forEach(d=>{ (PIPE_DOCS[d.rfp_id]=PIPE_DOCS[d.rfp_id]||[]).push(d); });
+    }
+  }
   const toggle = `<div class="card" style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <b class="muted">${PIPE_ITEMS.length} opportunities</b><span style="flex:1"></span>
     <button class="btn sm ${PIPE_VIEW==='board'?'primary':''}" onclick="setPipeView('board')">▦ Board</button>
     <button class="btn sm ${PIPE_VIEW==='grid'?'primary':''}" onclick="setPipeView('grid')">▤ Grid</button>
   </div>`;
-  V().innerHTML = toggle + (PIPE_VIEW==='board' ? pipeBoard() : pipeGrid()) + `<div id="leadBox"></div>`;
+  V().innerHTML = toggle + (PIPE_VIEW==='board' ? pipeBoard() : pipeGrid()) + `<div id="leadBox"></div>` + pipeViewerMarkup();
   if (PIPE_VIEW==='board') wireDnd();
+}
+// ── slide-in document / research viewer for a pipeline opportunity ──────────
+function pipeViewerMarkup(){
+  return `<div id="pipeViewer" style="position:fixed;top:0;right:0;height:100vh;width:min(460px,94vw);background:var(--panel);border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(0,0,0,.12);transform:translateX(100%);transition:transform .25s ease;z-index:1200;display:flex;flex-direction:column">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:8px">
+      <div style="flex:1"><b id="pvTitle">—</b><div class="muted" id="pvSub" style="font-size:12px"></div></div>
+      <button class="btn sm" onclick="closePipeViewer()">✕</button>
+    </div>
+    <div id="pvBody" style="flex:1;overflow-y:auto;padding:16px"></div>
+  </div>`;
+}
+async function openPipeViewer(rfpId){
+  const item = PIPE_ITEMS.find(i=>i.rfp_id===rfpId) || {}; const r = item.govcon_rfps || {};
+  const pv=$('#pipeViewer'); if(!pv) return;
+  $('#pvTitle').textContent = r.title || 'Opportunity';
+  $('#pvSub').textContent = [r.agency, r.deadline?('due '+fmtDate(r.deadline)):''].filter(Boolean).join(' · ');
+  pv.style.transform='translateX(0)';
+  const body=$('#pvBody'); body.innerHTML='<div class="muted">Loading…</div>';
+  const docs = PIPE_DOCS[rfpId] || [];
+  const [analysis, research] = await Promise.all([
+    api(`govcon_opportunity_analysis?rfp_id=eq.${rfpId}&owner=eq.${SESSION.user.id}&select=fit_score,analysis_confidence,recommendation&order=version.desc&limit=1`).catch(()=>[]),
+    api(`govcon_research?rfp_id=eq.${rfpId}&owner=eq.${SESSION.user.id}&select=win_probability_score,risk_score,recommendation_label&limit=1`).catch(()=>[]),
+  ]);
+  const a=(analysis||[])[0], rs=(research||[])[0];
+  body.innerHTML = `
+    ${a||rs?`<div class="scores" style="margin-bottom:10px">${a?`<span class="pill" style="background:${REC_COLOR[a.recommendation]||'#555'};color:#fff">${esc(a.recommendation||'')}</span><span class="pill">Fit ${a.fit_score}</span><span class="pill">Conf ${a.analysis_confidence}</span>`:''}${rs?`<span class="pill">Win ${rs.win_probability_score}%</span><span class="pill">Risk ${rs.risk_score}</span>`:''}</div>`:'<div class="banner info" style="margin-bottom:10px">Not analyzed yet — use “Download + Research selected” in RFP Discovery.</div>'}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn sm primary" onclick="openReview('${rfpId}')">Open full review / research →</button>
+      ${r.url?`<a class="btn sm" href="${esc(r.url)}" target="_blank">Source ↗</a>`:''}
+    </div>
+    <h2 class="section" style="margin-top:0">Documents (${docs.length})</h2>
+    ${docs.length ? docs.map(d=>`<div class="rfp" style="margin-bottom:6px;padding:8px 10px;display:flex;gap:8px;align-items:center">
+        <span>📄</span><a href="#" style="flex:1;word-break:break-word;color:var(--blue-700)" onclick="event.preventDefault();openDocSigned('${esc(d.stored_path)}')">${esc(d.original_filename)}</a>
+        <span class="pill">${esc(d.document_type||'doc')}</span></div>`).join('')
+      : '<div class="muted" style="font-size:13px">No documents downloaded yet.</div>'}`;
+}
+function closePipeViewer(){ const pv=$('#pipeViewer'); if(pv) pv.style.transform='translateX(100%)'; }
+async function openDocSigned(storedPath){
+  try{ const { data, error } = await sb.storage.from(DOCS_BUCKET).createSignedUrl(storedPath, 3600);
+    if(error) throw error; window.open(data.signedUrl,'_blank'); }
+  catch(e){ toast('Could not open document: '+e.message); }
 }
 function setPipeView(v){ PIPE_VIEW=v; renderPipeline(); }
 
@@ -1871,16 +1992,19 @@ function pipeBoard() {
 }
 function pipeCard(i) {
   const r = i.govcon_rfps || {};
+  const nDocs = (PIPE_DOCS[i.rfp_id]||[]).length;
   return `<div class="pcard" draggable="true" data-id="${i.id}">
     <div class="pt" style="cursor:pointer" onclick="openLead('${i.id}')">${esc(r.title||'RFP')}</div>
     <div class="muted" style="font-size:11px">${esc(r.agency||'')} · ${fmtDate(r.deadline)}</div>
     <span class="pill ${i.priority}">${i.priority}</span>
     ${r.win_probability!=null?`<span class="pill">Win ${r.win_probability}%</span>`:''}
+    ${nDocs?`<span class="pill" style="cursor:pointer;background:var(--blue-100);color:var(--blue-900)" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')" title="View downloaded documents & research">📎 ${nDocs} doc${nDocs!==1?'s':''}</span>`:`<span class="pill" style="cursor:pointer" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')" title="View / research">🔬 view</span>`}
   </div>`;
 }
 function pipeGrid() {
   const rows = PIPE_ITEMS.map(i=>{
     const r = i.govcon_rfps || {};
+    const nDocs=(PIPE_DOCS[i.rfp_id]||[]).length;
     return `<tr style="cursor:pointer" onclick="openLead('${i.id}')">
       <td style="font-weight:600;color:var(--blue-900)">${esc(r.title||'RFP')}</td>
       <td>${esc(r.agency||'—')}</td>
@@ -1888,14 +2012,15 @@ function pipeGrid() {
       <td><span class="pill ${i.priority}">${i.priority}</span></td>
       <td>${r.win_probability!=null?r.win_probability+'%':'—'}</td>
       <td>${esc(STAGES.find(s=>s[0]===i.stage)?.[1]||i.stage)}</td>
+      <td><span class="pill" style="cursor:pointer;${nDocs?'background:var(--blue-100);color:var(--blue-900)':''}" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')">${nDocs?`📎 ${nDocs}`:'🔬 view'}</span></td>
     </tr>`;
   }).join('');
   return `<div class="card" style="padding:0;overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:13.5px">
       <thead><tr style="text-align:left;background:var(--blue-050)">
-        ${['Title','Agency','Deadline','Priority','Win %','Stage'].map(h=>`<th style="padding:10px 12px;border-bottom:1px solid var(--line);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">${h}</th>`).join('')}
+        ${['Title','Agency','Deadline','Priority','Win %','Stage','Docs'].map(h=>`<th style="padding:10px 12px;border-bottom:1px solid var(--line);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">${h}</th>`).join('')}
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted)">Pipeline is empty.</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--muted)">Pipeline is empty.</td></tr>'}</tbody>
     </table></div>`;
 }
 // HTML5 drag-and-drop between stage columns
@@ -2488,6 +2613,7 @@ async function renderPartners() {
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         <button class="btn primary" onclick="pnResearchUI()">🔎 Research Partners</button>
         <button class="btn" onclick="pnYelpUI()">🗺 Import from Yelp</button>
+        <button class="btn" onclick="pnCsvDialerUI()">⬆ CSV → Dialer</button>
         <button class="btn" onclick="pnDedupe()">Merge duplicates</button>
         <button class="btn" onclick="showAddPartner()">+ Add manually</button>
         <span style="flex:1"></span>
@@ -2524,23 +2650,28 @@ async function renderPartners() {
 function pnConfPill(p){ const c=p.research_confidence; if(c==null) return '';
   const lbl=c>=85?'Strongly Verified':c>=70?'Verified':c>=50?'Partially Verified':'Needs Manual Verification';
   return `<span class="pill" title="${lbl}">Conf ${c}</span>`; }
+// Compact partner row — one dense line + a slim meta line, hover reveals actions.
 function pnCard(p){
   const emails=(p.contact_emails||[]);
-  return `<div class="rfp">
+  const loc=[p.city,p.state].filter(Boolean).join(', ')||p.location||'';
+  const caps=[...(p.service_categories||[]),...(p.capabilities||[])].filter(Boolean).slice(0,3);
+  return `<div class="rfp pn-compact" style="padding:8px 10px;margin-bottom:6px">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <input type="checkbox" class="pnsel" data-id="${p.id}" ${PN_SEL.has(p.id)?'checked':''} style="width:auto">
-      <div class="t" style="cursor:pointer;flex:1" onclick="openPartner('${p.id}')">${esc(p.company_name)}</div>
+      <b class="t" style="cursor:pointer;flex:1;min-width:120px;font-size:13.5px" onclick="openPartner('${p.id}')">${esc(p.company_name)}</b>
       ${pnConfPill(p)}
-      <select class="pn-status" data-id="${p.id}" style="width:auto;font-size:12px">${PARTNER_STATUSES.map(s=>`<option ${s===p.partner_status?'selected':''}>${s}</option>`).join('')}</select>
+      ${caps.map(c=>`<span class="chip" style="font-size:10px;padding:1px 6px">${esc(String(c))}</span>`).join('')}
+      ${(p.public_awards||[]).length?`<span class="chip" style="font-size:10px;padding:1px 6px">🏛 ${(p.public_awards||[]).length}</span>`:''}
+      <select class="pn-status" data-id="${p.id}" style="width:auto;font-size:11px;padding:2px 4px">${PARTNER_STATUSES.map(s=>`<option ${s===p.partner_status?'selected':''}>${s}</option>`).join('')}</select>
+      <div class="pn-acts" style="display:flex;gap:4px">
+        <button class="btn sm" style="padding:3px 8px" title="Open" onclick="openPartner('${p.id}')">Open</button>
+        <button class="btn sm" style="padding:3px 8px" title="Refresh info" onclick="pnCall('govcon-partner-refresh','${p.id}','Refreshing…')">↻</button>
+        <button class="btn sm" style="padding:3px 8px" title="Find contacts" onclick="pnCall('govcon-partner-contact-research','${p.id}','Finding contacts…')">☎</button>
+        <button class="btn sm" style="padding:3px 8px" title="Award history" onclick="pnCall('govcon-partner-award-research','${p.id}','Searching awards…')">🏛</button>
+      </div>
     </div>
-    <div class="m">${esc([p.city,p.state].filter(Boolean).join(', ')||p.location||'')}${p.primary_phone?' · '+esc(p.primary_phone):''}${p.website?` · <a href="${esc(p.website)}" target="_blank">site ↗</a>`:''}${emails.length?` · ${emails.length} email(s)`:''}</div>
-    <div class="chips" style="margin-top:6px">${[...(p.service_categories||[]),...(p.capabilities||[])].slice(0,8).map(c=>`<span class="chip">${esc(String(c))}</span>`).join('')}${(p.public_awards||[]).length?`<span class="chip">🏛 ${(p.public_awards||[]).length} award(s)</span>`:''}</div>
-    <div class="acts">
-      <button class="btn sm primary" onclick="openPartner('${p.id}')">Open</button>
-      <button class="btn sm" onclick="pnCall('govcon-partner-refresh','${p.id}','Refreshing company info…')">↻ Refresh info</button>
-      <button class="btn sm" onclick="pnCall('govcon-partner-contact-research','${p.id}','Finding contacts…')">☎ Find contacts</button>
-      <button class="btn sm" onclick="pnCall('govcon-partner-award-research','${p.id}','Searching public awards…')">🏛 Award history</button>
-    </div></div>`;
+    <div class="m" style="font-size:11.5px;margin-top:3px;color:var(--muted)">${esc(loc)}${p.primary_phone?' · '+esc(p.primary_phone):''}${emails.length?` · ${emails.length} email(s)`:''}${p.website?` · <a href="${esc(p.website)}" target="_blank">site ↗</a>`:''}</div>
+  </div>`;
 }
 async function pnCall(fn, partnerId, msg){
   toast(msg, true);
@@ -2618,7 +2749,41 @@ async function pushPartnersToDialer(ids){
     try{ const r=await fetch(`${SB_URL}/rest/v1/crm_leads`,{method:'POST',headers:crmHdr,body:JSON.stringify(lead)});
       r.ok?pushed++:failed++; }catch{ failed++; }
   }
-  toast(`Dialer: ${pushed} pushed${failed?`, ${failed} failed`:''} — open the Blu Balances CRM → Auto Dialer to start calling.`);
+  toast(`Dialer: ${pushed} pushed${failed?`, ${failed} failed`:''} — open the ConnexionTwo Dialer → Auto Dialer to start calling.`);
+}
+/* ── CSV → Dialer: upload a header CSV (Title,Address,Industry,Phone,Dispo,Email
+      or similar) and push rows straight into crm_leads so the dialer can call.
+      Columns are read by HEADER NAME, any order. ── */
+const CSV_DIALER_MAP={title:'business_name',business:'business_name','business name':'business_name',company:'business_name',name:'contact_name',contact:'contact_name','contact name':'contact_name',phone:'phone','phone number':'phone',tel:'phone',email:'email','e-mail':'email',address:'address',street:'address',city:'city',state:'state',county:'county',industry:'industry',category:'industry',dispo:'dispo',status:'dispo',notes:'notes',website:'website',site:'website',url:'website'};
+function pnCsvDialerUI(){
+  openModal(`<div class="shd"><h3>Upload CSV → Dialer</h3><button class="sclose" onclick="closeModal()">×</button></div>
+    <div class="sbd">
+      <div class="muted" style="font-size:13px;margin-bottom:10px">Columns are matched by <b>header name</b> (any order). Recognized: Title/Business · Name/Contact · Phone · Email · Address · City · State · Industry · Dispo · Notes · Website. Rows go straight into the dialer's call list (crm_leads).</div>
+      <input type="file" id="cd_file" accept=".csv" class="field-input" style="border:1px solid var(--line);border-radius:8px;padding:8px">
+      <div id="cd_out" style="margin-top:10px"></div>
+    </div>`);
+  $('#cd_file').onchange=e=>{ const f=e.target.files?.[0]; if(!f) return; const rd=new FileReader(); rd.onload=ev=>cdParseAndPush(ev.target.result); rd.readAsText(f); };
+}
+function cdSplit(line){ const out=[];let cur='',q=false; for(let i=0;i<line.length;i++){const c=line[i]; if(c==='"'){ if(q&&line[i+1]==='"'){cur+='"';i++;} else q=!q; } else if(c===','&&!q){out.push(cur);cur='';} else cur+=c;} out.push(cur); return out.map(s=>s.trim()); }
+async function cdParseAndPush(text){
+  const out=$('#cd_out'); const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(!lines.length){ out.innerHTML='<div class="banner bad">Empty file.</div>'; return; }
+  const header=cdSplit(lines[0]).map(h=>CSV_DIALER_MAP[h.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim()]||null);
+  if(!header.includes('business_name')){ out.innerHTML='<div class="banner bad">No Title/Business/Company column found.</div>'; return; }
+  const rows=[];
+  for(const line of lines.slice(1)){ if(!line.trim())continue; const cols=cdSplit(line); const row={source:'csv_govcon',dispo:'new'};
+    header.forEach((f,i)=>{ if(f&&cols[i]) row[f]=cols[i]; });
+    if(!row.business_name) continue;
+    if(row.dispo) row.dispo=String(row.dispo).toLowerCase().replace(/\s+/g,'_').replace(/[^a-z_]/g,'')||'new';
+    rows.push(row);
+  }
+  if(!rows.length){ out.innerHTML='<div class="banner bad">No valid rows.</div>'; return; }
+  out.innerHTML=`<div class="muted">Pushing ${rows.length} lead(s) to the dialer…</div>`;
+  const crmHdr={'Content-Type':'application/json',apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,Prefer:'return=minimal'};
+  let ok=0,fail=0;
+  for(let i=0;i<rows.length;i+=50){ const batch=rows.slice(i,i+50);
+    try{ const r=await fetch(`${SB_URL}/rest/v1/crm_leads`,{method:'POST',headers:crmHdr,body:JSON.stringify(batch)}); r.ok?ok+=batch.length:fail+=batch.length; }catch{ fail+=batch.length; } }
+  out.innerHTML=`<div class="banner info">✓ ${ok} lead(s) pushed to the dialer${fail?` · ${fail} failed`:''}. Open the ConnexionTwo Dialer to start calling.</div>`;
 }
 /* ── Yelp business import (official Fusion API — needs a "yelp" API key) ── */
 function pnYelpUI(){
