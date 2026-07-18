@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r29-2026-07-17';
+const GOVCON_BUILD = 'r30-2026-07-18';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -317,24 +317,30 @@ function scoreCell(v, goodHigh=true){
 async function renderDashboard() {
   loading();
   const uid = SESSION.user.id;
-  const [rfps, pipeline, proposals, research, runs] = await Promise.all([
+  const [rfps, pipeline, proposals, research, runs, analyses] = await Promise.all([
     api(`govcon_rfps?owner=eq.${uid}&select=id,title,agency,deadline,review_stage,automation_stage,category,place_of_performance_raw,details,status,priority`),
     api(`govcon_pipeline_items?owner=eq.${uid}&select=id,stage`),
     api(`govcon_proposals?owner=eq.${uid}&select=id,status`),
     api(`govcon_research?owner=eq.${uid}&select=rfp_id,win_probability_score,risk_score,competition_score,recommendation_label`).catch(()=>[]),
     api(`govcon_run_logs?owner=eq.${uid}&fn=eq.govcon-auto-pilot-run&select=*&order=started_at.desc&limit=5`).catch(()=>[]),
+    api(`govcon_opportunity_analysis?owner=eq.${uid}&select=rfp_id,fit_score,analysis_confidence,recommendation,version&order=version.desc&limit=1000`).catch(()=>[]),
   ]);
   const rById={}; (research||[]).forEach(r=>rById[r.rfp_id]=r);
+  // fit/conf/rec straight from the analysis table — details.analysis_summary can
+  // be missing on older analyses, which made scores vanish from the boards.
+  window.ANALYSIS_BY_RFP={}; (analyses||[]).forEach(a=>{ if(!window.ANALYSIS_BY_RFP[a.rfp_id]) window.ANALYSIS_BY_RFP[a.rfp_id]=a; });
+  const aById=window.ANALYSIS_BY_RFP;
   const awarded = pipeline.filter(p=>p.stage==='awarded'||p.stage==='won').length;
   const closed = pipeline.filter(p=>['awarded','won','lost'].includes(p.stage)).length;
   const winRate = closed ? Math.round(awarded/closed*100) : 0;
-  const analyzed = rfps.filter(r=>(r.details&&r.details.analysis_summary)).length;
+  const analyzed = rfps.filter(r=>(r.details&&r.details.analysis_summary)||aById[r.id]).length;
 
   // merged scored rows for the sortable table
-  const rows = rfps.map(r=>{ const sum=(r.details&&r.details.analysis_summary)||{}; const rr=rById[r.id]||{};
+  const rows = rfps.map(r=>{ const sum=(r.details&&r.details.analysis_summary)||{}; const rr=rById[r.id]||{}; const aa=aById[r.id]||{};
     return { id:r.id, title:r.title, agency:r.agency, deadline:r.deadline, stage:r.review_stage||'Discovered',
       astage:r.automation_stage, pop:r.place_of_performance_raw, naics:r.category,
-      fit:sum.fit??null, conf:sum.confidence??null, rec:sum.recommendation||rr.recommendation_label||null,
+      fit:sum.fit??aa.fit_score??null, conf:sum.confidence??aa.analysis_confidence??null,
+      rec:sum.recommendation||aa.recommendation||rr.recommendation_label||null,
       win:rr.win_probability_score??null, risk:rr.risk_score??null, comp:rr.competition_score??null };
   });
   const key=DASH_SORT;
@@ -416,7 +422,12 @@ const RFP_SEL = new Set();
 async function renderRfps() {
   loading();
   const uid = SESSION.user.id;
-  const rfps = await api(`govcon_rfps?owner=eq.${uid}&select=*&order=deadline.asc.nullslast&limit=500`);
+  const [rfps, analyses] = await Promise.all([
+    api(`govcon_rfps?owner=eq.${uid}&select=*&order=deadline.asc.nullslast&limit=500`),
+    api(`govcon_opportunity_analysis?owner=eq.${uid}&select=rfp_id,fit_score,analysis_confidence,recommendation,version&order=version.desc&limit=1000`).catch(()=>[]),
+  ]);
+  window.ANALYSIS_BY_RFP=window.ANALYSIS_BY_RFP||{};
+  (analyses||[]).forEach(a=>{ if(!window.ANALYSIS_BY_RFP[a.rfp_id]) window.ANALYSIS_BY_RFP[a.rfp_id]=a; });
   const q = RFP_FILTER.toLowerCase();
   const shown = rfps.filter(r => {
     if (q && !`${r.title} ${r.agency} ${r.category} ${r.description||''}`.toLowerCase().includes(q)) return false;
@@ -536,7 +547,12 @@ let RESEARCH_Q='', RS_FROM='', RS_TO='', RS_SEL=new Set();
 async function renderResearch(){
   loading();
   const uid=SESSION.user.id;
-  const rows=await api(`govcon_rfps?owner=eq.${uid}&select=*&order=deadline.asc.nullslast&limit=500`);
+  const [rows, analyses]=await Promise.all([
+    api(`govcon_rfps?owner=eq.${uid}&select=*&order=deadline.asc.nullslast&limit=500`),
+    api(`govcon_opportunity_analysis?owner=eq.${uid}&select=rfp_id,fit_score,analysis_confidence,recommendation,version&order=version.desc&limit=1000`).catch(()=>[]),
+  ]);
+  window.ANALYSIS_BY_RFP=window.ANALYSIS_BY_RFP||{};
+  (analyses||[]).forEach(a=>{ if(!window.ANALYSIS_BY_RFP[a.rfp_id]) window.ANALYSIS_BY_RFP[a.rfp_id]=a; });
   const inResearch=rows.filter(r=>RESEARCH_STAGES.includes(r.review_stage||'Discovered'));
   const q=RESEARCH_Q.toLowerCase();
   const shown=inResearch.filter(r=>{
@@ -613,7 +629,8 @@ async function rsBulk(action){
   toast(`${verb} ${ids.length} done`); RS_SEL.clear(); renderResearch();
 }
 function researchCard(r){
-  const sum=(r.details&&r.details.analysis_summary)||null;
+  const aa=(window.ANALYSIS_BY_RFP||{})[r.id];
+  const sum=(r.details&&r.details.analysis_summary)||(aa?{fit:aa.fit_score,confidence:aa.analysis_confidence,recommendation:aa.recommendation}:null);
   return `<div class="rfp">
     <div style="display:flex;align-items:flex-start;gap:9px">
       <input type="checkbox" class="rssel" data-id="${r.id}" ${RS_SEL.has(r.id)?'checked':''} style="width:auto;margin-top:4px">
@@ -1211,7 +1228,8 @@ async function rvArchive(){
 
 const REC_COLOR = {'Strong Pursue':'#0b6b34','Pursue':'#0b6b34','Conditional Pursue':'#7a5b00','Monitor':'#555','Team':'#0054d1','No-Bid':'#b3261e'};
 function rfpCard(r) {
-  const sum = (r.details && r.details.analysis_summary) || null;
+  const aa=(window.ANALYSIS_BY_RFP||{})[r.id];
+  const sum = (r.details && r.details.analysis_summary) || (aa?{fit:aa.fit_score,readiness:'—',dependency:'—',confidence:aa.analysis_confidence,recommendation:aa.recommendation,version:aa.version}:null);
   const stage = r.review_stage || 'Discovered';
   return `<div class="rfp">
     <div style="display:flex;align-items:flex-start;gap:9px">
@@ -1747,18 +1765,56 @@ async function testAutopilot(){
     line(!!st.enabled,'Autopilot enabled', st.enabled?`every ${st.interval_hours||6}h`:'toggle "Enable Autopilot" on');
     line((keys||[]).length>0,'SAM.gov API key', (keys||[]).length?'stored':'add one under Settings → API keys to discover');
   }catch(e){ line('warn','Settings','could not read settings'); }
-  // 4) last run + pending backlog
+  // 4) last run + SCHEDULER HEARTBEAT — is the pg_cron actually firing?
+  let intervalH=6;
+  try{ const s2=await api(`govcon_autopilot_settings?owner=eq.${SESSION.user.id}&select=interval_hours`); intervalH=s2[0]?.interval_hours||6; }catch(e){}
   try{
     const runs=await api(`govcon_run_logs?owner=eq.${SESSION.user.id}&fn=eq.govcon-auto-pilot-run&select=status,started_at,error&order=started_at.desc&limit=1`);
     const lr=runs[0];
-    line(lr?(lr.status!=='error'):'warn','Last run', lr?`${lr.status} · ${fmtDate(lr.started_at)}${lr.error?' · '+esc(String(lr.error).slice(0,60)):''}`:'no runs yet — click Run now');
+    line(lr?(lr.status!=='error'):'warn','Last run', lr?`${lr.status} · ${new Date(lr.started_at).toLocaleString()}${lr.error?' · '+esc(String(lr.error).slice(0,60)):''}`:'no runs yet');
+    const ageH = lr ? (Date.now()-new Date(lr.started_at).getTime())/36e5 : Infinity;
+    const cronOk = ageH <= intervalH + 0.5;
+    line(cronOk,'Scheduled runs (pg_cron)', cronOk
+      ? `firing — last run ${ageH.toFixed(1)}h ago (interval ${intervalH}h)`
+      : `NOT firing — last run ${isFinite(ageH)?ageH.toFixed(1)+'h ago':'never'} vs ${intervalH}h interval. Run govcon_migration_13.sql (with your service-role key) in the SQL editor to schedule the hourly run + 5-min downloader. Until then NOTHING runs by itself.`);
   }catch(e){}
   if(reachable){
     try{ const p=await callFn('govcon-auto-pilot-run',{action:'list_pending'}); line('warn','Pending to research', `${(p.pending||[]).length} opportunit${(p.pending||[]).length===1?'y':'ies'} awaiting analysis`); }catch(e){}
   }
   const allGood = !rows.some(r=>r.includes('❌'));
   box.innerHTML=`<div class="card" style="border-left:4px solid ${allGood?'var(--good,#0b6b34)':'var(--bad)'}">${rows.join('')}
-    <div class="muted" style="font-size:12px;margin-top:8px">${allGood?'Autopilot looks healthy. Use “Run now” or the daily/hourly cron (govcon_migration_13.sql) to process opportunities.':'Fix the ❌ items above, then re-test.'}</div></div>`;
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
+      <button class="btn sm primary" id="apFullCycle">▶ Test full cycle now (discover → download → research)</button>
+      <span id="apFullCycleStatus" class="muted" style="font-size:12px"></span>
+    </div>
+    <div class="muted" style="font-size:12px;margin-top:8px">${allGood?'Autopilot machinery is healthy. If "Scheduled runs" shows NOT firing, the cron SQL is the only missing piece.':'Fix the ❌ items above, then re-test.'}</div></div>`;
+  const fc=$('#apFullCycle'); if(fc) fc.onclick=testFullCycle;
+}
+// Kick ONE complete cycle end-to-end and report what actually happened at each
+// step. This is the "is it really working?" proof: SAM discovery → document
+// download → AI research, all server-side, same code the schedule runs.
+async function testFullCycle(){
+  const st=$('#apFullCycleStatus'), btn=$('#apFullCycle'); if(!st||!btn) return;
+  btn.disabled=true; st.textContent='Starting a full run…';
+  let runId=null;
+  try{ const r=await callFn('govcon-auto-pilot-run',{action:'start'}); runId=r.run_id;
+    st.textContent = r.status==='already_running' ? 'A run is already in progress — watching it…' : 'Run started — discovering from SAM.gov…';
+  }catch(e){ st.textContent='✕ Could not start: '+e.message; btn.disabled=false; return; }
+  const t0=Date.now();
+  const poll=setInterval(async ()=>{
+    try{
+      const r=await callFn('govcon-auto-pilot-run',{action:'run_status', run_id:runId});
+      const run=r.run;
+      const mins=((Date.now()-t0)/6e4).toFixed(1);
+      if(!run){ st.textContent=`Waiting for run record… (${mins}m)`; return; }
+      if(run.status==='started'){ st.textContent=`Running… (${mins}m — discovery, downloads, and analysis happen server-side)`; return; }
+      clearInterval(poll); btn.disabled=false;
+      const s=run.stats||{};
+      if(run.status==='error'){ st.textContent='✕ Run failed: '+(run.error||'unknown'); return; }
+      st.innerHTML=`✅ <b>Full cycle completed</b> — found ${s.found??0} on SAM · ${s.new??0} new${s.declined?` · ${s.declined} auto-declined`:''} · ${s.files_downloaded??0} document(s) downloaded · ${s.analyzed??0} researched · ${s.pending_remaining??0} still pending (next runs continue automatically once the cron is scheduled).`;
+      if($('#views')) setTimeout(renderAutopilot, 4000);
+    }catch(e){ /* transient poll error — keep polling */ }
+  }, 5000);
 }
 async function saveAutopilot() {
   const body = {
