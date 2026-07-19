@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r32-2026-07-18';
+const GOVCON_BUILD = 'r33-partner-research-2026-07-19';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -325,7 +325,7 @@ async function renderDashboard() {
     api(`govcon_pipeline_items?owner=eq.${uid}&select=id,stage`),
     api(`govcon_proposals?owner=eq.${uid}&select=id,status`),
     api(`govcon_research?owner=eq.${uid}&select=rfp_id,win_probability_score,risk_score,competition_score,recommendation_label`).catch(()=>[]),
-    api(`govcon_run_logs?owner=eq.${uid}&fn=eq.govcon-autopilot-run&select=*&order=started_at.desc&limit=5`).catch(()=>[]),
+    api(`govcon_run_logs?owner=eq.${uid}&fn=eq.govcon-auto-pilot-run&select=*&order=started_at.desc&limit=5`).catch(()=>[]),
     api(`govcon_opportunity_analysis?owner=eq.${uid}&select=rfp_id,fit_score,analysis_confidence,recommendation,version&order=version.desc&limit=1000`).catch(()=>[]),
   ]);
   const rById={}; (research||[]).forEach(r=>rById[r.rfp_id]=r);
@@ -1542,10 +1542,62 @@ async function renderAutopilot() {
       <div id="autopilotTest" style="margin-top:12px"></div>
     </div>
     ${aiProviderCard(s)}
+    ${partnerResearchCard(s)}
     ${automationRulesCard(s)}`;
   wireAutomationRules();
   wireAiProvider();
   aiRefreshStatus();
+}
+// ── Partner Verification & Research System controls ──────────────────────────
+function partnerResearchCard(s){
+  const depth=s.partner_research_depth||'standard', sched=s.partner_research_schedule||'after_import';
+  return `<div class="card" style="margin-top:14px">
+    <h2 class="section" style="margin-top:0">🤝 Partner auto-research</h2>
+    <div class="muted" style="font-size:12.5px;margin-bottom:10px">When you import companies, the system automatically researches every one — SAM.gov verification, website contacts &amp; services, federal awards, an AI summary, a 0–100 score, and suggested contract types. A pg_cron job (<b>govcon_migration_16.sql</b>) drains the queue on a schedule so you never have to press a button. AI provider/model/temperature/timeout come from the AI Provider card above.</div>
+    <label class="toggle"><input type="checkbox" id="pr_enabled" ${s.partner_autoresearch_enabled!==false?'checked':''}> Automatically research imported &amp; new companies</label>
+    <div class="row2">
+      <div class="field"><label>Research depth</label>
+        <select id="pr_depth">
+          <option value="fast" ${depth==='fast'?'selected':''}>Fast — SAM verification only</option>
+          <option value="standard" ${depth==='standard'?'selected':''}>Standard — SAM + website extraction (recommended)</option>
+          <option value="deep" ${depth==='deep'?'selected':''}>Deep — SAM + website + website discovery + federal awards + AI summary</option>
+        </select></div>
+      <div class="field"><label>Auto-update schedule</label>
+        <select id="pr_sched">
+          <option value="after_import" ${sched==='after_import'?'selected':''}>After import only</option>
+          <option value="daily" ${sched==='daily'?'selected':''}>Daily — recheck stale records</option>
+          <option value="weekly" ${sched==='weekly'?'selected':''}>Weekly</option>
+          <option value="monthly" ${sched==='monthly'?'selected':''}>Monthly</option>
+          <option value="manual" ${sched==='manual'?'selected':''}>Manual only</option>
+        </select></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Recheck records older than (days)</label><input id="pr_recheck" type="number" min="1" max="365" value="${s.partner_recheck_days??30}"></div>
+      <div class="field"><label>Companies per background batch</label><input id="pr_batch" type="number" min="1" max="25" value="${s.partner_research_batch??5}"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Max websites per company</label><input id="pr_maxweb" type="number" min="0" max="5" value="${s.partner_max_websites??1}"></div>
+      <div class="field"><label>Max pages per website</label><input id="pr_maxpages" type="number" min="1" max="10" value="${s.partner_max_pages??3}"></div>
+    </div>
+    <div class="field"><label>Min confidence to auto-accept a fact (0–1)</label><input id="pr_conf" type="number" step="0.05" min="0" max="1" value="${s.partner_confidence_threshold??0.5}"></div>
+    <button class="btn primary" onclick="savePartnerResearch()" style="margin-top:8px">Save partner-research settings</button>
+    <div id="prSaveOut" style="margin-top:8px"></div>
+  </div>`;
+}
+async function savePartnerResearch(){
+  const body={ owner:SESSION.user.id,
+    partner_autoresearch_enabled:$('#pr_enabled').checked,
+    partner_research_depth:$('#pr_depth').value,
+    partner_research_schedule:$('#pr_sched').value,
+    partner_recheck_days:Math.max(1,+$('#pr_recheck').value||30),
+    partner_research_batch:Math.max(1,Math.min(25,+$('#pr_batch').value||5)),
+    partner_max_websites:Math.max(0,+$('#pr_maxweb').value||1),
+    partner_max_pages:Math.max(1,+$('#pr_maxpages').value||3),
+    partner_confidence_threshold:Math.max(0,Math.min(1,+$('#pr_conf').value||0.5)),
+    updated_at:new Date().toISOString() };
+  try{ await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify(body)});
+    $('#prSaveOut').innerHTML='<span style="color:var(--good);font-size:13px">✓ Saved</span>';
+  }catch(e){ $('#prSaveOut').innerHTML=`<span class="banner bad">${/column/.test(e.message)?'Run govcon_migration_16.sql first to add these settings columns.':esc(e.message)}</span>`; }
 }
 // ── AI Provider & Document Analysis (spec: choose provider + model) ──────────
 const ANTHROPIC_MODELS = [['claude-opus-4-8','Claude Opus 4.8 — deepest analysis (current default)'],['claude-sonnet-5','Claude Sonnet 5 — balanced'],['claude-haiku-4-5-20251001','Claude Haiku 4.5 — fastest / lowest cost']];
@@ -1840,8 +1892,8 @@ async function testAutopilot(){
   try{ const s2=await api(`govcon_autopilot_settings?owner=eq.${SESSION.user.id}&select=interval_hours`); intervalH=s2[0]?.interval_hours||6; }catch(e){}
   try{
     // watch BOTH scheduled jobs: the hourly full run AND the 5-minute downloader
-    const runs=await api(`govcon_run_logs?owner=eq.${SESSION.user.id}&fn=in.(govcon-autopilot-run,govcon-autopilot-downloads)&select=fn,status,started_at,error&order=started_at.desc&limit=10`);
-    const lastFull=(runs||[]).find(r=>r.fn==='govcon-autopilot-run');
+    const runs=await api(`govcon_run_logs?owner=eq.${SESSION.user.id}&fn=in.(govcon-auto-pilot-run,govcon-autopilot-downloads)&select=fn,status,started_at,error&order=started_at.desc&limit=10`);
+    const lastFull=(runs||[]).find(r=>r.fn==='govcon-auto-pilot-run');
     const lastDl=(runs||[]).find(r=>r.fn==='govcon-autopilot-downloads');
     line(lastFull?(lastFull.status!=='error'):'warn','Last full run', lastFull?`${lastFull.status} · ${new Date(lastFull.started_at).toLocaleString()}${lastFull.error?' · '+esc(String(lastFull.error).slice(0,60)):''}`:'no runs yet (hourly job fires at :05 past each hour)');
     const dlAgeM = lastDl ? (Date.now()-new Date(lastDl.started_at).getTime())/6e4 : Infinity;
@@ -2724,32 +2776,67 @@ const PN_VIEWS = [
   ['Moving', p=>JSON.stringify([p.service_categories,p.capabilities]).toLowerCase().match(/moving|relocat/)],
 ];
 let PN_Q='', PN_STATE='', PN_STATUS='', PN_VIEW=-1;
+// Partner Verification & Research System filters
+let PN_SAM='', PN_SMALL='', PN_MINSCORE='', PN_HASWEB='', PN_HASEMAIL='', PN_CTYPE='', PN_RSTATUS='';
 const PN_SEL = new Set();
+const CONTRACT_TYPES = ['Portable Toilets / Sanitation','Janitorial / Custodial','Landscaping / Grounds','Dumpsters / Waste Removal','Equipment Rental','Pest Control','Facilities Maintenance'];
 async function renderPartners() {
   loading();
   const mine = await api(`govcon_partners?owner=eq.${SESSION.user.id}&select=*&order=updated_at.desc.nullslast&limit=500`);
   for (const id of [...PN_SEL]) if (!mine.some(p=>p.id===id)) PN_SEL.delete(id);   // prune stale
   let shown = mine.filter(p=>{
-    if (PN_Q && !`${p.company_name} ${p.city||''} ${p.state||''} ${JSON.stringify(p.capabilities||[])} ${JSON.stringify(p.service_categories||[])} ${JSON.stringify(p.naics_codes||[])}`.toLowerCase().includes(PN_Q.toLowerCase())) return false;
+    if (PN_Q && !`${p.company_name} ${p.city||''} ${p.state||''} ${p.uei||''} ${p.cage_code||''} ${JSON.stringify(p.capabilities||[])} ${JSON.stringify(p.service_categories||[])} ${JSON.stringify(p.naics_codes||[])} ${JSON.stringify(p.suggested_contract_types||[])}`.toLowerCase().includes(PN_Q.toLowerCase())) return false;
     if (PN_STATE && (p.state||'').toUpperCase()!==PN_STATE.toUpperCase()) return false;
     if (PN_STATUS && p.partner_status!==PN_STATUS) return false;
+    if (PN_SAM==='yes' && !p.sam_registered) return false;
+    if (PN_SAM==='active' && !p.sam_active) return false;
+    if (PN_SAM==='no' && p.sam_registered) return false;
+    if (PN_SMALL==='yes' && !p.is_small_business) return false;
+    if (PN_SMALL==='no' && p.is_small_business) return false;
+    if (PN_MINSCORE!=='' && (p.partner_score==null || p.partner_score < +PN_MINSCORE)) return false;
+    if (PN_HASWEB==='yes' && !p.website) return false;
+    if (PN_HASEMAIL==='yes' && !(p.general_email || (p.contact_emails||[]).length)) return false;
+    if (PN_CTYPE && !(p.suggested_contract_types||[]).includes(PN_CTYPE)) return false;
+    if (PN_RSTATUS && (p.research_status||'pending')!==PN_RSTATUS) return false;
     if (PN_VIEW>=0 && !PN_VIEWS[PN_VIEW][1](p)) return false;
     if (PN_VIEW<0 && p.partner_status==='Archived') return false;
     return true;
   });
+  const rc = {pending:0,processing:0,done:0,failed:0};
+  mine.forEach(p=>{ const s=p.research_status||'pending'; if(rc[s]!=null) rc[s]++; });
   V().innerHTML = `
-    <div class="banner info">Research subcontractors and teaming partners automatically — no manual Googling. Add a web-search API key under <b>Settings → API keys</b> (provider <b>serper</b> — free tier at serper.dev — or <b>google_cse</b> / <b>bing</b>) to enable automated research.</div>
+    <div class="banner info">Import a CSV of companies and the system <b>automatically verifies &amp; researches every one</b> — SAM.gov (UEI/CAGE/active/small-business), website contacts &amp; services, federal award history, an AI summary, a 0–100 partner score, and suggested contract types. Nothing waits on a button: a background queue drains imports on a schedule. Add a web-search key under <b>Settings → API keys</b> (provider <b>serper</b>) for website discovery.</div>
     <div class="card" style="margin-bottom:12px">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-        <button class="btn primary" onclick="pnResearchUI()">🔎 Research Partners</button>
-        <button class="btn" onclick="pnYelpUI()">🗺 Import from Yelp</button>
+        <button class="btn primary" onclick="pnImportUI()">⬆ Import companies (CSV)</button>
+        <button class="btn" onclick="pnResearchAllPending()">🤖 Research all pending${rc.pending+rc.failed?` (${rc.pending+rc.failed})`:''}</button>
+        <button class="btn" onclick="pnResearchUI()">🔎 Find new partners</button>
+        <button class="btn" onclick="pnYelpUI()">🗺 Yelp</button>
         <button class="btn" onclick="pnCsvDialerUI()">⬆ CSV → Dialer</button>
         <button class="btn" onclick="pnDedupe()">Merge duplicates</button>
         <button class="btn" onclick="showAddPartner()">+ Add manually</button>
         <span style="flex:1"></span>
-        <input id="pnQ" placeholder="Search name, capability, NAICS…" value="${esc(PN_Q)}" style="width:220px">
-        <input id="pnState" placeholder="State" value="${esc(PN_STATE)}" style="width:70px">
-        <select id="pnStatus" style="width:auto"><option value="">All statuses</option>${PARTNER_STATUSES.map(s=>`<option ${s===PN_STATUS?'selected':''}>${s}</option>`).join('')}</select>
+        <input id="pnQ" placeholder="Search name, NAICS, UEI…" value="${esc(PN_Q)}" style="width:200px">
+      </div>
+      <div id="pnProgress" style="margin-top:10px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:12px">
+        <span class="muted">Research:</span>
+        <span class="pill" title="Enriched">✓ ${rc.done} done</span>
+        ${rc.pending?`<span class="pill" style="background:#fde68a;color:#78350f">⏳ ${rc.pending} pending</span>`:''}
+        ${rc.processing?`<span class="pill" style="background:#bfdbfe;color:#1e3a8a">↻ ${rc.processing} processing</span>`:''}
+        ${rc.failed?`<span class="pill" style="background:#fecaca;color:#7f1d1d;cursor:pointer" onclick="pnRequeue('failed')" title="Click to retry">⚠ ${rc.failed} failed — retry</span>`:''}
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
+        <input id="pnState" placeholder="State" value="${esc(PN_STATE)}" style="width:64px">
+        <select id="pnStatus" style="width:auto;font-size:12px"><option value="">All statuses</option>${PARTNER_STATUSES.map(s=>`<option ${s===PN_STATUS?'selected':''}>${s}</option>`).join('')}</select>
+        <select id="pnSam" style="width:auto;font-size:12px"><option value="">SAM: any</option><option value="active" ${PN_SAM==='active'?'selected':''}>SAM active</option><option value="yes" ${PN_SAM==='yes'?'selected':''}>SAM registered</option><option value="no" ${PN_SAM==='no'?'selected':''}>Not in SAM</option></select>
+        <select id="pnSmall" style="width:auto;font-size:12px"><option value="">Small biz: any</option><option value="yes" ${PN_SMALL==='yes'?'selected':''}>Small business</option><option value="no" ${PN_SMALL==='no'?'selected':''}>Not small biz</option></select>
+        <select id="pnCtype" style="width:auto;font-size:12px"><option value="">Contract type: any</option>${CONTRACT_TYPES.map(c=>`<option ${c===PN_CTYPE?'selected':''}>${c}</option>`).join('')}</select>
+        <select id="pnRstatus" style="width:auto;font-size:12px"><option value="">Research: any</option>${['pending','processing','done','failed'].map(s=>`<option value="${s}" ${s===PN_RSTATUS?'selected':''}>Research ${s}</option>`).join('')}</select>
+        <label class="muted" style="font-size:12px">Score ≥ <input id="pnMinScore" type="number" min="0" max="100" value="${esc(PN_MINSCORE)}" style="width:52px"></label>
+        <label class="toggle" style="margin:0;font-size:12px"><input type="checkbox" id="pnHasWeb" ${PN_HASWEB==='yes'?'checked':''} style="width:auto"> Has website</label>
+        <label class="toggle" style="margin:0;font-size:12px"><input type="checkbox" id="pnHasEmail" ${PN_HASEMAIL==='yes'?'checked':''} style="width:auto"> Has email</label>
+        ${(PN_SAM||PN_SMALL||PN_CTYPE||PN_RSTATUS||PN_MINSCORE||PN_HASWEB||PN_HASEMAIL)?`<span class="chip" style="cursor:pointer" onclick="pnClearFilters()">✕ clear filters</span>`:''}
       </div>
       <div class="chips" style="margin-top:10px">${PN_VIEWS.map((v,i)=>`<span class="chip" data-view="${i}" style="cursor:pointer;${i===PN_VIEW?'background:var(--blue-500);color:#fff':''}">${v[0]}</span>`).join('')}${PN_VIEW>=0?'<span class="chip" data-view="-1" style="cursor:pointer">✕ clear view</span>':''}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
@@ -2768,6 +2855,13 @@ async function renderPartners() {
   $('#pnQ').oninput = e=>{ PN_Q=e.target.value; clearTimeout(window._pt); window._pt=setTimeout(renderPartners,300); };
   $('#pnState').onchange = e=>{ PN_STATE=e.target.value; renderPartners(); };
   $('#pnStatus').onchange = e=>{ PN_STATUS=e.target.value; renderPartners(); };
+  $('#pnSam').onchange = e=>{ PN_SAM=e.target.value; renderPartners(); };
+  $('#pnSmall').onchange = e=>{ PN_SMALL=e.target.value; renderPartners(); };
+  $('#pnCtype').onchange = e=>{ PN_CTYPE=e.target.value; renderPartners(); };
+  $('#pnRstatus').onchange = e=>{ PN_RSTATUS=e.target.value; renderPartners(); };
+  $('#pnMinScore').oninput = e=>{ PN_MINSCORE=e.target.value; clearTimeout(window._ps); window._ps=setTimeout(renderPartners,400); };
+  $('#pnHasWeb').onchange = e=>{ PN_HASWEB=e.target.checked?'yes':''; renderPartners(); };
+  $('#pnHasEmail').onchange = e=>{ PN_HASEMAIL=e.target.checked?'yes':''; renderPartners(); };
   $('#pnSelAll').onchange = e=>{ shown.forEach(p=>e.target.checked?PN_SEL.add(p.id):PN_SEL.delete(p.id)); renderPartners(); };
   $('#pnBulkStatus').onchange = e=>{ if(e.target.value) pnBulk('status', e.target.value); };
   document.querySelectorAll('.pnsel').forEach(c=>c.onchange=()=>{ c.checked?PN_SEL.add(c.dataset.id):PN_SEL.delete(c.dataset.id); const n=$('#pnSelCount'); if(n) n.textContent=PN_SEL.size; });
@@ -2780,33 +2874,161 @@ async function renderPartners() {
 function pnConfPill(p){ const c=p.research_confidence; if(c==null) return '';
   const lbl=c>=85?'Strongly Verified':c>=70?'Verified':c>=50?'Partially Verified':'Needs Manual Verification';
   return `<span class="pill" title="${lbl}">Conf ${c}</span>`; }
+function pnScorePill(p){ const s=p.partner_score; if(s==null) return '';
+  const bg=s>=75?'#bbf7d0;color:#14532d':s>=50?'#fde68a;color:#78350f':'#e5e7eb;color:#374151';
+  return `<span class="pill" title="Partner quality score (0–100)" style="background:${bg};font-weight:700">${s}</span>`; }
+function pnSamBadge(p){
+  if(p.sam_active) return `<span class="pill" title="SAM.gov registration ACTIVE${p.uei?' · UEI '+p.uei:''}${p.cage_code?' · CAGE '+p.cage_code:''}${p.sam_expiration?' · exp '+p.sam_expiration:''}" style="background:#bbf7d0;color:#14532d">SAM ✓</span>`;
+  if(p.sam_registered) return `<span class="pill" title="In SAM but not active" style="background:#fde68a;color:#78350f">SAM ⚠</span>`;
+  if(p.sam_registered===false) return `<span class="pill" title="Not found in SAM.gov" style="background:#f3f4f6;color:#6b7280">no SAM</span>`;
+  return ''; }
+function pnRstatusDot(p){ const s=p.research_status||'pending';
+  const m={pending:['⏳','#d97706','Research pending'],processing:['↻','#2563eb','Researching…'],done:['','','Researched'],failed:['⚠','#dc2626','Research failed — click to retry']};
+  const d=m[s]||m.pending; if(!d[0]) return '';
+  return `<span title="${d[2]}" style="color:${d[1]};font-size:11px;cursor:${s==='failed'?'pointer':'default'}" ${s==='failed'?`onclick="pnRequeue(null,'${p.id}')"`:''}>${d[0]}</span>`; }
 // Compact partner row — one dense line + a slim meta line, hover reveals actions.
 function pnCard(p){
   const emails=(p.contact_emails||[]);
   const loc=[p.city,p.state].filter(Boolean).join(', ')||p.location||'';
-  const caps=[...(p.service_categories||[]),...(p.capabilities||[])].filter(Boolean).slice(0,3);
+  const ctypes=(p.suggested_contract_types||[]).slice(0,2);
+  const caps=ctypes.length?[]:[...(p.service_categories||[]),...(p.capabilities||[])].filter(Boolean).slice(0,2);
   return `<div class="rfp pn-compact" style="padding:8px 10px;margin-bottom:6px">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <input type="checkbox" class="pnsel" data-id="${p.id}" ${PN_SEL.has(p.id)?'checked':''} style="width:auto">
+      ${pnRstatusDot(p)}
       <b class="t" style="cursor:pointer;flex:1;min-width:120px;font-size:13.5px" onclick="openPartner('${p.id}')">${esc(p.company_name)}</b>
-      ${pnConfPill(p)}
+      ${pnScorePill(p)}
+      ${pnSamBadge(p)}
+      ${p.is_small_business?`<span class="pill" title="Small business${(p.small_business_status&&p.small_business_status.socioeconomic&&p.small_business_status.socioeconomic.length)?' · '+p.small_business_status.socioeconomic.join(', '):''}" style="background:#dbeafe;color:#1e40af">SB</span>`:''}
+      ${ctypes.map(c=>`<span class="chip" style="font-size:10px;padding:1px 6px" title="Suggested contract type">${esc(String(c))}</span>`).join('')}
       ${caps.map(c=>`<span class="chip" style="font-size:10px;padding:1px 6px">${esc(String(c))}</span>`).join('')}
-      ${(p.public_awards||[]).length?`<span class="chip" style="font-size:10px;padding:1px 6px">🏛 ${(p.public_awards||[]).length}</span>`:''}
+      ${(p.public_awards||[]).length?`<span class="chip" style="font-size:10px;padding:1px 6px" title="Federal awards found">🏛 ${(p.public_awards||[]).length}</span>`:''}
       <select class="pn-status" data-id="${p.id}" style="width:auto;font-size:11px;padding:2px 4px">${PARTNER_STATUSES.map(s=>`<option ${s===p.partner_status?'selected':''}>${s}</option>`).join('')}</select>
       <div class="pn-acts" style="display:flex;gap:4px">
         <button class="btn sm" style="padding:3px 8px" title="Open" onclick="openPartner('${p.id}')">Open</button>
-        <button class="btn sm" style="padding:3px 8px" title="Refresh info" onclick="pnCall('govcon-partner-refresh','${p.id}','Refreshing…')">↻</button>
+        <button class="btn sm" style="padding:3px 8px" title="Auto-research this company now" onclick="pnResearchOne('${p.id}')">🤖</button>
         <button class="btn sm" style="padding:3px 8px" title="Find contacts" onclick="pnCall('govcon-partner-contact-research','${p.id}','Finding contacts…')">☎</button>
-        <button class="btn sm" style="padding:3px 8px" title="Award history" onclick="pnCall('govcon-partner-award-research','${p.id}','Searching awards…')">🏛</button>
       </div>
     </div>
-    <div class="m" style="font-size:11.5px;margin-top:3px;color:var(--muted)">${esc(loc)}${p.primary_phone?' · '+esc(p.primary_phone):''}${emails.length?` · ${emails.length} email(s)`:''}${p.website?` · <a href="${esc(p.website)}" target="_blank">site ↗</a>`:''}</div>
+    <div class="m" style="font-size:11.5px;margin-top:3px;color:var(--muted)">${esc(loc)}${p.primary_phone?' · '+esc(p.primary_phone):''}${emails.length?` · ${emails.length} email(s)`:''}${p.website?` · <a href="${esc(p.website)}" target="_blank">site ↗</a>`:''}${p.sam_last_checked?` · SAM checked ${fmtDate(p.sam_last_checked)}`:''}${p.research_error?` · <span style="color:var(--bad)" title="${esc(p.research_error)}">research error</span>`:''}</div>
   </div>`;
 }
 async function pnCall(fn, partnerId, msg){
   toast(msg, true);
   try{ const r=await callFn(fn,{partner_id:partnerId});
     toast(r.warning || 'Done ✓ '+(r.awards_found!=null?`(${r.awards_found} award(s))`:r.partner?`(confidence ${r.partner.research_confidence})`:''));
+    renderPartners();
+  }catch(e){ toast('Failed: '+e.message); }
+}
+function pnClearFilters(){ PN_SAM=PN_SMALL=PN_CTYPE=PN_RSTATUS=PN_MINSCORE=PN_HASWEB=PN_HASEMAIL=''; renderPartners(); }
+
+/* ── Partner Verification & Research System ──────────────────────────────────
+   Import ANY CSV → auto-map columns → dedupe → queue → auto-research. */
+const AUTORESEARCH_FN='govcon-partner-autoresearch';
+// header synonyms → our canonical partner fields (auto column mapping)
+const PN_IMPORT_MAP={
+  company_name:['company','company name','business','business name','name','organization','vendor','vendor name','account','account name','firm','contractor','dba','legal name'],
+  website:['website','web site','url','site','web','domain','homepage'],
+  contact_email:['email','e-mail','email address','contact email','general email','mail'],
+  phone:['phone','phone number','telephone','tel','contact phone','office phone','mobile','cell'],
+  address:['address','street','street address','address 1','mailing address'],
+  city:['city','town'],
+  state:['state','province','st','state/province'],
+  zip:['zip','zip code','postal','postal code','zipcode'],
+  industry:['industry','category','sector','trade','service','services','type','naics description'],
+  notes:['notes','note','comments','description','remarks','details'],
+};
+function pnGuessField(header){ const h=header.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim();
+  for(const [field,syn] of Object.entries(PN_IMPORT_MAP)) if(syn.includes(h)) return field;
+  // fuzzy contains fallback
+  for(const [field,syn] of Object.entries(PN_IMPORT_MAP)) if(syn.some(s=>h.includes(s)||s.includes(h))) return field;
+  return ''; }
+function pnCsvSplit(line){ const out=[];let cur='',q=false; for(let i=0;i<line.length;i++){const c=line[i]; if(c==='"'){ if(q&&line[i+1]==='"'){cur+='"';i++;} else q=!q; } else if(c===','&&!q){out.push(cur);cur='';} else cur+=c;} out.push(cur); return out.map(s=>s.trim()); }
+let PN_IMPORT_ROWS=[], PN_IMPORT_HEADERS=[];
+function pnImportUI(){
+  openModal(`<div class="shd"><h3>Import companies → auto-research</h3><button class="sclose" onclick="closeModal()">×</button></div>
+    <div class="sbd">
+      <div class="muted" style="font-size:13px;margin-bottom:10px">Upload a CSV in <b>any format</b> — columns are auto-detected (you can fix the mapping below). Company names are normalized and deduped against your existing partners. Every imported company is queued and the system <b>automatically researches it</b> (SAM.gov, website, awards, score) — no manual work.</div>
+      <input type="file" id="pi_file" accept=".csv" class="field-input" style="border:1px solid var(--line);border-radius:8px;padding:8px;width:100%">
+      <div id="pi_map"></div>
+      <div id="pi_out" style="margin-top:10px"></div>
+    </div>`);
+  $('#pi_file').onchange=e=>{ const f=e.target.files?.[0]; if(!f) return; const rd=new FileReader(); rd.onload=ev=>pnImportParse(ev.target.result); rd.readAsText(f); };
+}
+function pnImportParse(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2){ $('#pi_out').innerHTML='<div class="banner bad">Need a header row and at least one data row.</div>'; return; }
+  PN_IMPORT_HEADERS=pnCsvSplit(lines[0]);
+  const guesses=PN_IMPORT_HEADERS.map(pnGuessField);
+  PN_IMPORT_ROWS=lines.slice(1).map(pnCsvSplit);
+  const fields=['','company_name','website','contact_email','phone','address','city','state','zip','industry','notes'];
+  $('#pi_map').innerHTML=`<div class="card" style="margin-top:10px;padding:10px">
+    <div style="font-weight:600;margin-bottom:8px">Column mapping <span class="muted" style="font-weight:400">(auto-detected — adjust if needed)</span></div>
+    ${PN_IMPORT_HEADERS.map((h,i)=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:13px">
+      <span style="flex:1;min-width:120px" title="${esc((PN_IMPORT_ROWS[0]||[])[i]||'')}">${esc(h)} <span class="muted">e.g. ${esc(String((PN_IMPORT_ROWS[0]||[])[i]||'').slice(0,24))}</span></span>
+      <select class="pi_sel" data-col="${i}" style="width:auto">${fields.map(f=>`<option value="${f}" ${f===guesses[i]?'selected':''}>${f||'— ignore —'}</option>`).join('')}</select>
+    </div>`).join('')}
+    <div class="muted" style="font-size:12px;margin-top:6px">${PN_IMPORT_ROWS.length} data row(s) detected.</div>
+    <button class="btn primary" id="pi_go" style="margin-top:10px">Import ${PN_IMPORT_ROWS.length} &amp; start research</button>
+  </div>`;
+  $('#pi_go').onclick=pnImportGo;
+}
+async function pnImportGo(){
+  const map={}; document.querySelectorAll('.pi_sel').forEach(s=>{ if(s.value) map[+s.dataset.col]=s.value; });
+  if(!Object.values(map).includes('company_name')){ $('#pi_out').innerHTML='<div class="banner bad">Map one column to <b>company_name</b>.</div>'; return; }
+  const partners=PN_IMPORT_ROWS.map(cols=>{ const o={}; for(const [ci,field] of Object.entries(map)){ const v=(cols[+ci]||'').trim(); if(v) o[field]=v; } return o; }).filter(o=>o.company_name);
+  if(!partners.length){ $('#pi_out').innerHTML='<div class="banner bad">No rows with a company name.</div>'; return; }
+  const b=$('#pi_go'); b.disabled=true; b.textContent='Importing…';
+  $('#pi_out').innerHTML=`<div class="muted">Importing ${partners.length} compan(ies)…</div>`;
+  try{
+    const r=await callFn(AUTORESEARCH_FN,{action:'import', partners, source:'csv_import'});
+    $('#pi_out').innerHTML=`<div class="banner info">✓ Imported ${r.imported} new · ${r.duplicates} duplicate(s)${r.requeued?` (${r.requeued} re-queued)`:''}.${(r.errors||[]).length?` ⚠ ${esc(r.errors[0])}`:''}<br>The background queue will research these automatically. Click <b>Research all pending</b> to run them now.</div>`;
+    b.textContent='Done'; renderPartners();
+    if(r.imported+r.requeued>0){ setTimeout(()=>{ closeModal(); pnResearchAllPending(); }, 1200); }
+  }catch(e){ $('#pi_out').innerHTML=`<div class="banner bad">${esc(e.message)}</div>`; b.disabled=false; b.textContent='Retry import'; }
+}
+/* Progress-bar loop: pull the pending list, research each one, live progress. */
+let PN_RESEARCH_ABORT=false;
+async function pnResearchAllPending(){
+  const box=$('#pnProgress'); if(!box) return;
+  let pending=[];
+  try{ const r=await callFn(AUTORESEARCH_FN,{action:'list_pending'}); pending=r.pending||[]; }
+  catch(e){ toast('Could not load pending: '+e.message); return; }
+  if(!pending.length){ toast('Nothing pending — all partners researched ✓'); return; }
+  PN_RESEARCH_ABORT=false;
+  const total=pending.length; let done=0, ok=0, fail=0; const t0=Date.now();
+  const draw=(label)=>{ const pct=Math.round(done/total*100); const eta=done? Math.round((Date.now()-t0)/done*(total-done)/1000):0;
+    box.innerHTML=`<div class="card" style="padding:10px;background:var(--panel)">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+        <b>Auto-researching partners…</b>
+        <span>${done}/${total} · ✓${ok} ${fail?`⚠${fail}`:''} ${eta&&done<total?`· ~${eta}s left`:''} <a href="#" onclick="PN_RESEARCH_ABORT=true;return false" style="margin-left:8px">stop</a></span>
+      </div>
+      <div style="height:8px;background:var(--line);border-radius:5px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--blue-500);transition:width .3s"></div></div>
+      <div class="muted" style="font-size:11px;margin-top:5px">${esc(label||'')}</div></div>`; };
+  draw('Starting…');
+  for(const p of pending){
+    if(PN_RESEARCH_ABORT){ draw('Stopped.'); break; }
+    draw('Researching '+(p.company_name||'company')+'…');
+    try{ const r=await callFn(AUTORESEARCH_FN,{action:'research_one', partner_id:p.id});
+      if(r.partner&&r.partner.research_status==='failed') fail++; else ok++;
+    }catch(e){ fail++; }
+    done++; draw('Researching '+(p.company_name||'company')+'…');
+  }
+  box.innerHTML=`<div class="banner info" style="margin:0">✓ Researched ${ok} compan(ies)${fail?`, ${fail} need a retry`:''}. Scores, SAM status, and contract types are on the cards below.</div>`;
+  setTimeout(()=>{ if($('#pnProgress')===box) renderPartners(); }, 2500);
+}
+async function pnResearchOne(id){
+  toast('Auto-researching…', true);
+  try{ const r=await callFn(AUTORESEARCH_FN,{action:'research_one', partner_id:id});
+    const pt=r.partner||{};
+    toast(pt.research_status==='failed'?('Research failed: '+(pt.research_error||'')):`Researched ✓ score ${pt.partner_score??'?'}${pt.sam_active?' · SAM active':''}`);
+    renderPartners();
+  }catch(e){ toast('Failed: '+e.message); }
+}
+async function pnRequeue(scope, id){
+  try{ const body=id?{action:'requeue', partner_ids:[id]}:{action:'requeue', scope};
+    const r=await callFn(AUTORESEARCH_FN, body);
+    toast(`Re-queued ${r.requeued} partner(s) for research`);
     renderPartners();
   }catch(e){ toast('Failed: '+e.message); }
 }
@@ -2938,13 +3160,33 @@ function pnYelpUI(){
     b.disabled=false; b.textContent='Import from Yelp';
   };
 }
+// Verification & research summary panel for the partner detail modal.
+function pnVerifyPanel(p){
+  const rows=[];
+  if(p.sam_registered!=null){
+    const sam=p.sam_active?'<b style="color:var(--good)">Active</b>':(p.sam_registered?'<b style="color:#b45309">Registered (not active)</b>':'Not found in SAM');
+    rows.push(`<div><b>SAM.gov:</b> ${sam}${p.uei?` · UEI ${esc(p.uei)}`:''}${p.cage_code?` · CAGE ${esc(p.cage_code)}`:''}${p.sam_expiration?` · expires ${esc(p.sam_expiration)}`:''}${p.sam_last_checked?` <span class="muted">(checked ${fmtDate(p.sam_last_checked)})</span>`:''}</div>`);
+  }
+  const sb=p.small_business_status||{};
+  if((sb.socioeconomic||[]).length) rows.push(`<div><b>Certifications:</b> ${sb.socioeconomic.map(x=>`<span class="chip" style="font-size:10px">${esc(x)}</span>`).join(' ')}</div>`);
+  if((p.suggested_contract_types||[]).length) rows.push(`<div><b>Suggested contract types:</b> ${p.suggested_contract_types.map(c=>`<span class="chip" style="font-size:10px">${esc(c)}</span>`).join(' ')}</div>`);
+  const nc=(p.naics_confidence||[]);
+  if(nc.length) rows.push(`<div><b>NAICS:</b> ${nc.slice(0,8).map(n=>`<span class="chip" style="font-size:10px" title="${esc(n.description||'')} · ${Math.round((n.confidence||0)*100)}% · ${esc(n.source||'')}">${esc(n.code)}${n.small_business?' (SB)':''}</span>`).join(' ')}</div>`);
+  if(p.ai_summary&&p.ai_summary.text) rows.push(`<div style="margin-top:4px"><b>AI summary:</b> ${esc(String(p.ai_summary.text).slice(0,400))}</div>`);
+  const log=(p.research_source_log||[]);
+  if(log.length) rows.push(`<div class="muted" style="font-size:11px;margin-top:4px">Sources checked: ${log.slice(-6).map(l=>`${esc(l.source)}${l.found===false?' (not found)':''}`).join(' · ')}</div>`);
+  if(p.research_status&&p.research_status!=='done') rows.push(`<div style="margin-top:4px"><span class="pill" style="background:${p.research_status==='failed'?'#fecaca;color:#7f1d1d':'#fde68a;color:#78350f'}">research ${esc(p.research_status)}</span>${p.research_error?` <span class="muted">${esc(String(p.research_error).slice(0,120))}</span>`:''} <button class="btn sm" style="padding:2px 8px" onclick="pnResearchOne('${p.id}')">🤖 research now</button></div>`);
+  if(!rows.length) return `<div class="banner info" style="margin-bottom:10px;font-size:12.5px">Not yet auto-researched. <button class="btn sm" style="padding:2px 8px" onclick="pnResearchOne('${p.id}')">🤖 Research now</button> to verify SAM.gov, pull website contacts, and score.</div>`;
+  return `<div class="card" style="margin-bottom:10px;padding:10px;font-size:12.5px;line-height:1.7">${rows.join('')}</div>`;
+}
 async function openPartner(id){
   const rows=await api(`govcon_partners?id=eq.${id}&owner=eq.${SESSION.user.id}&select=*`);
   const p=rows[0]; if(!p) return toast('Partner not found');
   const emails=(p.contact_emails||[]);
   openModal(`<div class="shd"><h3>${esc(p.company_name)}</h3><button class="sclose" onclick="closeModal()">×</button></div>
     <div class="sbd">
-      <div class="scores" style="margin-bottom:10px">${pnConfPill(p)}<span class="pill">${esc(p.partner_status||'Researched')}</span><span class="pill">${esc(p.verification_status||'Found')}</span>${p.last_researched_at?`<span class="pill">researched ${fmtDate(p.last_researched_at)}</span>`:''}</div>
+      <div class="scores" style="margin-bottom:10px">${pnScorePill(p)}${pnSamBadge(p)}${p.is_small_business?'<span class="pill" style="background:#dbeafe;color:#1e40af">Small business</span>':''}${pnConfPill(p)}<span class="pill">${esc(p.partner_status||'Researched')}</span><span class="pill">${esc(p.verification_status||'Found')}</span>${p.last_researched_at?`<span class="pill">researched ${fmtDate(p.last_researched_at)}</span>`:''}</div>
+      ${pnVerifyPanel(p)}
       <div class="row3">
         <div class="field"><label>Website</label><input id="pp_web" value="${esc(p.website||'')}"></div>
         <div class="field"><label>Phone</label><input id="pp_phone" value="${esc(p.primary_phone||'')}"></div>
