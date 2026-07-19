@@ -325,7 +325,7 @@ async function renderDashboard() {
     api(`govcon_pipeline_items?owner=eq.${uid}&select=id,stage`),
     api(`govcon_proposals?owner=eq.${uid}&select=id,status`),
     api(`govcon_research?owner=eq.${uid}&select=rfp_id,win_probability_score,risk_score,competition_score,recommendation_label`).catch(()=>[]),
-    api(`govcon_run_logs?owner=eq.${uid}&fn=eq.govcon-autopilot-run&select=*&order=started_at.desc&limit=5`).catch(()=>[]),
+    api(`govcon_run_logs?owner=eq.${uid}&fn=eq.govcon-auto-pilot-run&select=*&order=started_at.desc&limit=5`).catch(()=>[]),
     api(`govcon_opportunity_analysis?owner=eq.${uid}&select=rfp_id,fit_score,analysis_confidence,recommendation,version&order=version.desc&limit=1000`).catch(()=>[]),
   ]);
   const rById={}; (research||[]).forEach(r=>rById[r.rfp_id]=r);
@@ -1835,8 +1835,8 @@ async function testAutopilot(){
   try{ const s2=await api(`govcon_autopilot_settings?owner=eq.${SESSION.user.id}&select=interval_hours`); intervalH=s2[0]?.interval_hours||6; }catch(e){}
   try{
     // watch BOTH scheduled jobs: the hourly full run AND the 5-minute downloader
-    const runs=await api(`govcon_run_logs?owner=eq.${SESSION.user.id}&fn=in.(govcon-autopilot-run,govcon-autopilot-downloads)&select=fn,status,started_at,error&order=started_at.desc&limit=10`);
-    const lastFull=(runs||[]).find(r=>r.fn==='govcon-autopilot-run');
+    const runs=await api(`govcon_run_logs?owner=eq.${SESSION.user.id}&fn=in.(govcon-auto-pilot-run,govcon-autopilot-downloads)&select=fn,status,started_at,error&order=started_at.desc&limit=10`);
+    const lastFull=(runs||[]).find(r=>r.fn==='govcon-auto-pilot-run');
     const lastDl=(runs||[]).find(r=>r.fn==='govcon-autopilot-downloads');
     line(lastFull?(lastFull.status!=='error'):'warn','Last full run', lastFull?`${lastFull.status} · ${new Date(lastFull.started_at).toLocaleString()}${lastFull.error?' · '+esc(String(lastFull.error).slice(0,60)):''}`:'no runs yet (hourly job fires at :05 past each hour)');
     const dlAgeM = lastDl ? (Date.now()-new Date(lastDl.started_at).getTime())/6e4 : Infinity;
