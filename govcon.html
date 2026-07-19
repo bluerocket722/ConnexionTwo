@@ -185,7 +185,10 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r30.1-2026-07-18';
+const GOVCON_BUILD = 'r31-2026-07-18';
+// YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
+// Every call below uses this constant, so the name is set in ONE place.
+const AUTOPILOT_FN = 'govcon-auto-pilot-run';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -322,7 +325,7 @@ async function renderDashboard() {
     api(`govcon_pipeline_items?owner=eq.${uid}&select=id,stage`),
     api(`govcon_proposals?owner=eq.${uid}&select=id,status`),
     api(`govcon_research?owner=eq.${uid}&select=rfp_id,win_probability_score,risk_score,competition_score,recommendation_label`).catch(()=>[]),
-    api(`govcon_run_logs?owner=eq.${uid}&fn=eq.govcon-auto-pilot-run&select=*&order=started_at.desc&limit=5`).catch(()=>[]),
+    api(`govcon_run_logs?owner=eq.${uid}&fn=eq.govcon-autopilot-run&select=*&order=started_at.desc&limit=5`).catch(()=>[]),
     api(`govcon_opportunity_analysis?owner=eq.${uid}&select=rfp_id,fit_score,analysis_confidence,recommendation,version&order=version.desc&limit=1000`).catch(()=>[]),
   ]);
   const rById={}; (research||[]).forEach(r=>rById[r.rfp_id]=r);
@@ -351,6 +354,20 @@ async function renderDashboard() {
 
   // every column is sortable — active column shows ▲/▼, the rest show a dim ↕
   const th=(k,lbl,left)=>`<th style="cursor:pointer;white-space:nowrap${left?';text-align:left':''}" data-sort="${k}" title="Click to sort by ${lbl}">${lbl}${DASH_SORT===k?(DASH_DIR>0?' ▲':' ▼'):' <span style="opacity:.35">↕</span>'}</th>`;
+  // ── autopilot backlog counter (what's left to download / research) ──────────
+  const DONE_STAGES=['Rejected / No-Bid','Archived'];
+  const NEED_DL_STAGES=['Discovered'];
+  const active = rfps.filter(r=>!DONE_STAGES.includes(r.review_stage||'Discovered'));
+  const cntTotal = active.length;
+  const cntResearched = active.filter(r=>aById[r.id]).length;
+  const cntNeedResearch = active.filter(r=>!aById[r.id]).length;
+  const cntNeedDownload = active.filter(r=>NEED_DL_STAGES.includes(r.review_stage||'Discovered')).length;
+  const cntDownloaded = cntTotal - cntNeedDownload;
+  const pctDone = cntTotal ? Math.round(cntResearched/cntTotal*100) : 0;
+  window.DASH_ACTIVE_IDS = active.map(r=>r.id);   // for "process all" loops
+  window.DASH_NEED_RESEARCH = active.filter(r=>!aById[r.id]).map(r=>({id:r.id,title:r.title}));
+  window.DASH_NEED_DL = active.filter(r=>NEED_DL_STAGES.includes(r.review_stage||'Discovered')).map(r=>({id:r.id,title:r.title}));
+
   V().innerHTML = `
     <div class="cards kpis">
       ${kpi('Total RFPs', rfps.length, `${analyzed} analyzed`)}
@@ -358,12 +375,25 @@ async function renderDashboard() {
       ${kpi('Proposals', proposals.length, 'drafts & submissions')}
       ${kpi('Win Rate', winRate+'%', `${awarded} of ${closed} closed`)}
     </div>
-    <div class="card" style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-      <button class="btn primary" onclick="analyzeAllPending()">⚙ Analyze all pending</button>
-      <button class="btn" onclick="runAutopilotNow()">✈ Run Autopilot</button>
-      <button class="btn" onclick="route('research')">Research</button>
-      <button class="btn" onclick="route('pipeline')">Pipeline</button>
-      <span id="dashPendStatus" class="muted" style="font-size:12px"></span>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <b>⚙ Autopilot progress</b>
+        <span class="muted" style="font-size:12px">Researched <b style="color:var(--blue-700)">${cntResearched}</b> of <b>${cntTotal}</b> · <b style="color:#b3261e">${cntNeedResearch}</b> still to research · <b style="color:#7a5b00">${cntNeedDownload}</b> still to download</span>
+        <span style="flex:1"></span>
+        <b style="font-size:18px">${pctDone}%</b>
+      </div>
+      <div style="height:10px;border-radius:6px;background:var(--line);overflow:hidden;margin-top:8px">
+        <div style="height:100%;width:${pctDone}%;background:linear-gradient(90deg,#0054d1,#0b6b34);border-radius:6px;transition:width .4s"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
+        <button class="btn primary" onclick="processAllPending()">▶ Download + research ALL (${cntNeedResearch})</button>
+        <button class="btn" onclick="downloadAllPending()">⬇ Just download ALL (${cntNeedDownload})</button>
+        <button class="btn" onclick="analyzeAllPending()">⚙ Analyze all pending</button>
+        <button class="btn" onclick="runAutopilotNow()">✈ Run Autopilot</button>
+        <button class="btn" onclick="renderDashboard()">↻ Refresh</button>
+        <span id="dashPendStatus" class="muted" style="font-size:12px"></span>
+      </div>
+      <div class="muted" style="font-size:11px;margin-top:6px">Runs also happen automatically — downloads every 5 min, full discovery + research every hour. These buttons let you churn the whole backlog now instead of waiting.</div>
     </div>
     <h2 class="section">Opportunity scoreboard <span class="muted" style="font-weight:normal;font-size:13px">— click a header to sort</span></h2>
     <div class="card" style="overflow-x:auto">
@@ -396,19 +426,54 @@ async function renderDashboard() {
     if(DASH_SORT===k) DASH_DIR*=-1; else { DASH_SORT=k; DASH_DIR = (k==='deadline'||k==='risk'||k==='comp'||k==='title'||k==='rec'||k==='stage')?1:-1; } renderDashboard(); });
   document.querySelectorAll('.dashopen').forEach(a=>a.onclick=e=>{e.preventDefault(); openReview(a.dataset.id);});
 }
+// Churn the ENTIRE research backlog from the browser — download FIRST (so a
+// file always lands even when research can't run), then research. One failure
+// never stops the loop; the live counter shows progress.
+async function processAllPending(){
+  const list = window.DASH_NEED_RESEARCH || [];
+  const say=(m)=>{ const st=$('#dashPendStatus'); if(st) st.textContent=m; };
+  if(!list.length){ say('✓ Nothing to research — all caught up.'); return; }
+  let dl=0, done=0, fail=0;
+  for(let i=0;i<list.length;i++){
+    const p=list[i];
+    say(`(${i+1}/${list.length}) ${String(p.title||'').slice(0,40)} — downloading…`);
+    try{ const d=await callFn('govcon-download-documents',{rfp_id:p.id}); dl+=d.saved||0; }catch(e){ /* no attachments / already have them — keep going */ }
+    say(`(${i+1}/${list.length}) ${String(p.title||'').slice(0,40)} — researching…`);
+    try{ await callFn('govcon-auto-pilot-run',{action:'process_one', rfp_id:p.id}); done++; }
+    catch(e){ fail++; if(/Failed to fetch|CORS|not_deployed/i.test(e.message)){ say('Autopilot function unreachable — see Autopilot → Test. '+e.message); break; } }
+  }
+  say(`✓ ${dl} document(s) downloaded · ${done} researched${fail?` · ${fail} could not be researched (documents still saved)`:''}.`);
+  setTimeout(renderDashboard, 1500);
+}
+// Download-only pass — guarantees documents are pulled for everything still at
+// "Discovered", independent of AI/research (so downloads never wait on research).
+async function downloadAllPending(){
+  const list = window.DASH_NEED_DL || [];
+  const say=(m)=>{ const st=$('#dashPendStatus'); if(st) st.textContent=m; };
+  if(!list.length){ say('✓ Nothing left to download.'); return; }
+  let dl=0, ok=0, fail=0;
+  for(let i=0;i<list.length;i++){
+    const p=list[i];
+    say(`Downloading ${i+1}/${list.length}: ${String(p.title||'').slice(0,45)}…`);
+    try{ const d=await callFn('govcon-download-documents',{rfp_id:p.id}); dl+=d.saved||0; ok++; }
+    catch(e){ fail++; }
+  }
+  say(`✓ Downloaded ${dl} file(s) across ${ok} opportunit${ok===1?'y':'ies'}${fail?` · ${fail} had none/failed`:''}.`);
+  setTimeout(renderDashboard, 1500);
+}
 async function analyzeAllPending(){
   // status element differs by page (Dashboard vs Autopilot) → tolerate either, fall back to toast
   const say=(m)=>{ const st=$('#dashPendStatus')||$('#ar_status'); if(st) st.textContent=m; else toast(m, true); };
-  const deployHint='govcon-auto-pilot-run isn’t deployed yet — deploy the r23 function, then try again.';
+  const deployHint=AUTOPILOT_FN+' isn’t reachable — check it is deployed with Verify JWT off, then try again.';
   say('Finding pending opportunities…');
   let pending=[];
-  try{ const r=await callFn('govcon-auto-pilot-run',{action:'list_pending'}); pending=r.pending||[]; }
+  try{ const r=await callFn(AUTOPILOT_FN,{action:'list_pending'}); pending=r.pending||[]; }
   catch(e){ say(/Failed to fetch|HTTP 5|CORS/i.test(e.message)? deployHint : 'Could not list pending: '+e.message); return; }
   if(!pending.length){ say('✓ Nothing pending — all opportunities are analyzed.'); return; }
   let done=0, fail=0;
   for(const p of pending){
     say(`Analyzing ${done+1}/${pending.length}: ${String(p.title||'').slice(0,50)}…`);
-    try{ await callFn('govcon-auto-pilot-run',{action:'process_one', rfp_id:p.id}); done++; }
+    try{ await callFn(AUTOPILOT_FN,{action:'process_one', rfp_id:p.id}); done++; }
     catch(e){ fail++; if(/Failed to fetch|HTTP 5|CORS/i.test(e.message)){ say(deployHint); return; } }
   }
   say(`✓ Analyzed ${done} opportunit${done===1?'y':'ies'}${fail?`, ${fail} failed`:''}.`);
@@ -503,8 +568,8 @@ async function bulkDownloadResearch(){
     try{ const d=await callFn('govcon-download-documents',{rfp_id:id}); dl+=d.saved||0; }
     catch(e){ /* keep going — a source with no attachments still gets researched */ }
     st.textContent=`(${n+1}/${ids.length}) researching…`;
-    try{ await callFn('govcon-auto-pilot-run',{action:'process_one', rfp_id:id}); done++; }
-    catch(e){ fail++; if(/Failed to fetch|CORS|HTTP 5/i.test(e.message)){ st.textContent='govcon-auto-pilot-run isn’t reachable — deploy/rename it (see Autopilot → Test). '+e.message; btn.disabled=false; return; } }
+    try{ await callFn(AUTOPILOT_FN,{action:'process_one', rfp_id:id}); done++; }
+    catch(e){ fail++; if(/Failed to fetch|CORS|HTTP 5/i.test(e.message)){ st.textContent=AUTOPILOT_FN+' isn’t reachable — check the deploy (Autopilot → Test). '+e.message; btn.disabled=false; return; } }
   }
   st.textContent=`✓ ${dl} document(s) downloaded · ${done} researched${fail?` · ${fail} failed`:''}. Open any opportunity to review.`;
   btn.disabled=false; RFP_SEL.clear();
@@ -1357,14 +1422,14 @@ async function runAutopilotNow() {
   showApProgress('Starting…');
   try {
     // Non-blocking: the function creates a run and returns 202 immediately (spec §11)
-    const r = await callFn('govcon-auto-pilot-run', { action:'start' });
+    const r = await callFn(AUTOPILOT_FN, { action:'start' });
     if (r.status==='already_running'){ showApProgress('A run is already in progress…'); pollApRun(r.run_id); }
     else { showApProgress('Queued — discovering opportunities…'); pollApRun(r.run_id); }
   } catch(e){
     // NO silent legacy fallback — show the real error (spec §10)
     const hint = e.kind==='cors_or_network'
-      ? 'Set "Verify JWT = OFF" for govcon-auto-pilot-run in Supabase (Edge Functions → govcon-auto-pilot-run → Settings) and confirm it deployed.'
-      : e.kind==='not_deployed' ? 'govcon-auto-pilot-run is not deployed.' : '';
+      ? 'Set "Verify JWT = OFF" for '+AUTOPILOT_FN+' in Supabase (Edge Functions → Settings) and confirm it deployed.'
+      : e.kind==='not_deployed' ? AUTOPILOT_FN+' is not deployed.' : '';
     showApProgress(`Autopilot failed: ${e.message}${hint?'  ·  '+hint:''}`, true);
     btns.forEach(b=>b.disabled=false);
   }
@@ -1386,7 +1451,7 @@ async function pollApRun(runId){
   AP_POLL=setInterval(async ()=>{
     ticks++;
     try{
-      const r=await callFn('govcon-auto-pilot-run',{action:'run_status', run_id:runId});
+      const r=await callFn(AUTOPILOT_FN,{action:'run_status', run_id:runId});
       const run=r.run;
       if(!run){ return; }
       const s=run.stats||{};
@@ -1744,13 +1809,13 @@ async function testAutopilot(){
   // 1) reachable + boots + compliance logic passes (proves the function + rules)
   let reachable=false;
   try{
-    const r=await callFn('govcon-auto-pilot-run',{action:'compliance_selftest'});
+    const r=await callFn(AUTOPILOT_FN,{action:'compliance_selftest'});
     reachable=true;
     const passed=(r.tests||[]).filter(t=>t.pass).length, total=(r.tests||[]).length;
-    line(true,'Function reachable & booting','govcon-auto-pilot-run responded');
+    line(true,'Function reachable & booting',AUTOPILOT_FN+' responded');
     line(r.ok===true,'Compliance engine',`${passed}/${total} rule tests passed`);
   }catch(e){
-    line(false,'Function reachable', /Failed to fetch|CORS|not_deployed/i.test(e.message)?'NOT reachable — deploy/rename the function to exactly govcon-auto-pilot-run, Verify JWT off':e.message);
+    line(false,'Function reachable', /Failed to fetch|CORS|not_deployed/i.test(e.message)?'NOT reachable — check the function '+AUTOPILOT_FN+' is deployed with Verify JWT off':e.message);
   }
   // 2) AI provider configured
   try{ const s=await callFn('govcon-ai-config',{action:'status'}); line(s.anthropic?.configured||s.gemini?.configured, 'AI provider key', `Anthropic ${s.anthropic?.configured?'✓':'—'} · Gemini ${s.gemini?.configured?'✓':'—'}`); }
@@ -1770,8 +1835,8 @@ async function testAutopilot(){
   try{ const s2=await api(`govcon_autopilot_settings?owner=eq.${SESSION.user.id}&select=interval_hours`); intervalH=s2[0]?.interval_hours||6; }catch(e){}
   try{
     // watch BOTH scheduled jobs: the hourly full run AND the 5-minute downloader
-    const runs=await api(`govcon_run_logs?owner=eq.${SESSION.user.id}&fn=in.(govcon-auto-pilot-run,govcon-autopilot-downloads)&select=fn,status,started_at,error&order=started_at.desc&limit=10`);
-    const lastFull=(runs||[]).find(r=>r.fn==='govcon-auto-pilot-run');
+    const runs=await api(`govcon_run_logs?owner=eq.${SESSION.user.id}&fn=in.(govcon-autopilot-run,govcon-autopilot-downloads)&select=fn,status,started_at,error&order=started_at.desc&limit=10`);
+    const lastFull=(runs||[]).find(r=>r.fn==='govcon-autopilot-run');
     const lastDl=(runs||[]).find(r=>r.fn==='govcon-autopilot-downloads');
     line(lastFull?(lastFull.status!=='error'):'warn','Last full run', lastFull?`${lastFull.status} · ${new Date(lastFull.started_at).toLocaleString()}${lastFull.error?' · '+esc(String(lastFull.error).slice(0,60)):''}`:'no runs yet (hourly job fires at :05 past each hour)');
     const dlAgeM = lastDl ? (Date.now()-new Date(lastDl.started_at).getTime())/6e4 : Infinity;
@@ -1783,7 +1848,7 @@ async function testAutopilot(){
       : `NOT reaching the function. Jobs may be scheduled but the HTTP call is failing (usually a wrong service-role key in the cron SQL) or no firing has happened yet. In the SQL editor run: select id,status_code,left(content::text,140) from net._http_response order by id desc limit 5; — a 401 means re-run govcon_migration_13.sql with the correct service_role key; 404 means the function name; 200/202 means it's working and this will go green shortly.`);
   }catch(e){}
   if(reachable){
-    try{ const p=await callFn('govcon-auto-pilot-run',{action:'list_pending'}); line('warn','Pending to research', `${(p.pending||[]).length} opportunit${(p.pending||[]).length===1?'y':'ies'} awaiting analysis`); }catch(e){}
+    try{ const p=await callFn(AUTOPILOT_FN,{action:'list_pending'}); line('warn','Pending to research', `${(p.pending||[]).length} opportunit${(p.pending||[]).length===1?'y':'ies'} awaiting analysis`); }catch(e){}
   }
   const allGood = !rows.some(r=>r.includes('❌'));
   box.innerHTML=`<div class="card" style="border-left:4px solid ${allGood?'var(--good,#0b6b34)':'var(--bad)'}">${rows.join('')}
@@ -1801,13 +1866,13 @@ async function testFullCycle(){
   const st=$('#apFullCycleStatus'), btn=$('#apFullCycle'); if(!st||!btn) return;
   btn.disabled=true; st.textContent='Starting a full run…';
   let runId=null;
-  try{ const r=await callFn('govcon-auto-pilot-run',{action:'start'}); runId=r.run_id;
+  try{ const r=await callFn(AUTOPILOT_FN,{action:'start'}); runId=r.run_id;
     st.textContent = r.status==='already_running' ? 'A run is already in progress — watching it…' : 'Run started — discovering from SAM.gov…';
   }catch(e){ st.textContent='✕ Could not start: '+e.message; btn.disabled=false; return; }
   const t0=Date.now();
   const poll=setInterval(async ()=>{
     try{
-      const r=await callFn('govcon-auto-pilot-run',{action:'run_status', run_id:runId});
+      const r=await callFn(AUTOPILOT_FN,{action:'run_status', run_id:runId});
       const run=r.run;
       const mins=((Date.now()-t0)/6e4).toFixed(1);
       if(!run){ st.textContent=`Waiting for run record… (${mins}m)`; return; }
