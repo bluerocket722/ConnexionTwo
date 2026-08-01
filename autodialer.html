@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Blu Balances CRM</title>
+<title>ConnexionTwo CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -235,7 +235,7 @@ select.field-input:focus{border-color:#1a73e8;outline:none}
 </div>
 
 <nav class="nav">
-  <div class="nav-logo"><span>Blu</span> Balances CRM</div>
+  <div class="nav-logo"><span>Connexion</span>Two CRM</div>
   <div class="nav-actions">
     <button class="btn btn-green btn-sm" onclick="openDialerSetup()">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.12 1.18 2 2 0 012.1 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.1v2.82z"/></svg>
@@ -302,6 +302,7 @@ select.field-input:focus{border-color:#1a73e8;outline:none}
     <option value="reviews_desc">Reviews ↓</option>
     <option value="created_at_desc">Newest</option>
     <option value="updated_at_desc">Recently Updated</option>
+    <option value="tag">Tag (A–Z)</option>
   </select>
   <select class="sort-select" id="tag-filter" onchange="applyFilter()" style="max-width:160px">
     <option value="">All Tags</option>
@@ -421,6 +422,15 @@ select.field-input:focus{border-color:#1a73e8;outline:none}
         <p style="font-size:11px;margin-top:6px;color:#5f6368">Expected columns: Title · Rating · Reviews · Industry · Phone · Notes · Dispo · Call Back Date · Name · Email · Last Called Date · Appointment Date · Address · Website · City · State · County</p>
       </div>
       <input type="file" id="csv-file-input" accept=".csv" style="display:none" onchange="handleCSVFile(event)">
+      <div id="import-solicitation-section" style="margin-top:14px;display:none">
+        <div style="font-size:12px;font-weight:500;color:#9aa0a6;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Auto-tag partners with solicitation</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <input id="import-sol-name" class="tag-input-box" placeholder="Solicitation name" style="padding:5px 8px">
+          <input id="import-sol-id" class="tag-input-box" placeholder="Solicitation ID / #" style="padding:5px 8px">
+          <input id="import-sol-state" class="tag-input-box" placeholder="State (e.g. MD)" style="padding:5px 8px">
+        </div>
+        <p style="font-size:11px;margin-top:6px;color:#5f6368">Each value becomes a tag on every imported partner, so you can sort &amp; filter by solicitation name, ID, or state.</p>
+      </div>
       <div id="import-tags-section" style="margin-top:14px;display:none">
         <div style="font-size:12px;font-weight:500;color:#9aa0a6;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Apply Tags to Imported Leads</div>
         <div id="import-tag-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
@@ -677,25 +687,26 @@ function clearFilter() { activeDispo=null; document.getElementById("search-input
 function applyFilter() {
   const q=(document.getElementById("search-input").value||"").toLowerCase();
   const sort=document.getElementById("sort-select").value;
-    const tagId=document.getElementById("tag-filter")?.value||"";
-  // Cascade: selecting a tag includes that tag + every tag above it in the list.
-  let allowedTagIds=null;
-  if(tagId){
-    const idx=allTags.findIndex(t=>t.id===tagId);
-    allowedTagIds=new Set(allTags.slice(0, idx<0?allTags.length:idx+1).map(t=>t.id));
-  }
+  const tagId=document.getElementById("tag-filter")?.value||"";
+  // Filter to exactly the selected tag (leads carrying that tag).
   let leads=allLeads.filter(l => {
     if(activeDispo && l.dispo!==activeDispo) return false;
-    if(allowedTagIds && !(leadTagsMap[l.id]||[]).some(tid=>allowedTagIds.has(tid))) return false;
+    if(tagId && !(leadTagsMap[l.id]||[]).includes(tagId)) return false;
     if(!q) return true;
     return [l.business_name,l.contact_name,l.phone,l.email,l.address,l.city,l.state,l.notes].join(" ").toLowerCase().includes(q);
   });
+  // First tag name for a lead (used when sorting by tag); untagged sort last.
+  const firstTagName=(l)=>{
+    const names=(leadTagsMap[l.id]||[]).map(tid=>(allTags.find(t=>t.id===tid)||{}).name).filter(Boolean).sort((a,b)=>a.localeCompare(b));
+    return names.length?names[0].toLowerCase():" ";
+  };
   leads.sort((a,b) => {
     if(sort==="business_name") return (a.business_name||"").localeCompare(b.business_name||"");
     if(sort==="rating_desc")   return (b.rating||0)-(a.rating||0);
     if(sort==="reviews_desc")  return (b.reviews||0)-(a.reviews||0);
     if(sort==="created_at_desc") return new Date(b.created_at)-new Date(a.created_at);
     if(sort==="updated_at_desc") return new Date(b.updated_at)-new Date(a.updated_at);
+    if(sort==="tag"){ const c=firstTagName(a).localeCompare(firstTagName(b)); return c!==0?c:(a.business_name||"").localeCompare(b.business_name||""); }
     return 0;
   });
   filteredLeads=leads;
@@ -714,8 +725,11 @@ function renderTable() {
     const tagChips=(leadTagsMap[l.id]||[]).map(tid=>{const tag=allTags.find(t=>t.id===tid);return tag?`<span class="tag-chip" style="background:${tag.color}">${esc(tag.name)}</span>`:''}).join('');
         return `<tr class="${sel}" onclick="openLead('${l.id}')"><td style="font-weight:500;white-space:normal">${esc(l.business_name)}${tagChips?`<div class="tag-chips-row">${tagChips}</div>`:''}</td><td>${esc(l.contact_name||"—")}</td><td>${l.email?`<a class="phone-link" href="mailto:${esc(l.email)}" onclick="event.stopPropagation()">${esc(l.email)}</a>`:'<span style="color:#5f6368">—</span>'}</td><td><a class="phone-link" href="tel:${esc(l.phone)}" onclick="event.stopPropagation()">${esc(l.phone||"—")}</a></td><td>${esc(loc)}</td><td><span class="rating-stars">${stars}</span></td><td><span class="dispo-badge" style="background:${d.color}">${d.label}</span></td><td style="color:#9aa0a6;font-size:12px">${l.updated_at?new Date(l.updated_at).toLocaleDateString():"—"}</td></tr>`;
   }).join("");
-  area.innerHTML=`<table><thead><tr><th>Business</th><th>Contact</th><th>Email</th><th>Phone</th><th>Location</th><th>Rating</th><th>Dispo</th><th>Updated</th></tr></thead><tbody>${rows}</tbody></table>`;
+  area.innerHTML=`<table><thead><tr><th onclick="setSort('business_name')" title="Sort by name">Business</th><th>Contact</th><th>Email</th><th>Phone</th><th>Location</th><th onclick="setSort('rating_desc')" title="Sort by rating">Rating</th><th>Dispo</th><th onclick="setSort('updated_at_desc')" title="Sort by recently updated">Updated</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
+
+// Clicking a sortable column header drives the same sort dropdown.
+function setSort(v){ const s=document.getElementById("sort-select"); if(s){ s.value=v; applyFilter(); } }
 
 async function openLead(id) {
   const lead=allLeads.find(l=>l.id===id); if(!lead)return;
@@ -1008,7 +1022,22 @@ async function submitImportedLeads() {
   if (btn) { btn.style.display = "none"; btn.disabled = false; btn.textContent = "📤 Submit Leads"; }
 }
     
-function openImportModal() { importTagIds=[]; document.getElementById("import-modal").classList.add("open"); document.getElementById("import-status").textContent=""; document.getElementById("csv-file-input").value=""; document.getElementById("import-tags-section").style.display="block"; renderImportTagPicker(); }
+function openImportModal() { importTagIds=[]; document.getElementById("import-modal").classList.add("open"); document.getElementById("import-status").textContent=""; document.getElementById("csv-file-input").value=""; document.getElementById("import-tags-section").style.display="block"; const solSec=document.getElementById("import-solicitation-section"); if(solSec)solSec.style.display="block"; ["import-sol-name","import-sol-id","import-sol-state"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";}); renderImportTagPicker(); }
+
+// Find an existing tag by name (case-insensitive) or create it, returning its id.
+async function ensureTagId(name){
+  name=(name||"").trim(); if(!name) return null;
+  const existing=allTags.find(t=>(t.name||"").toLowerCase()===name.toLowerCase());
+  if(existing) return existing.id;
+  try{
+    const color=TAG_COLORS[allTags.length % TAG_COLORS.length];
+    const res=await fetch(db("crm_tags"),{method:"POST",headers:hdr(),body:JSON.stringify({name,color})});
+    if(!res.ok) throw new Error(await res.text());
+    const [tag]=await res.json();
+    allTags.push(tag); allTags.sort((a,b)=>a.name.localeCompare(b.name)); buildTagFilter();
+    return tag.id;
+  }catch(e){ console.error("ensureTagId failed:",e); return null; }
+}
 function handleDrop(e) { e.preventDefault(); document.getElementById("drop-zone").classList.remove("drag-over"); const file=e.dataTransfer?.files?.[0]; if(file)processCSVFile(file); }
 function handleCSVFile(e) { const file=e.target.files?.[0]; if(file)processCSVFile(file); }
 function processCSVFile(file) {
@@ -1090,6 +1119,13 @@ async function importCSV(text, preparsed) {
   const updatedIds=[];
   for(let i=0;i<toUpdate.length;i+=PARALLEL){const chunk=toUpdate.slice(i,i+PARALLEL);const results=await Promise.allSettled(chunk.map(({id,patch})=>fetch(db(`crm_leads?id=eq.${id}`),{method:"PATCH",headers:{...hdr(),"Prefer":"return=minimal"},body:JSON.stringify(patch)})));results.forEach((r,j)=>{if(r.status==="fulfilled"&&r.value.ok){updated++;updatedIds.push(chunk[j].id);}else errors++;});status.innerHTML=`Inserted ${inserted} new · Updated ${updated}/${toUpdate.length}...`;}
     const taggableIds=[...insertedIds,...updatedIds];
+  // Auto-tag imported partners with the solicitation name, ID, and state.
+  const solTagVals=[
+    document.getElementById("import-sol-name")?.value,
+    document.getElementById("import-sol-id")?.value,
+    document.getElementById("import-sol-state")?.value,
+  ].map(v=>(v||"").trim()).filter(Boolean);
+  for(const val of solTagVals){ const tid=await ensureTagId(val); if(tid && !importTagIds.includes(tid)) importTagIds.push(tid); }
   if(importTagIds.length&&taggableIds.length){try{const ltRows=[];taggableIds.forEach(lid=>importTagIds.forEach(tid=>ltRows.push({lead_id:lid,tag_id:tid})));if(ltRows.length){const tagRes=await fetch(db("crm_lead_tags")+"?on_conflict=lead_id,tag_id",{method:"POST",headers:{...hdr(),"Prefer":"resolution=ignore-duplicates,return=minimal"},body:JSON.stringify(ltRows)});if(!tagRes.ok){console.error('Tag apply error:',tagRes.status,await tagRes.text());showToast('Tags failed: '+tagRes.status,'error');}else{taggableIds.forEach(lid=>{if(!leadTagsMap[lid])leadTagsMap[lid]=[];importTagIds.forEach(tid=>{if(!leadTagsMap[lid].includes(tid))leadTagsMap[lid].push(tid);});});showToast(`Tags applied to ${taggableIds.length} lead${taggableIds.length!==1?'s':''}`,'success');}}}catch(e){console.error('Tag apply error:',e);showToast('Tag apply error — see console','error');}}
   const parts=[];if(inserted)parts.push(`✅ ${inserted} inserted`);if(updated)parts.push(`🔄 ${updated} updated`);if(skipped)parts.push(`⏭ ${skipped} skipped`);if(errors)parts.push(`❌ ${errors} errors`);
   status.innerHTML=parts.join(" &nbsp;·&nbsp; "); await loadLeads();
