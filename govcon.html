@@ -241,6 +241,21 @@ async function apiPatchTolerant(path, obj) {
   }
   return { skipped, rows: [] };
 }
+// ── CRM (Auto Dialer) bridge ────────────────────────────────────────────────
+// The dialer reads/writes crm_leads with the ANON key (see autodialer.html hdr()),
+// so its rows are owned by the anon role. GovCon must write leads the same way —
+// using an authenticated (user) token stamps owner=uid and the dialer can't see
+// them. crmApi mirrors the dialer's auth so pushed leads actually show up.
+const CRM_HDR = { 'Content-Type':'application/json', apikey:SB_KEY, Authorization:`Bearer ${SB_KEY}` };
+async function crmApi(path, opts={}) {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: { ...CRM_HDR, Prefer: opts.prefer || 'return=representation', ...(opts.headers||{}) },
+  });
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
 async function callFn(name, body) {
   const token = await freshToken();
   let res;
@@ -2725,12 +2740,12 @@ async function pipeUploadLeads(rfpId){
 async function crmEnsureTag(name){
   name=(name||'').trim(); if(!name) return null;
   try{
-    const found=await api(`crm_tags?name=eq.${encodeURIComponent(name)}&select=id&limit=1`);
+    const found=await crmApi(`crm_tags?name=eq.${encodeURIComponent(name)}&select=id&limit=1`);
     if(found && found.length) return found[0].id;
   }catch(_){ /* fall through to create */ }
   try{
     const palette=['#1a73e8','#0f9d58','#d93025','#d97706','#7c3aed','#0891b2','#be185d','#0f766e'];
-    const rows=await api('crm_tags',{method:'POST',prefer:'return=representation',body:JSON.stringify({name,color:palette[Math.floor(Math.random()*palette.length)]})});
+    const rows=await crmApi('crm_tags',{method:'POST',prefer:'return=representation',body:JSON.stringify({name,color:palette[Math.floor(Math.random()*palette.length)]})});
     return (rows && rows[0]) ? rows[0].id : null;
   }catch(e){ console.warn('crm tag create failed:', e.message); return null; }
 }
@@ -2757,7 +2772,7 @@ async function puParseAndPush(text){
   const tagIds=[]; for(const nm of tagNames){ const id=await crmEnsureTag(nm); if(id) tagIds.push(id); }
   let ok=0, fail=0, firstErr=''; const newIds=[];
   for(let i=0;i<rows.length;i+=50){ const batch=rows.slice(i,i+50).map(crmNormalizeLead);
-    try{ const saved=await api('crm_leads',{method:'POST',prefer:'return=representation',body:JSON.stringify(batch)});
+    try{ const saved=await crmApi('crm_leads',{method:'POST',prefer:'return=representation',body:JSON.stringify(batch)});
       (saved||[]).forEach(l=>l&&l.id&&newIds.push(l.id)); ok+=batch.length;
     }catch(e){ fail+=batch.length; if(!firstErr) firstErr=e.message; }
   }
@@ -2765,7 +2780,7 @@ async function puParseAndPush(text){
   if(tagIds.length && newIds.length){
     const links=[]; newIds.forEach(lid=>tagIds.forEach(tid=>links.push({lead_id:lid,tag_id:tid})));
     for(let i=0;i<links.length;i+=100){ const batch=links.slice(i,i+100);
-      try{ await api('crm_lead_tags?on_conflict=lead_id,tag_id',{method:'POST',prefer:'resolution=ignore-duplicates,return=minimal',body:JSON.stringify(batch)}); tagged+=batch.length; }catch(_){}
+      try{ await crmApi('crm_lead_tags?on_conflict=lead_id,tag_id',{method:'POST',prefer:'resolution=ignore-duplicates,return=minimal',body:JSON.stringify(batch)}); tagged+=batch.length; }catch(_){}
     }
   }
   if(ok===0){
@@ -3327,7 +3342,7 @@ async function pushPartnersToDialer(ids){
       city:p.city||null, state:p.state||null, website:p.website||null,
       industry:(p.service_categories||[])[0]||'GovCon subcontractor', dispo:'new', source:'govcon',
       notes:`Pushed from ConnexionTwo GovCon — ${[...(p.service_categories||[]),...(p.capabilities||[])].slice(0,5).join(', ')||'partner'}${p.research_notes?'\n'+String(p.research_notes).slice(0,200):''}` };
-    try{ await api('crm_leads',{method:'POST',prefer:'return=minimal',body:JSON.stringify(lead)}); pushed++; }
+    try{ await crmApi('crm_leads',{method:'POST',prefer:'return=minimal',body:JSON.stringify(crmNormalizeLead(lead))}); pushed++; }
     catch(e){ failed++; if(!firstErr) firstErr=e.message; }
   }
   toast(pushed?`Dialer: ${pushed} pushed${failed?`, ${failed} failed`:''} — open the ConnexionTwo Dialer → Auto Dialer to start calling.`:`Dialer push failed: ${(firstErr||'unknown').slice(0,120)}`);
@@ -3367,7 +3382,7 @@ async function cdParseAndPush(text){
   out.innerHTML=`<div class="muted">Pushing ${rows.length} lead(s) to the dialer…</div>`;
   let ok=0,fail=0,firstErr='';
   for(let i=0;i<rows.length;i+=50){ const batch=rows.slice(i,i+50).map(crmNormalizeLead);
-    try{ await api('crm_leads',{method:'POST',prefer:'return=minimal',body:JSON.stringify(batch)}); ok+=batch.length; }
+    try{ await crmApi('crm_leads',{method:'POST',prefer:'return=minimal',body:JSON.stringify(batch)}); ok+=batch.length; }
     catch(e){ fail+=batch.length; if(!firstErr) firstErr=e.message; } }
   out.innerHTML = ok
     ? `<div class="banner info">✓ ${ok} lead(s) pushed to the dialer${fail?` · ${fail} failed`:''}. Open the ConnexionTwo Dialer to start calling.</div>`
