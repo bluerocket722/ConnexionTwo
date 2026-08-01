@@ -2756,7 +2756,7 @@ async function puParseAndPush(text){
   const tagNames=[solNum, stateTag].filter(Boolean);
   const tagIds=[]; for(const nm of tagNames){ const id=await crmEnsureTag(nm); if(id) tagIds.push(id); }
   let ok=0, fail=0, firstErr=''; const newIds=[];
-  for(let i=0;i<rows.length;i+=50){ const batch=rows.slice(i,i+50);
+  for(let i=0;i<rows.length;i+=50){ const batch=rows.slice(i,i+50).map(crmNormalizeLead);
     try{ const saved=await api('crm_leads',{method:'POST',prefer:'return=representation',body:JSON.stringify(batch)});
       (saved||[]).forEach(l=>l&&l.id&&newIds.push(l.id)); ok+=batch.length;
     }catch(e){ fail+=batch.length; if(!firstErr) firstErr=e.message; }
@@ -3336,6 +3336,11 @@ async function pushPartnersToDialer(ids){
       or similar) and push rows straight into crm_leads so the dialer can call.
       Columns are read by HEADER NAME, any order. ── */
 const CSV_DIALER_MAP={title:'business_name',business:'business_name','business name':'business_name',company:'business_name',name:'contact_name',contact:'contact_name','contact name':'contact_name',phone:'phone','phone number':'phone',tel:'phone',email:'email','e-mail':'email',address:'address',street:'address',city:'city',state:'state',county:'county',industry:'industry',category:'industry',dispo:'dispo',status:'dispo',notes:'notes',website:'website',site:'website',url:'website'};
+// PostgREST bulk insert requires every object in the array to share the SAME
+// keys (error PGRST102 "All object keys must match") — so give every lead an
+// identical shape, filling any missing/blank value with null.
+const CRM_LEAD_KEYS=['business_name','contact_name','phone','email','address','city','county','state','website','industry','notes','dispo','source'];
+function crmNormalizeLead(row){ const o={}; for(const k of CRM_LEAD_KEYS){ const v=row[k]; o[k]=(v===undefined||v==='')?null:v; } return o; }
 function pnCsvDialerUI(){
   openModal(`<div class="shd"><h3>Upload CSV → Dialer</h3><button class="sclose" onclick="closeModal()">×</button></div>
     <div class="sbd">
@@ -3361,7 +3366,7 @@ async function cdParseAndPush(text){
   if(!rows.length){ out.innerHTML='<div class="banner bad">No valid rows.</div>'; return; }
   out.innerHTML=`<div class="muted">Pushing ${rows.length} lead(s) to the dialer…</div>`;
   let ok=0,fail=0,firstErr='';
-  for(let i=0;i<rows.length;i+=50){ const batch=rows.slice(i,i+50);
+  for(let i=0;i<rows.length;i+=50){ const batch=rows.slice(i,i+50).map(crmNormalizeLead);
     try{ await api('crm_leads',{method:'POST',prefer:'return=minimal',body:JSON.stringify(batch)}); ok+=batch.length; }
     catch(e){ fail+=batch.length; if(!firstErr) firstErr=e.message; } }
   out.innerHTML = ok
