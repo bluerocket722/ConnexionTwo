@@ -2720,16 +2720,19 @@ async function pipeUploadLeads(rfpId){
     </div>`);
   $('#pu_file').onchange=e=>{ const f=e.target.files?.[0]; if(!f) return; const rd=new FileReader(); rd.onload=ev=>puParseAndPush(ev.target.result); rd.readAsText(f); };
 }
-async function crmEnsureTag(name, crmHdr){
+// Find-or-create a CRM tag, using the logged-in user's token (via api()) so
+// row-level security on crm_tags is satisfied — the anon key is rejected.
+async function crmEnsureTag(name){
   name=(name||'').trim(); if(!name) return null;
   try{
-    const found=await fetch(`${SB_URL}/rest/v1/crm_tags?name=eq.${encodeURIComponent(name)}&select=id&limit=1`,{headers:crmHdr});
-    if(found.ok){ const rows=await found.json(); if(rows.length) return rows[0].id; }
+    const found=await api(`crm_tags?name=eq.${encodeURIComponent(name)}&select=id&limit=1`);
+    if(found && found.length) return found[0].id;
+  }catch(_){ /* fall through to create */ }
+  try{
     const palette=['#1a73e8','#0f9d58','#d93025','#d97706','#7c3aed','#0891b2','#be185d','#0f766e'];
-    const res=await fetch(`${SB_URL}/rest/v1/crm_tags`,{method:'POST',headers:{...crmHdr,Prefer:'return=representation'},body:JSON.stringify({name,color:palette[Math.floor(Math.random()*palette.length)]})});
-    if(res.ok){ const [t]=await res.json(); return t?.id||null; }
-  }catch(_){}
-  return null;
+    const rows=await api('crm_tags',{method:'POST',prefer:'return=representation',body:JSON.stringify({name,color:palette[Math.floor(Math.random()*palette.length)]})});
+    return (rows && rows[0]) ? rows[0].id : null;
+  }catch(e){ console.warn('crm tag create failed:', e.message); return null; }
 }
 async function puParseAndPush(text){
   const out=$('#pu_out'); const lines=text.split(/\r?\n/).filter(l=>l.trim());
@@ -2748,22 +2751,28 @@ async function puParseAndPush(text){
   }
   if(!rows.length){ out.innerHTML='<div class="banner bad">No valid rows.</div>'; return; }
   out.innerHTML=`<div class="muted">Pushing ${rows.length} lead(s) to the Auto Dialer…</div>`;
-  const crmHdr={'Content-Type':'application/json', apikey:SB_KEY, Authorization:`Bearer ${SB_KEY}`};
+  // All CRM writes go through api() (logged-in token) so RLS on crm_leads /
+  // crm_tags / crm_lead_tags passes — same auth the dialer itself uses.
   const tagNames=[solNum, stateTag].filter(Boolean);
-  const tagIds=[]; for(const nm of tagNames){ const id=await crmEnsureTag(nm, crmHdr); if(id) tagIds.push(id); }
-  let ok=0, fail=0; const newIds=[];
+  const tagIds=[]; for(const nm of tagNames){ const id=await crmEnsureTag(nm); if(id) tagIds.push(id); }
+  let ok=0, fail=0, firstErr=''; const newIds=[];
   for(let i=0;i<rows.length;i+=50){ const batch=rows.slice(i,i+50);
-    try{ const r=await fetch(`${SB_URL}/rest/v1/crm_leads`,{method:'POST',headers:{...crmHdr,Prefer:'return=representation'},body:JSON.stringify(batch)});
-      if(r.ok){ const saved=await r.json(); (saved||[]).forEach(l=>l&&l.id&&newIds.push(l.id)); ok+=batch.length; } else fail+=batch.length;
-    }catch{ fail+=batch.length; } }
+    try{ const saved=await api('crm_leads',{method:'POST',prefer:'return=representation',body:JSON.stringify(batch)});
+      (saved||[]).forEach(l=>l&&l.id&&newIds.push(l.id)); ok+=batch.length;
+    }catch(e){ fail+=batch.length; if(!firstErr) firstErr=e.message; }
+  }
   let tagged=0;
   if(tagIds.length && newIds.length){
     const links=[]; newIds.forEach(lid=>tagIds.forEach(tid=>links.push({lead_id:lid,tag_id:tid})));
     for(let i=0;i<links.length;i+=100){ const batch=links.slice(i,i+100);
-      try{ const r=await fetch(`${SB_URL}/rest/v1/crm_lead_tags?on_conflict=lead_id,tag_id`,{method:'POST',headers:{...crmHdr,Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify(batch)}); if(r.ok) tagged+=batch.length; }catch{}
+      try{ await api('crm_lead_tags?on_conflict=lead_id,tag_id',{method:'POST',prefer:'resolution=ignore-duplicates,return=minimal',body:JSON.stringify(batch)}); tagged+=batch.length; }catch(_){}
     }
   }
-  const tagMsg = tagNames.length ? (tagged ? `, tagged <b>${tagNames.map(esc).join('</b> + <b>')}</b>` : ` — tag step could not write (leads still carry the solicitation # in notes & the state field for filtering)`) : '';
+  if(ok===0){
+    out.innerHTML=`<div class="banner bad">Could not push leads to the dialer.<br><span style="font-size:12px">${esc((firstErr||'Unknown error').slice(0,240))}</span></div>`;
+    return;
+  }
+  const tagMsg = tagNames.length ? (tagged ? `, tagged <b>${tagNames.map(esc).join('</b> + <b>')}</b>` : ` — tag step could not write, but leads carry the solicitation # in notes & the state field for filtering`) : '';
   out.innerHTML=`<div class="banner info">✓ ${ok} lead(s) pushed to the Auto Dialer${fail?` · ${fail} failed`:''}${tagMsg}.<br>Open the ConnexionTwo Dialer and filter by the <b>${esc(solNum||stateTag||'tag')}</b> tag (or search it) to call this solicitation only.</div>`;
 }
 /* ── solicitation folder + document upload + AI extraction ── */
@@ -3310,8 +3319,7 @@ async function pushPartnersToDialer(ids){
   const withPhone=rows.filter(p=>p.primary_phone||p.general_email);
   if(!withPhone.length) return toast('None of the selected partners have a phone or email.');
   if(!confirm(`Push ${withPhone.length} partner(s) to the dialer CRM?`)) return;
-  const crmHdr={'Content-Type':'application/json', apikey:SB_KEY, Authorization:`Bearer ${SB_KEY}`, Prefer:'return=minimal'};
-  let pushed=0, failed=0;
+  let pushed=0, failed=0, firstErr='';
   for(const p of withPhone){
     const emails=(p.contact_emails||[]);
     const lead={ business_name:p.company_name, contact_name:emails[0]?.contact_name||null,
@@ -3319,10 +3327,10 @@ async function pushPartnersToDialer(ids){
       city:p.city||null, state:p.state||null, website:p.website||null,
       industry:(p.service_categories||[])[0]||'GovCon subcontractor', dispo:'new', source:'govcon',
       notes:`Pushed from ConnexionTwo GovCon — ${[...(p.service_categories||[]),...(p.capabilities||[])].slice(0,5).join(', ')||'partner'}${p.research_notes?'\n'+String(p.research_notes).slice(0,200):''}` };
-    try{ const r=await fetch(`${SB_URL}/rest/v1/crm_leads`,{method:'POST',headers:crmHdr,body:JSON.stringify(lead)});
-      r.ok?pushed++:failed++; }catch{ failed++; }
+    try{ await api('crm_leads',{method:'POST',prefer:'return=minimal',body:JSON.stringify(lead)}); pushed++; }
+    catch(e){ failed++; if(!firstErr) firstErr=e.message; }
   }
-  toast(`Dialer: ${pushed} pushed${failed?`, ${failed} failed`:''} — open the ConnexionTwo Dialer → Auto Dialer to start calling.`);
+  toast(pushed?`Dialer: ${pushed} pushed${failed?`, ${failed} failed`:''} — open the ConnexionTwo Dialer → Auto Dialer to start calling.`:`Dialer push failed: ${(firstErr||'unknown').slice(0,120)}`);
 }
 /* ── CSV → Dialer: upload a header CSV (Title,Address,Industry,Phone,Dispo,Email
       or similar) and push rows straight into crm_leads so the dialer can call.
@@ -3352,11 +3360,13 @@ async function cdParseAndPush(text){
   }
   if(!rows.length){ out.innerHTML='<div class="banner bad">No valid rows.</div>'; return; }
   out.innerHTML=`<div class="muted">Pushing ${rows.length} lead(s) to the dialer…</div>`;
-  const crmHdr={'Content-Type':'application/json',apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,Prefer:'return=minimal'};
-  let ok=0,fail=0;
+  let ok=0,fail=0,firstErr='';
   for(let i=0;i<rows.length;i+=50){ const batch=rows.slice(i,i+50);
-    try{ const r=await fetch(`${SB_URL}/rest/v1/crm_leads`,{method:'POST',headers:crmHdr,body:JSON.stringify(batch)}); r.ok?ok+=batch.length:fail+=batch.length; }catch{ fail+=batch.length; } }
-  out.innerHTML=`<div class="banner info">✓ ${ok} lead(s) pushed to the dialer${fail?` · ${fail} failed`:''}. Open the ConnexionTwo Dialer to start calling.</div>`;
+    try{ await api('crm_leads',{method:'POST',prefer:'return=minimal',body:JSON.stringify(batch)}); ok+=batch.length; }
+    catch(e){ fail+=batch.length; if(!firstErr) firstErr=e.message; } }
+  out.innerHTML = ok
+    ? `<div class="banner info">✓ ${ok} lead(s) pushed to the dialer${fail?` · ${fail} failed`:''}. Open the ConnexionTwo Dialer to start calling.</div>`
+    : `<div class="banner bad">Could not push leads.<br><span style="font-size:12px">${esc((firstErr||'Unknown error').slice(0,240))}</span></div>`;
 }
 /* ── Yelp business import (official Fusion API — needs a "yelp" API key) ── */
 function pnYelpUI(){
