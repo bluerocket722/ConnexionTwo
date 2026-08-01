@@ -657,15 +657,25 @@ async function loadLeads() {
       page++;
     }
     allLeads = allLeadsArr;
-    const [tagsRes, leadTagsRes, actRes] = await Promise.all([
-      fetch(db("crm_tags?order=name.asc"), { headers: hdr() }),
-      fetch(db("crm_lead_tags?select=lead_id,tag_id"), { headers: hdr() }),
+    const [tagsRes, actRes] = await Promise.all([
+      fetch(db("crm_tags?order=name.asc&limit=5000"), { headers: hdr() }),
       fetch(db(`crm_daily_activity?date=eq.${today}`), { headers: hdr() }),
     ]);
     allTags = tagsRes.ok ? await tagsRes.json() : [];
-    const ltRows = leadTagsRes.ok ? await leadTagsRes.json() : [];
+    // Page through crm_lead_tags — a single unpaged read is capped by PostgREST
+    // (default 1000 rows), which silently drops tag links once the join table
+    // grows, so tagged leads stop appearing under their tag filter.
     leadTagsMap = {};
-    ltRows.forEach(r => { if (!leadTagsMap[r.lead_id]) leadTagsMap[r.lead_id]=[]; leadTagsMap[r.lead_id].push(r.tag_id); });
+    { const LTP = 1000; let lp = 0;
+      while (true) {
+        const r = await fetch(db(`crm_lead_tags?select=lead_id,tag_id&limit=${LTP}&offset=${lp * LTP}`), { headers: hdr() });
+        if (!r.ok) break;
+        const batch = await r.json();
+        batch.forEach(row => { if (!leadTagsMap[row.lead_id]) leadTagsMap[row.lead_id] = []; leadTagsMap[row.lead_id].push(row.tag_id); });
+        if (batch.length < LTP) break;
+        lp++;
+      }
+    }
     if (actRes.ok) { const actRows = await actRes.json(); if (actRows.length) { const row=actRows[0]; activityDbId=row.id; todayActivity={dials:row.dials,talk_time_secs:row.talk_time_secs,connected:row.connected,voicemail:row.voicemail,no_answer:row.no_answer,appointments:row.appointments}; } }
     buildTagFilter(); buildStats(); applyFilter(); renderActivityBar();
   } catch(e) { console.error(e); document.getElementById("table-area").innerHTML=`<div class="empty-state"><p>Could not load leads — check console</p></div>`; }
