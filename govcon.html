@@ -765,6 +765,7 @@ async function openReview(id){
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
         <button class="btn sm primary" id="rvSaveFields">💾 Save fields</button>
+        <button class="btn sm ${r.monitored?'primary':''}" id="rvMonitorBtn" title="Monitored opportunities auto-add to the pipeline" onclick="rvToggleMonitor()">${r.monitored?'👁 Monitoring':'👁 Monitor'}</button>
         ${r.url?`<a class="btn sm" href="${esc(r.url)}" target="_blank">Open source notice ↗</a>`:''}
         <button class="btn sm" id="rvEnrich">↻ Pull latest full detail</button>
         <button class="btn sm" id="rvDownload">⬇ Download from SAM.gov</button>
@@ -1176,12 +1177,14 @@ async function rvSaveScript(){
     if(st) st.textContent='✓ Saved — this version now shows on the dialer.';
   }catch(e){ if(st) st.textContent='Save failed: '+e.message; }
 }
-async function rvPushPartners(){
-  const rid=window._RV.rfp.id, title=window._RV.rfp.title||null, st=$('#rvScriptStatus');
+function rvPushPartners(){ return pushContractPartnersToDialer(window._RV.rfp.id, window._RV.rfp.title||null, $('#rvScriptStatus')); }
+// Push a contract's researched partners into the dialer, already linked to the
+// solicitation (rfp_id) so the call script auto-shows on each call.
+async function pushContractPartnersToDialer(rid, title, st){
   const links=await api(`govcon_opportunity_partners?rfp_id=eq.${rid}&owner=eq.${SESSION.user.id}&select=selected_for_bid,govcon_partners(company_name,primary_phone,general_email,contact_emails,city,state,website,service_categories)&limit=200`).catch(()=>[]);
   let pool=(links||[]).filter(l=>l.selected_for_bid); if(!pool.length) pool=links||[];
   const rows=pool.map(l=>l.govcon_partners).filter(p=>p&&(p.primary_phone||p.general_email));
-  if(!rows.length) return toast('No partners with a phone/email yet — run “Find Partners for This Contract” first.');
+  if(!rows.length) return toast('No partners with a phone/email yet — run “Find partners for this contract” first.');
   if(!confirm(`Send ${rows.length} partner(s) to the Auto Dialer for this contract? The call script shows on each call.`)) return;
   if(st) st.textContent='Sending to dialer…';
   const crmHdr={'Content-Type':'application/json',apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,Prefer:'return=minimal'};
@@ -1382,11 +1385,23 @@ function rfpCard(r) {
     </div>
     <div class="acts">
       <button class="btn sm primary" onclick="openReview('${r.id}')">Review</button>
+      <button class="btn sm ${r.monitored?'primary':''}" title="${r.monitored?'Monitoring — auto-adds to the pipeline':'Monitor this opportunity so it auto-adds to the pipeline'}" onclick="toggleMonitor('${r.id}',${!r.monitored})">${r.monitored?'👁 Monitoring':'👁 Monitor'}</button>
       <button class="btn sm" onclick="openRfp('${r.id}')">Edit</button>
       ${r.url?`<a class="btn sm" href="${esc(r.url)}" target="_blank">Source ↗</a>`:''}
       <button class="btn sm" style="color:var(--bad)" onclick="deleteRfp('${r.id}')">Delete</button>
     </div></div>`;
 }
+// Monitor watchlist — only monitored opportunities auto-add to the pipeline
+// (unless the Settings "Pipeline auto-add" mode says otherwise).
+async function toggleMonitor(id, on){
+  try{
+    await api(`govcon_rfps?id=eq.${id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({monitored:on, monitored_at:on?new Date().toISOString():null})});
+    toast(on?'Monitoring on — this will auto-add to the pipeline':'Monitoring off');
+    if(window._RV&&window._RV.rfp&&window._RV.rfp.id===id){ window._RV.rfp.monitored=on; const b=$('#rvMonitorBtn'); if(b){ b.textContent=on?'👁 Monitoring':'👁 Monitor'; b.className='btn sm'+(on?' primary':''); } }
+    if($('#rfpList')) renderRfps();
+  }catch(e){ toast(/monitored/.test(e.message)?'Run govcon_migration_17.sql to enable Monitor.':'Could not update monitor: '+e.message); }
+}
+async function rvToggleMonitor(){ const r=window._RV.rfp; await toggleMonitor(r.id, !r.monitored); }
 
 /* view / edit / delete a single RFP */
 async function openRfp(id) {
@@ -1567,11 +1582,41 @@ async function genCallScriptFor(rfpId){
   return {script, brief};
 }
 let AUTORUN_ABORT=false;
+// Which opportunities auto-add is allowed to touch, per Settings → Pipeline auto-add.
+async function autoRunCandidates(){
+  const uid=SESSION.user.id;
+  const sRows=await api(`govcon_autopilot_settings?owner=eq.${uid}&select=pipeline_auto_add_mode,pipeline_auto_min_fit,pipeline_auto_generate_script`).catch(()=>[]);
+  const S=sRows[0]||{}; const mode=S.pipeline_auto_add_mode||'monitored';
+  const minFit=S.pipeline_auto_min_fit==null?55:S.pipeline_auto_min_fit;
+  const genScript=S.pipeline_auto_generate_script!==false;
+  const done=['Archived','Rejected / No-Bid'];
+  let ids=[], why='';
+  if(mode==='off'){ return {mode, ids:[], genScript, why:'Pipeline auto-add is Off. Turn it on in Settings → Autopilot → Pipeline auto-add.'}; }
+  if(mode==='monitored'){
+    const rows=await api(`govcon_rfps?owner=eq.${uid}&monitored=eq.true&select=id,review_stage`).catch(()=>[]);
+    ids=(rows||[]).filter(r=>!done.includes(r.review_stage||'')).map(r=>r.id);
+    if(!ids.length) why='No opportunities are marked 👁 Monitor yet. Open an opportunity and click Monitor — or change the mode in Settings.';
+  } else if(mode==='recommended'){
+    const [ans, rfpsA]=await Promise.all([
+      api(`govcon_opportunity_analysis?owner=eq.${uid}&select=rfp_id,fit_score,recommendation,version&order=version.desc&limit=2000`).catch(()=>[]),
+      api(`govcon_rfps?owner=eq.${uid}&select=id,review_stage`).catch(()=>[]),
+    ]);
+    const latest={}; (ans||[]).forEach(a=>{ if(!latest[a.rfp_id]) latest[a.rfp_id]=a; });
+    const okStage=new Set((rfpsA||[]).filter(r=>!done.includes(r.review_stage||'')).map(r=>r.id));
+    const good=new Set(['Strong Pursue','Pursue','Conditional Pursue']);
+    ids=Object.values(latest).filter(a=>okStage.has(a.rfp_id)&&(good.has(a.recommendation)||(a.fit_score!=null&&a.fit_score>=minFit))).map(a=>a.rfp_id);
+    if(!ids.length) why=`No analyzed opportunities pass the threshold (recommendation Pursue/Conditional, or fit ≥ ${minFit}).`;
+  } else { // all
+    const docRows=await api(`govcon_source_documents?owner=eq.${uid}&select=rfp_id`).catch(()=>[]);
+    ids=[...new Set((docRows||[]).map(d=>d.rfp_id).filter(Boolean))];
+    if(!ids.length) why='No downloaded documents yet — run Autopilot or download an opportunity first.';
+  }
+  return {mode, ids, genScript, why};
+}
 async function autoRunPipeline(){
   const host=$('#autoRunBox');
-  const docRows=await api(`govcon_source_documents?owner=eq.${SESSION.user.id}&select=rfp_id`).catch(()=>[]);
-  const ids=[...new Set((docRows||[]).map(d=>d.rfp_id).filter(Boolean))];
-  if(!ids.length){ toast('No downloaded documents yet — run Autopilot or download an opportunity first.'); return; }
+  const {mode, ids, genScript, why}=await autoRunCandidates();
+  if(!ids.length){ toast(why||'Nothing to auto-run.'); if(host) host.innerHTML=`<div class="banner info" style="margin-top:10px">${esc(why||'')}</div>`; return; }
   AUTORUN_ABORT=false;
   const total=ids.length; let done=0, piped=0, analyzed=0, scripted=0, failed=0; const t0=Date.now();
   const draw=(label)=>{ const pct=Math.round(done/total*100); const eta=done?Math.round((Date.now()-t0)/done*(total-done)/1000):0;
@@ -1600,7 +1645,7 @@ async function autoRunPipeline(){
         try{ await callFn('govcon-analyze-selected-documents',{rfp_id:id, document_ids:dids, analysis_mode:'initial', preserve_human_edits:true}); analyzed++; }
         catch(_){ /* analysis failed — still generate a script from the metadata below */ }
       }
-      if(!(r.details||{}).call_script_edited){ draw('Writing call script: '+(r.title||'')); await genCallScriptFor(id); scripted++; }
+      if(genScript && !(r.details||{}).call_script_edited){ draw('Writing call script: '+(r.title||'')); await genCallScriptFor(id); scripted++; }
     }catch(e){ failed++; }
     done++; draw('');
   }
@@ -1720,6 +1765,21 @@ async function renderAutopilot() {
       <h2 class="section">Pipeline</h2>
       <label class="toggle"><input type="checkbox" id="ap_addpipe" ${s.auto_add_pipeline!==false?'checked':''}> Auto-add qualifying RFPs to Pipeline</label>
       <label class="toggle"><input type="checkbox" id="ap_prio" ${s.auto_prioritize!==false?'checked':''}> Auto-prioritize by win probability &amp; deadline</label>
+
+      <h2 class="section" style="margin-top:8px">Pipeline auto-add — what gets added automatically</h2>
+      <div class="field"><label>Add to the pipeline</label>
+        <select id="ap_pipemode">
+          <option value="monitored" ${(!s.pipeline_auto_add_mode||s.pipeline_auto_add_mode==='monitored')?'selected':''}>Only opportunities I mark 👁 Monitor (recommended)</option>
+          <option value="recommended" ${s.pipeline_auto_add_mode==='recommended'?'selected':''}>Analyzed opportunities that pass the fit / recommendation threshold</option>
+          <option value="all" ${s.pipeline_auto_add_mode==='all'?'selected':''}>Every opportunity with downloaded documents</option>
+          <option value="off" ${s.pipeline_auto_add_mode==='off'?'selected':''}>Off — I'll add them to the pipeline manually</option>
+        </select></div>
+      <div class="row2">
+        <div class="field"><label>Min fit score (for the “recommended” mode)</label><input id="ap_pipeminfit" type="number" min="0" max="100" value="${s.pipeline_auto_min_fit??55}"></div>
+        <div class="field"><label>Auto-generate the partner call script</label>
+          <select id="ap_pipescript"><option value="yes" ${s.pipeline_auto_generate_script!==false?'selected':''}>Yes</option><option value="no" ${s.pipeline_auto_generate_script===false?'selected':''}>No</option></select></div>
+      </div>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Controls what the Pipeline <b>⚡ Auto-run</b> button and the background pipeline sync add. Mark an individual opportunity with the <b>👁 Monitor</b> button on its card or review screen. The background sync runs on the pg_cron job in <b>govcon_migration_17.sql</b> (function <b>govcon-pipeline-sync</b>).</div>
 
       <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
         <button class="btn primary" onclick="saveAutopilot()">Save settings</button>
@@ -2147,6 +2207,9 @@ async function saveAutopilot() {
     autopilot_mode: $('#ap_mode') ? $('#ap_mode').value : 'mode2_manual',
     naics_codes: $('#ap_naics') ? $('#ap_naics').value.split(',').map(s=>s.trim()).filter(Boolean) : undefined,
     download_interval_minutes: $('#ap_dlmins') ? Math.max(0, +$('#ap_dlmins').value||0) : undefined,
+    pipeline_auto_add_mode: $('#ap_pipemode') ? $('#ap_pipemode').value : undefined,
+    pipeline_auto_min_fit: $('#ap_pipeminfit') ? Math.max(0, Math.min(100, +$('#ap_pipeminfit').value||55)) : undefined,
+    pipeline_auto_generate_script: $('#ap_pipescript') ? $('#ap_pipescript').value==='yes' : undefined,
     updated_at: new Date().toISOString(),
   };
   Object.keys(body).forEach(k=>body[k]===undefined&&delete body[k]);
@@ -2156,12 +2219,12 @@ async function saveAutopilot() {
   } catch(e){
     // graceful degrade when a migration hasn't been run yet — save what we can
     let retried=false;
-    for (const col of ['naics_codes','download_interval_minutes','autopilot_mode']) {
+    for (const col of ['naics_codes','download_interval_minutes','autopilot_mode','pipeline_auto_add_mode','pipeline_auto_min_fit','pipeline_auto_generate_script']) {
       if (new RegExp(col).test(e.message)) { delete body[col]; retried=true; }
     }
     if (retried) {
       await api('govcon_autopilot_settings', {method:'POST', prefer:'resolution=merge-duplicates', body:JSON.stringify(body)});
-      toast('Saved — run govcon_migration_13.sql to enable NAICS list & background downloads');
+      toast('Saved — run the latest govcon_migration_*.sql (13 & 17) to enable all Autopilot options');
     } else throw e;
   }
 }
@@ -2302,12 +2365,12 @@ async function renderPipeline() {
   const toggle = `<div class="card" style="margin-bottom:14px">
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <b class="muted">${PIPE_ITEMS.length} opportunities</b>
-      <button class="btn sm primary" onclick="autoRunPipeline()" title="Add every opportunity with downloaded documents to the pipeline, run its matrices, and write an editable partner call script">⚡ Auto-run all (pipeline + matrices + call scripts)</button>
+      <button class="btn sm primary" onclick="autoRunPipeline()" title="Add the opportunities allowed by your Settings → Pipeline auto-add mode, run their matrices, and write an editable partner call script">⚡ Auto-run (pipeline + matrices + call scripts)</button>
       <span style="flex:1"></span>
       <button class="btn sm ${PIPE_VIEW==='board'?'primary':''}" onclick="setPipeView('board')">▦ Board</button>
       <button class="btn sm ${PIPE_VIEW==='grid'?'primary':''}" onclick="setPipeView('grid')">▤ Grid</button>
     </div>
-    <div class="muted" style="font-size:12px;margin-top:6px">Auto-run populates the pipeline from every downloaded solicitation, runs the qualification matrices, and generates a partner call script (site visit, units, contract length, start date, scope) you can edit — it appears on the Auto Dialer once a partner is linked to the contract.</div>
+    <div class="muted" style="font-size:12px;margin-top:6px">Auto-run only adds the opportunities allowed by <b>Settings → Autopilot → Pipeline auto-add</b> (default: only ones you mark 👁 Monitor). It runs their qualification matrices and generates an editable partner call script (site visit, units, contract length, start date, scope) that appears on the Auto Dialer once a partner is linked to the contract.</div>
     <div id="autoRunBox"></div>
   </div>`;
   V().innerHTML = toggle + (PIPE_VIEW==='board' ? pipeBoard() : pipeGrid()) + `<div id="leadBox"></div>` + pipeViewerMarkup();
@@ -2596,6 +2659,17 @@ async function openLead(itemId) {
       <div class="muted" style="font-size:12px;margin:-6px 0 10px">Everything the contract requires you to do, mapped to your capability and status.</div>
       <div id="matrixHost" style="overflow-x:auto"></div>
 
+      <h2 class="section">Partner call script</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Auto-written from this contract — site visit date, number of units, contract length, start date, and the work to be done — so you can call partners for a quote. Edit and Save; it shows on the Auto Dialer whenever a partner is linked to this solicitation.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+        <button class="btn sm" id="ld_genscript">✍ ${(r.details||{}).call_script?'Refresh':'Generate'}</button>
+        <button class="btn sm primary" id="ld_savescript">💾 Save script</button>
+        <button class="btn sm" id="ld_copyscript">⧉ Copy</button>
+        <button class="btn sm" id="ld_pushpartners">📞 Send contract partners to dialer</button>
+        <span class="muted" style="font-size:12px" id="ld_scriptstatus"></span>
+      </div>
+      <textarea id="ld_script" style="width:100%;min-height:240px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.5">${esc((r.details||{}).call_script||'')}</textarea>
+
       <h2 class="section">Subcontractors &amp; quotes</h2>
       <div class="muted" style="font-size:12px;margin:-6px 0 10px">Track who you called, their quote, and store their insurance / documents. Add as many as you need.</div>
       <div id="subsHost"><div class="muted" style="font-size:13px">Loading…</div></div>
@@ -2639,6 +2713,15 @@ async function openLead(itemId) {
     b.disabled=false; b.textContent='🔎 Find partners for this contract';
   };
   $('#ld_wonwith').onclick = ()=>leadWonWith(r);
+  // partner call script (under the matrices)
+  $('#ld_genscript').onclick = async ()=>{ const st=$('#ld_scriptstatus'); if(st)st.textContent='Writing…';
+    try{ const res=await genCallScriptFor(r.id); const t=$('#ld_script'); if(t)t.value=res.script; r.details=Object.assign({}, r.details||{}, {call_script:res.script, quote_brief:res.brief, call_script_edited:false}); if(st)st.textContent='Generated — Save to lock it in.'; }
+    catch(e){ if(st)st.textContent='Failed: '+e.message; } };
+  $('#ld_savescript').onclick = async ()=>{ const t=$('#ld_script'), st=$('#ld_scriptstatus'); if(st)st.textContent='Saving…';
+    try{ await saveCallScript(r.id, t.value, null, true); r.details=Object.assign({}, r.details||{}, {call_script:t.value, call_script_edited:true}); if(st)st.textContent='✓ Saved — shows on the dialer.'; }
+    catch(e){ if(st)st.textContent='Save failed: '+e.message; } };
+  $('#ld_copyscript').onclick = ()=>{ const t=$('#ld_script'); if(!t)return; t.select(); document.execCommand('copy'); toast('Call script copied'); };
+  $('#ld_pushpartners').onclick = ()=>pushContractPartnersToDialer(r.id, r.title, $('#ld_scriptstatus'));
   // template generator (async — fill after the modal is up)
   tplSectionHtml(r).then(html=>{ const host=$('#tplSection'); if(!host) return; host.innerHTML=html;
     if($('#tpl_pick')){ tplRenderFields(); $('#tpl_pick').onchange=tplRenderFields; $('#tpl_gen').onclick=tplGenerate;
