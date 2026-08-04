@@ -1618,38 +1618,53 @@ async function autoRunPipeline(){
   const {mode, ids, genScript, why}=await autoRunCandidates();
   if(!ids.length){ toast(why||'Nothing to auto-run.'); if(host) host.innerHTML=`<div class="banner info" style="margin-top:10px">${esc(why||'')}</div>`; return; }
   AUTORUN_ABORT=false;
-  const total=ids.length; let done=0, piped=0, analyzed=0, scripted=0, failed=0; const t0=Date.now();
-  const draw=(label)=>{ const pct=Math.round(done/total*100); const eta=done?Math.round((Date.now()-t0)/done*(total-done)/1000):0;
+  const total=ids.length; let done=0, analyzed=0, failed=0; const t0=Date.now();
+  const draw=(label)=>{ const pct=Math.round(done/Math.max(total,1)*100); const eta=done?Math.round((Date.now()-t0)/done*(total-done)/1000):0;
     if(host) host.innerHTML=`<div class="card" style="padding:12px;margin-top:10px">
       <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;flex-wrap:wrap;gap:6px"><b>Auto-running pipeline…</b>
-      <span>${done}/${total} · ▦${piped} 🧮${analyzed} 📞${scripted}${failed?` ⚠${failed}`:''} ${eta&&done<total?`· ~${eta}s left`:''} <a href="#" onclick="AUTORUN_ABORT=true;return false" style="margin-left:8px">stop</a></span></div>
+      <span>matrices ${done}/${total} · 🧮${analyzed}${failed?` ⚠${failed}`:''} ${eta&&done<total?`· ~${eta}s left`:''} <a href="#" onclick="AUTORUN_ABORT=true;return false" style="margin-left:8px">stop</a></span></div>
       <div style="height:8px;background:var(--line);border-radius:5px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--blue-500);transition:width .3s"></div></div>
       <div class="muted" style="font-size:11px;margin-top:5px">${esc(label||'')}</div></div>`; };
   draw('Starting…');
+  // 1) run the matrices in the browser for candidates that don't have an analysis
+  //    yet (the one step the edge function doesn't do — analysis is heavy).
   for(const id of ids){
     if(AUTORUN_ABORT){ draw('Stopped.'); break; }
     try{
-      const [rr, docs, aa]=await Promise.all([
-        api(`govcon_rfps?id=eq.${id}&owner=eq.${SESSION.user.id}&select=*`),
+      const [docs, aa]=await Promise.all([
         api(`govcon_source_documents?rfp_id=eq.${id}&owner=eq.${SESSION.user.id}&select=id&limit=200`).catch(()=>[]),
-        api(`govcon_opportunity_analysis?rfp_id=eq.${id}&owner=eq.${SESSION.user.id}&select=id,version&order=version.desc&limit=1`).catch(()=>[]),
+        api(`govcon_opportunity_analysis?rfp_id=eq.${id}&owner=eq.${SESSION.user.id}&select=id&order=version.desc&limit=1`).catch(()=>[]),
       ]);
-      const r=(rr||[])[0]; if(!r){ done++; continue; }
-      const stage=r.review_stage||'Discovered';
-      if(!['Archived','Rejected / No-Bid'].includes(stage)){ draw('Adding to pipeline: '+(r.title||'')); await addToPipelineSilent(id); piped++; }
-      let analysis=(aa||[])[0];
-      if(!analysis && (docs||[]).length){
-        draw('Running matrices: '+(r.title||''));
+      if(!(aa||[]).length && (docs||[]).length){
+        draw('Running matrices…');
         const dids=(docs||[]).map(d=>d.id);
         try{ await api(`govcon_source_documents?rfp_id=eq.${id}&owner=eq.${SESSION.user.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({include_in_analysis:true})}); }catch(_){}
         try{ await callFn('govcon-analyze-selected-documents',{rfp_id:id, document_ids:dids, analysis_mode:'initial', preserve_human_edits:true}); analyzed++; }
-        catch(_){ /* analysis failed — still generate a script from the metadata below */ }
+        catch(_){ /* analysis failed — the script still generates from metadata */ }
       }
-      if(genScript && !(r.details||{}).call_script_edited){ draw('Writing call script: '+(r.title||'')); await genCallScriptFor(id); scripted++; }
     }catch(e){ failed++; }
     done++; draw('');
   }
-  if(host) host.innerHTML=`<div class="banner info" style="margin-top:10px">✓ Done — ${piped} in pipeline, ${analyzed} matrices run, ${scripted} call scripts ready${failed?`, ${failed} had an issue`:''}. Open a card → 🔬 view → <b>Partner call script</b> to edit; it shows on the Auto Dialer once a partner is linked to the contract.</div>`;
+  // 2) hand pipeline-add + call-script generation to the govcon-pipeline-sync
+  //    edge function — the SAME code path the 15-minute cron uses, so the button
+  //    and the background sync always agree. Falls back to client-side if the
+  //    function isn't deployed yet.
+  draw('Adding to pipeline + writing call scripts…');
+  let piped=0, scripted=0, via='govcon-pipeline-sync';
+  try{
+    const r=await callFn('govcon-pipeline-sync',{action:'sync'});
+    piped=r.added||0; scripted=r.scripts||0;
+  }catch(e){
+    via='browser (function not deployed)';
+    for(const id of ids){
+      try{
+        await addToPipelineSilent(id); piped++;
+        if(genScript){ const rr=await api(`govcon_rfps?id=eq.${id}&owner=eq.${SESSION.user.id}&select=details`).catch(()=>[]);
+          if(!((rr[0]||{}).details||{}).call_script_edited){ await genCallScriptFor(id); scripted++; } }
+      }catch(_){}
+    }
+  }
+  if(host) host.innerHTML=`<div class="banner info" style="margin-top:10px">✓ Done — ${piped} in pipeline, ${analyzed} matrices run, ${scripted} call scripts ready${failed?`, ${failed} had an issue`:''}. <span class="muted">via ${esc(via)}.</span> Open a card → the <b>Partner call script</b> sits under the Capability matrix; it shows on the Auto Dialer once a partner is linked to the contract.</div>`;
   renderPipeline();
 }
 let AP_POLL=null;
