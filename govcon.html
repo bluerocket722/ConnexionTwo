@@ -2834,9 +2834,14 @@ async function leadWonWith(r){
   };
 }
 async function removeLead(itemId) {
-  if(!confirm('Remove this opportunity from the pipeline? (The RFP stays in Discovery.)')) return;
+  if(!confirm('Remove this opportunity from the pipeline? (The RFP stays in Discovery. Monitor is turned off so the auto-add won’t bring it back.)')) return;
+  const item=(PIPE_ITEMS||[]).find(i=>i.id===itemId);
+  let rfpId=item&&item.rfp_id;
+  if(!rfpId){ try{ const rows=await api(`govcon_pipeline_items?id=eq.${itemId}&select=rfp_id`); rfpId=(rows[0]||{}).rfp_id; }catch(_){} }
   await api(`govcon_pipeline_items?id=eq.${itemId}`, {method:'DELETE', prefer:'return=minimal'});
-  toast('Removed from pipeline');
+  // stop the background sync / auto-run from re-adding a removed opportunity
+  if(rfpId){ try{ await api(`govcon_rfps?id=eq.${rfpId}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({monitored:false, monitored_at:null})}); }catch(_){} }
+  toast('Removed from pipeline · Monitor turned off');
   closeModal();
   renderPipeline();
 }
