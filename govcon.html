@@ -185,10 +185,14 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r33-partner-research-2026-07-19';
+const GOVCON_BUILD = 'r34-email-monitor-2026-07-20';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
+// YOUR deployed email function slug. You deployed it as "govcon-email-bundled",
+// so this points there. If you redeploy it as plain "govcon-email", change this
+// one line to 'govcon-email'.
+const EMAIL_FN = 'govcon-email-bundled';
 console.log('%cGovCon build '+GOVCON_BUILD, 'color:#0054d1;font-weight:bold;font-size:13px');
 const SB_URL = window.SB_URL || 'https://rfdvogakvyodixgpvqvz.supabase.co';
 const SB_KEY = window.SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHZvZ2FrdnlvZGl4Z3B2cXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzU4MDMsImV4cCI6MjA4MjYxMTgwM30.UumTuz6AaKL8uYmmNxFj1ec5CInHVNQowt6LRo4cu-E';
@@ -1879,7 +1883,8 @@ async function renderEmailSettings(){
     <h2 class="section" style="margin-top:0">✉ Email &amp; reminders (Brevo)</h2>
     <div class="muted" style="font-size:12.5px;margin-bottom:10px">Send subcontractor reminders and COR/CO emails through <b>Brevo</b>, from an address you choose. ${keys.length?'<b style="color:var(--good)">Brevo key detected.</b>':'<b style="color:var(--bad)">No Brevo key yet</b> — add one under <b>Settings → API keys</b> with provider <b>brevo</b>.'} <button class="btn sm" onclick="testBrevo()">Test connection</button> <span id="brevoTest" class="muted"></span></div>
 
-    <h2 class="section" style="margin-top:6px">From addresses <span class="muted" style="font-weight:normal;font-size:12px">— each must be a <b>verified sender</b> in Brevo (Brevo → Senders)</span></h2>
+    <h2 class="section" style="margin-top:6px">From addresses <span class="muted" style="font-weight:normal;font-size:12px">— the email you send from</span></h2>
+    <div class="banner info" style="font-size:12px;margin-bottom:8px"><b>Using a personal Gmail (or any address):</b> Brevo only sends from a <b>verified sender</b>. In Brevo → <b>Senders, Domains &amp; Dedicated IPs → Senders → Add a sender</b>, enter your Gmail and name → Brevo emails a confirmation link to that Gmail → click it. Then add the same Gmail below. (Deliverability is best from a domain you own, but a verified Gmail works.)</div>
     <div id="senderList"></div>
     <div class="row3" style="margin-top:6px">
       <div class="field"><label>Name</label><input id="sender_name" placeholder="Aaron Parker"></div>
@@ -1934,7 +1939,7 @@ async function saveEmailTemplate(kind, name, subjId, bodyId){
 }
 async function testBrevo(){
   const el=$('#brevoTest'); if(el) el.textContent='Testing…';
-  try{ const r=await callFn('govcon-email',{action:'test'});
+  try{ const r=await callFn(EMAIL_FN,{action:'test'});
     if(el) el.textContent = r.ok?`✓ Connected${r.account?.email?' as '+r.account.email:''}`:'✗ '+r.error;
   }catch(e){ if(el) el.textContent='✗ '+e.message; }
 }
@@ -2600,7 +2605,27 @@ function pipeCard(i) {
     <span class="pill ${i.priority}">${i.priority}</span>
     ${r.win_probability!=null?`<span class="pill">Win ${r.win_probability}%</span>`:''}
     ${nDocs?`<span class="pill" style="cursor:pointer;background:var(--blue-100);color:var(--blue-900)" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')" title="View downloaded documents & research">📎 ${nDocs} doc${nDocs!==1?'s':''}</span>`:`<span class="pill" style="cursor:pointer" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')" title="View / research">🔬 view</span>`}
+    <div class="pcard-edit" style="display:flex;gap:4px;align-items:center;margin-top:6px" onclick="event.stopPropagation()">
+      <select class="pstage" data-id="${i.id}" title="Change stage" style="flex:1;font-size:11px;padding:2px 4px" onchange="pipeSetStage('${i.id}', this.value)">${STAGES.map(([k,l])=>`<option value="${k}" ${k===i.stage?'selected':''}>${l}</option>`).join('')}</select>
+      <button class="btn sm" title="Edit / open" onclick="openLead('${i.id}')" style="padding:2px 8px">✎</button>
+      <button class="btn sm" title="Remove from pipeline" style="padding:2px 8px;color:var(--bad)" onclick="pipeRemove('${i.id}')">✕</button>
+    </div>
   </div>`;
+}
+// change a pipeline item's stage from the board card (same as dragging it)
+async function pipeSetStage(itemId, stage){
+  try{ await api(`govcon_pipeline_items?id=eq.${itemId}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({stage, stage_updated_at:new Date().toISOString()})});
+    const it=(PIPE_ITEMS||[]).find(x=>x.id===itemId); if(it) it.stage=stage;
+    toast('Stage → '+(STAGES.find(s=>s[0]===stage)?.[1]||stage)); renderPipeline();
+  }catch(e){ toast('Failed: '+e.message); }
+}
+// remove a pipeline card from the board (turns Monitor off so it won't re-add)
+async function pipeRemove(itemId){
+  if(!confirm('Remove this opportunity from the pipeline? (It stays in Discovery. Monitor is turned off so auto-add won’t bring it back.)')) return;
+  const it=(PIPE_ITEMS||[]).find(x=>x.id===itemId); const rfpId=it&&it.rfp_id;
+  await api(`govcon_pipeline_items?id=eq.${itemId}`,{method:'DELETE',prefer:'return=minimal'});
+  if(rfpId){ try{ await api(`govcon_rfps?id=eq.${rfpId}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({monitored:false, monitored_at:null})}); }catch(_){} }
+  toast('Removed'); renderPipeline();
 }
 function pipeGrid() {
   const rows = PIPE_ITEMS.map(i=>{
@@ -3036,13 +3061,22 @@ async function emLoadContacts(rfpId){
   const host=$('#em_contacts'); if(!host) return;
   const rows=await api(`govcon_email_contacts?owner=eq.${SESSION.user.id}&rfp_id=eq.${rfpId}&select=*&order=created_at`).catch(()=>null);
   if(rows===null){ host.innerHTML='<div class="muted" style="font-size:12px">Run govcon_migration_18.sql to enable contacts.</div>'; return; }
-  window._EM_CONTACTS=rows;
-  host.innerHTML = rows.length ? rows.map(c=>`<label class="rfp" style="padding:5px 8px;margin-bottom:4px;display:flex;gap:8px;align-items:center;font-size:12.5px">
-    <input type="checkbox" class="em_c_sel" data-id="${c.id}" style="width:auto">
-    <span class="pill" style="font-size:10px">${c.kind==='cor'?'COR':c.kind==='subcontractor'?'Sub':'Other'}</span>
+  // Contracting Officer(s) auto-pulled from the solicitation (SAM) — shown here
+  // as ready recipients so you never retype them. Not stored as duplicates.
+  const d=(window._LEAD_RFP||{}).details||{};
+  const autos=[];
+  if(d.co_email)  autos.push({id:'auto:'+d.co_email,  name:d.contracting_officer||'Contracting Officer',   email:d.co_email,  kind:'cor', auto:true});
+  if(d.co2_email) autos.push({id:'auto:'+d.co2_email, name:d.contracting_officer_2||'Contracting Officer 2', email:d.co2_email, kind:'cor', auto:true});
+  window._EM_CONTACTS=[...autos, ...rows];
+  const rowHtml=(c)=>`<label class="rfp" style="padding:5px 8px;margin-bottom:4px;display:flex;gap:8px;align-items:center;font-size:12.5px${c.auto?';background:var(--blue-050)':''}">
+    <input type="checkbox" class="em_c_sel" data-id="${esc(c.id)}" style="width:auto">
+    <span class="pill" style="font-size:10px">${c.kind==='cor'?'COR':c.kind==='subcontractor'?'Sub':'Other'}${c.auto?' · auto':''}</span>
     <b>${esc(c.name||c.company||'')}</b> <span class="muted">${esc(c.email)}</span>
-    <span style="flex:1"></span><span class="muted" style="cursor:pointer;color:var(--bad)" onclick="emDelContact('${c.id}','${rfpId}')">✕</span></label>`).join('')
-    : '<div class="muted" style="font-size:13px">No contacts yet — add subcontractors and CORs below.</div>';
+    <span style="flex:1"></span>${c.auto?'<span class="muted" style="font-size:10px">from solicitation</span>':`<span class="muted" style="cursor:pointer;color:var(--bad)" onclick="emDelContact('${c.id}','${rfpId}')">✕</span>`}</label>`;
+  const parts=[];
+  if(autos.length) parts.push('<div class="muted" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Contracting officer (auto)</div>'+autos.map(rowHtml).join(''));
+  parts.push(rows.length ? ((autos.length?'<div class="muted" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin:6px 0 3px">Saved contacts</div>':'')+rows.map(rowHtml).join('')) : (autos.length?'':'<div class="muted" style="font-size:13px">No contacts yet — add subcontractors and CORs below.</div>'));
+  host.innerHTML=parts.join('');
 }
 async function emAddContact(rfpId){
   const email=$('#em_c_email').value.trim(); if(!/\S+@\S+\.\S+/.test(email)) return toast('Enter a valid email');
@@ -3054,7 +3088,7 @@ async function emAddContact(rfpId){
 async function emDelContact(id,rfpId){ await api(`govcon_email_contacts?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); emLoadContacts(rfpId); }
 async function emLoadThreads(rfpId){
   const host=$('#em_threads'); if(!host) return;
-  try{ const r=await callFn('govcon-email',{action:'list_threads', rfp_id:rfpId});
+  try{ const r=await callFn(EMAIL_FN,{action:'list_threads', rfp_id:rfpId});
     const threads=r.threads||[];
     host.innerHTML = threads.length ? threads.map(t=>`<div class="rfp" style="padding:6px 10px;margin-bottom:5px;cursor:pointer" onclick="emOpenThread('${t.id}','${rfpId}')">
       <div style="display:flex;gap:8px;align-items:center"><span class="pill" style="font-size:10px">${t.kind==='cor'?'COR':t.kind==='subcontractor'?'Sub':'Other'}</span><b style="flex:1;font-size:12.5px">${esc(t.subject||'(no subject)')}</b></div>
@@ -3066,7 +3100,7 @@ async function emOpenThread(threadId, rfpId){
   const pane=$('#em_pane'); if(!pane) return;
   pane.innerHTML='<div class="muted">Loading thread…</div>';
   try{
-    const r=await callFn('govcon-email',{action:'thread', thread_id:threadId});
+    const r=await callFn(EMAIL_FN,{action:'thread', thread_id:threadId});
     const msgs=r.messages||[]; const t=r.thread||{};
     const rows=msgs.map(m=>{
       const out=m.direction==='outbound'; const note=m.direction==='note';
@@ -3090,7 +3124,7 @@ async function emOpenThread(threadId, rfpId){
 async function emLogInbound(threadId, rfpId){
   const bodyText=prompt('Paste the reply you received (it will be added to the thread):'); if(!bodyText) return;
   const from=prompt('From (email, optional):')||null;
-  try{ await callFn('govcon-email',{action:'log_inbound', thread_id:threadId, from_email:from, body:bodyText}); emOpenThread(threadId, rfpId); }
+  try{ await callFn(EMAIL_FN,{action:'log_inbound', thread_id:threadId, from_email:from, body:bodyText}); emOpenThread(threadId, rfpId); }
   catch(e){ toast('Failed: '+e.message); }
 }
 function emReplyBox(threadId, rfpId, kind){
@@ -3136,7 +3170,7 @@ async function emSend(rfpId, kind, threadId){
   if(!to.length){ if(st) st.textContent='Add at least one recipient'; return; }
   if(st) st.textContent='Sending…';
   try{
-    const r=await callFn('govcon-email',{action:'send', rfp_id:rfpId, thread_id:threadId||undefined, kind,
+    const r=await callFn(EMAIL_FN,{action:'send', rfp_id:rfpId, thread_id:threadId||undefined, kind,
       from:{email:fromSel.value, name:opt?opt.dataset.name:''},
       to, cc:$('#em_cc').value.split(',').map(s=>s.trim()).filter(Boolean), bcc:$('#em_bcc').value.split(',').map(s=>s.trim()).filter(Boolean),
       subject:$('#em_subject').value, body:$('#em_body').value});
