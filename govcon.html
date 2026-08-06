@@ -993,6 +993,55 @@ function gateChip(g){
   const col={pass:'#0b6b34',warning:'#7a5b00',blocked:'#b3261e',fail:'#b3261e'}[g.status]||'#555';
   return `<span class="pill" title="${esc(g.reason)}${g.action?' — '+esc(g.action):''}" style="background:${col};color:#fff">${esc(g.gate)}: ${esc(g.status)}</span>`;
 }
+// ── Site Visit card (auto-extracted from the documents during analysis) ──────
+const SV_COLOR={blocking:'#b3261e',high:'#b45309',medium:'#7a5b00',low:'#0b6b34'};
+const SV_STATUS_LABEL={mandatory:'Mandatory',optional_recommended:'Optional but Recommended',optional:'Optional',not_stated:'Not Stated',none:'None Found',unclear:'Unclear'};
+function siteVisitCard(sv){
+  // ALWAYS show a Site Visit section, even when nothing was found.
+  const row=(l,v)=>`<tr><td style="padding:5px 8px;white-space:nowrap;color:var(--muted);vertical-align:top">${l}</td><td style="padding:5px 8px">${v||'—'}</td></tr>`;
+  if(!sv || sv.status==='none' || sv.mentioned===false){
+    return `<div class="card" style="margin:10px 0;border-left:4px solid #555">
+      <b>🏗 Site Visit</b> <span class="pill">None Found</span>
+      <div class="m" style="font-size:12px;margin-top:4px">${esc((sv&&sv.recommended_action)||'No site visit requirement or opportunity was located in the reviewed documents.')}</div></div>`;
+  }
+  const col=SV_COLOR[sv.risk_level]||'#555';
+  const d=(sv.dates||[])[0]||{};
+  const dtline=[d.date,d.start_time,d.time_zone].filter(Boolean).join(' · ');
+  const contact=(sv.contacts||[])[0]||{};
+  const contactStr=[contact.name,contact.email,contact.phone].filter(Boolean).join(' · ');
+  const conflicts=(sv.conflicts_found||[]);
+  const src=(sv.sources||[]).map(s=>`<div class="m" style="font-size:12px">📄 <b>${esc(s.document||'')}</b>${s.page?` · p.${esc(String(s.page))}`:''}${s.section?` · ${esc(s.section)}`:''}${s.supporting_text?`<br><i style="color:var(--muted)">“${esc(String(s.supporting_text).slice(0,240))}”</i>`:''}</div>`).join('');
+  return `<div class="card" style="margin:10px 0;border-left:4px solid ${col}">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      <b>🏗 Site Visit</b>
+      <span class="pill" style="background:${col};color:#fff">${esc(SV_STATUS_LABEL[sv.status]||sv.status)}</span>
+      ${sv.pre_award_or_post_award&&sv.pre_award_or_post_award!=='unclear'?`<span class="pill">${sv.pre_award_or_post_award==='post_award'?'Post-award walk':'Pre-award visit'}</span>`:''}
+      ${sv.blocking_label?`<span class="pill" style="background:${col};color:#fff">${esc(sv.blocking_label)}</span>`:''}
+      ${sv.alert_within_7_days?`<span class="pill" style="background:#b3261e;color:#fff">⏰ within 7 days</span>`:''}
+    </div>
+    <div style="overflow-x:auto"><table class="matx"><tbody>
+      ${row('Date &amp; time', esc(dtline))}
+      ${row('Location', esc([d.meeting_location,d.full_address].filter(Boolean).join(' — ')))}
+      ${row('Directions / GPS', esc(d.gps_or_directions))}
+      ${row('Sites covered', esc((d.sites_covered||[]).join(', ')))}
+      ${row('RSVP required', esc(sv.rsvp_required))}
+      ${row('RSVP deadline', `${esc(sv.rsvp_deadline||'Not stated')} ${sv.rsvp_deadline_status?`<span class="pill">${esc(sv.rsvp_deadline_status.replace(/_/g,' '))}</span>`:''}`)}
+      ${row('Contact', esc(contactStr))}
+      ${row('Register with', esc((sv.registration_information_required||[]).join(', ')))}
+      ${row('Visitor requirements', esc((sv.visitor_requirements||[]).join(', ')))}
+      ${row('Sub / rep may attend', esc(sv.subcontractor_or_representative_may_attend))}
+      ${row('Travel reimbursed', esc(sv.travel_reimbursed))}
+      ${row('Consequence of missing', esc(sv.consequence_of_missing))}
+      ${row('Conflicts', conflicts.length?('• '+conflicts.map(esc).join('<br>• ')):'None')}
+      ${row('Recommended action', esc(sv.recommended_action))}
+      ${row('Blocking status', `<b style="color:${col}">${esc((sv.blocking_status||'none').replace(/_/g,' '))}</b>`)}
+    </tbody></table></div>
+    ${src?`<div style="margin-top:6px"><b style="font-size:12px">Source documents</b>${src}</div>`:''}
+    ${(sv.draft_email_subject||sv.draft_email_body)?`<details style="margin-top:8px"><summary style="cursor:pointer;font-size:13px"><b>✉ Draft RSVP / clarification email</b></summary>
+      <div class="field" style="margin-top:6px"><label>Subject</label><input value="${esc(sv.draft_email_subject||'')}" readonly></div>
+      <div class="field"><label>Body</label><textarea readonly style="min-height:150px">${esc(sv.draft_email_body||'')}</textarea></div></details>`:''}
+  </div>`;
+}
 // ── eligibility & compliance calculation (bonding + FAR 52.219-14, spec §8) ──
 const ELIG_COLOR={ELIGIBLE:'#0b6b34',ELIGIBLE_WITH_ACTION:'#7a5b00',MANUAL_REVIEW:'#555',INELIGIBLE:'#b3261e'};
 function complianceCard(c){
@@ -1046,6 +1095,7 @@ async function rvRenderAnalysis(){
     <div class="m" style="margin-bottom:8px">${esc(a.recommendation_reason||'')}</div>
     <div class="scores" style="margin-bottom:8px">${(a.hard_gates||[]).map(gateChip).join(' ')}</div>
     ${complianceCard((window._RV.rfp.details||{}).compliance || (a.decision_record||{}).compliance)}
+    ${siteVisitCard((window._RV.rfp.details||{}).site_visit || (a.decision_record||{}).site_visit)}
     ${warn.length?`<div class="banner warn" style="margin:8px 0">Analysis may be incomplete:<br>${warn.map(esc).join('<br>')}</div>`:''}
     <div style="display:flex;gap:18px;flex-wrap:wrap;margin:8px 0">
       ${(a.top_strengths||[]).length?`<div style="flex:1;min-width:220px"><b>Strengths</b><ul style="margin:6px 0 0 18px">${a.top_strengths.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div>`:''}
