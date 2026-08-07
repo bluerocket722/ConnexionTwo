@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r34-email-monitor-2026-07-20';
+const GOVCON_BUILD = 'r35-monitor-leads-2026-07-20';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -2492,13 +2492,60 @@ async function runAi(toolId) {
 }
 
 /* ═══════════════ PIPELINE ═══════════════ */
+// STAGE KEYS are the permanent IDs (never change — automations & the DB depend
+// on them). The DISPLAY label is editable and stored in settings.pipeline_stage_labels.
 const STAGES = [['lead','Lead'],['qualified','Qualified'],['in_development','In Development'],['submitted','Submitted'],['awarded','Awarded'],['lost','Lost']];
+let STAGE_LABELS = {};   // {stageKey: customLabel}
+const stageLabel = (k) => STAGE_LABELS[k] || (STAGES.find(s=>s[0]===k)?.[1]) || k;
+async function loadStageLabels(){
+  try{ const rows=await api(`govcon_autopilot_settings?owner=eq.${SESSION.user.id}&select=pipeline_stage_labels`); STAGE_LABELS=(rows[0]||{}).pipeline_stage_labels||{}; }catch(_){ STAGE_LABELS={}; }
+}
+function editStageNames(){
+  openModal(`<div class="shd"><h3>Edit pipeline stage names</h3><button class="sclose" onclick="closeModal()">×</button></div>
+    <div class="sbd">
+      <div class="muted" style="font-size:12px;margin-bottom:10px">Rename how each stage is shown. The underlying stage <b>ID</b> never changes, so drag-and-drop and automations keep working.</div>
+      ${STAGES.map(([k,def])=>`<div class="field"><label>${esc(def)} <span class="muted" style="font-weight:normal">(id: <code>${k}</code>)</span></label><input id="sl_${k}" value="${esc(stageLabel(k))}"></div>`).join('')}
+      <button class="btn primary" onclick="saveStageNames()">Save names</button>
+      <span id="slStatus" class="muted" style="font-size:12px;margin-left:8px"></span>
+    </div>`);
+}
+async function saveStageNames(){
+  const map={}; STAGES.forEach(([k,def])=>{ const v=($('#sl_'+k)?.value||'').trim(); if(v && v!==def) map[k]=v; });
+  try{
+    await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify({owner:SESSION.user.id, pipeline_stage_labels:map, updated_at:new Date().toISOString()})});
+    STAGE_LABELS=map; const st=$('#slStatus'); if(st) st.textContent='✓ Saved'; closeModal(); renderPipeline();
+  }catch(e){ const st=$('#slStatus'); if(st) st.textContent=/column|pipeline_stage_labels/.test(e.message)?'Run govcon_migration_19.sql first.':'Failed: '+e.message; }
+}
 let PIPE_VIEW = 'board';   // 'board' | 'grid'
 let PIPE_ITEMS = [];
 let PIPE_DOCS = {};   // rfp_id -> [documents]
+// Any opportunity scored "Monitor" whose due date is still 14+ days out
+// automatically becomes a Lead in the pipeline. This runs client-side so it
+// works for opportunities that were ALREADY scored (not only future analyses).
+async function backfillMonitorLeads(inPipe){
+  try{
+    const rfps=await api(`govcon_rfps?owner=eq.${SESSION.user.id}&select=id,deadline,review_stage,details&limit=1000`).catch(()=>[]);
+    const today=Date.now(); const toAdd=[];
+    for(const r of rfps){
+      const rec=(r.details&&r.details.analysis_summary&&r.details.analysis_summary.recommendation)||'';
+      if(rec!=='Monitor') continue;
+      if(['Archived','Rejected / No-Bid'].includes(r.review_stage||'')) continue;
+      if(inPipe.has(r.id)) continue;
+      const days=r.deadline?Math.ceil((new Date(r.deadline+'T23:59:59').getTime()-today)/86400000):null;
+      if(days==null||days<14) continue;
+      toAdd.push({owner:SESSION.user.id, rfp_id:r.id, stage:'lead'});
+    }
+    if(toAdd.length) await api('govcon_pipeline_items?on_conflict=owner,rfp_id',{method:'POST',prefer:'resolution=ignore-duplicates,return=minimal',body:JSON.stringify(toAdd)});
+    return toAdd.length;
+  }catch(_){ return 0; }
+}
 async function renderPipeline() {
   loading();
+  await loadStageLabels();
   PIPE_ITEMS = await api(`govcon_pipeline_items?owner=eq.${SESSION.user.id}&select=*,govcon_rfps(id,title,agency,deadline,win_probability,url,description)&order=stage_updated_at.desc`);
+  // auto-add any already-scored "Monitor" (≥14 days out) opportunities as Leads
+  const added=await backfillMonitorLeads(new Set((PIPE_ITEMS||[]).map(i=>i.rfp_id)));
+  if(added){ PIPE_ITEMS = await api(`govcon_pipeline_items?owner=eq.${SESSION.user.id}&select=*,govcon_rfps(id,title,agency,deadline,win_probability,url,description)&order=stage_updated_at.desc`); toast(`Added ${added} "Monitor" opportunit${added===1?'y':'ies'} as Leads`); }
   // pull downloaded documents for every opportunity in the pipeline so the
   // cards can show a clickable doc count and the side viewer can list them.
   PIPE_DOCS = {};
@@ -2515,6 +2562,7 @@ async function renderPipeline() {
       <b class="muted">${PIPE_ITEMS.length} opportunities</b>
       <button class="btn sm primary" onclick="autoRunPipeline()" title="Add the opportunities allowed by your Settings → Pipeline auto-add mode, run their matrices, and write an editable partner call script">⚡ Auto-run (pipeline + matrices + call scripts)</button>
       <span style="flex:1"></span>
+      <button class="btn sm" onclick="editStageNames()" title="Rename how the stages are shown (IDs stay the same)">✎ Stage names</button>
       <button class="btn sm ${PIPE_VIEW==='board'?'primary':''}" onclick="setPipeView('board')">▦ Board</button>
       <button class="btn sm ${PIPE_VIEW==='grid'?'primary':''}" onclick="setPipeView('grid')">▤ Grid</button>
     </div>
@@ -2591,7 +2639,7 @@ function pipeBoard() {
   return `<div class="board">${STAGES.map(([key,label])=>{
     const col = PIPE_ITEMS.filter(i=>i.stage===key);
     return `<div class="col" data-stage="${key}" ondragover="event.preventDefault()">
-      <h4>${label}<span class="n">${col.length}</span></h4>
+      <h4>${esc(stageLabel(key))}<span class="n">${col.length}</span></h4>
       ${col.map(pipeCard).join('')}</div>`;
   }).join('')}</div>
   <div class="muted" style="font-size:12px;margin-top:8px">Drag a card between columns to change its stage, or click it to view / edit the full lead.</div>`;
@@ -2606,7 +2654,7 @@ function pipeCard(i) {
     ${r.win_probability!=null?`<span class="pill">Win ${r.win_probability}%</span>`:''}
     ${nDocs?`<span class="pill" style="cursor:pointer;background:var(--blue-100);color:var(--blue-900)" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')" title="View downloaded documents & research">📎 ${nDocs} doc${nDocs!==1?'s':''}</span>`:`<span class="pill" style="cursor:pointer" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')" title="View / research">🔬 view</span>`}
     <div class="pcard-edit" style="display:flex;gap:4px;align-items:center;margin-top:6px" onclick="event.stopPropagation()">
-      <select class="pstage" data-id="${i.id}" title="Change stage" style="flex:1;font-size:11px;padding:2px 4px" onchange="pipeSetStage('${i.id}', this.value)">${STAGES.map(([k,l])=>`<option value="${k}" ${k===i.stage?'selected':''}>${l}</option>`).join('')}</select>
+      <select class="pstage" data-id="${i.id}" title="Change stage" style="flex:1;font-size:11px;padding:2px 4px" onchange="pipeSetStage('${i.id}', this.value)">${STAGES.map(([k,l])=>`<option value="${k}" ${k===i.stage?'selected':''}>${esc(stageLabel(k))}</option>`).join('')}</select>
       <button class="btn sm" title="Edit / open" onclick="openLead('${i.id}')" style="padding:2px 8px">✎</button>
       <button class="btn sm" title="Remove from pipeline" style="padding:2px 8px;color:var(--bad)" onclick="pipeRemove('${i.id}')">✕</button>
     </div>
@@ -2616,7 +2664,7 @@ function pipeCard(i) {
 async function pipeSetStage(itemId, stage){
   try{ await api(`govcon_pipeline_items?id=eq.${itemId}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({stage, stage_updated_at:new Date().toISOString()})});
     const it=(PIPE_ITEMS||[]).find(x=>x.id===itemId); if(it) it.stage=stage;
-    toast('Stage → '+(STAGES.find(s=>s[0]===stage)?.[1]||stage)); renderPipeline();
+    toast('Stage → '+stageLabel(stage)); renderPipeline();
   }catch(e){ toast('Failed: '+e.message); }
 }
 // remove a pipeline card from the board (turns Monitor off so it won't re-add)
@@ -2637,7 +2685,7 @@ function pipeGrid() {
       <td>${fmtDate(r.deadline)}</td>
       <td><span class="pill ${i.priority}">${i.priority}</span></td>
       <td>${r.win_probability!=null?r.win_probability+'%':'—'}</td>
-      <td>${esc(STAGES.find(s=>s[0]===i.stage)?.[1]||i.stage)}</td>
+      <td>${esc(stageLabel(i.stage))}</td>
       <td><span class="pill" style="cursor:pointer;${nDocs?'background:var(--blue-100);color:var(--blue-900)':''}" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')">${nDocs?`📎 ${nDocs}`:'🔬 view'}</span></td>
     </tr>`;
   }).join('');
@@ -2761,7 +2809,7 @@ async function openLead(itemId) {
       <div class="muted" style="font-size:12px;margin-bottom:12px">${esc(r.source||'')} · ${esc(r.agency||'')} · added ${fmtDate(r.created_at)}${r.url?` · <a href="${esc(r.url)}" target="_blank">Source ↗</a>`:''}</div>
       <div class="field"><label>Title *</label><input id="ld_title" value="${esc(r.title||'')}"></div>
       <div class="row3">
-        <div class="field"><label>Stage</label><select id="ld_stage">${STAGES.map(([k,l])=>`<option value="${k}" ${k===item.stage?'selected':''}>${l}</option>`).join('')}</select></div>
+        <div class="field"><label>Stage</label><select id="ld_stage">${STAGES.map(([k,l])=>`<option value="${k}" ${k===item.stage?'selected':''}>${esc(stageLabel(k))}</option>`).join('')}</select></div>
         <div class="field"><label>Priority</label><select id="ld_prio">${['low','medium','high'].map(p=>`<option ${p===item.priority?'selected':''}>${p}</option>`).join('')}</select></div>
         <div class="field"><label>Deadline</label><input id="ld_deadline" type="date" value="${r.deadline||''}"></div>
       </div>
@@ -3145,11 +3193,12 @@ async function emCompose(rfpId, kind, threadId){
   const tpl=(tpls||[])[0]||{subject:'', body:''};
   const subject=emResolve(tpl.subject, rfp, firstContact);
   const bodyResolved=emResolve(tpl.body, rfp, firstContact);
-  if(!senders.length){ pane.innerHTML='<div class="banner warn">Add a verified sender address first (Settings → Email).</div>'; return; }
+  const noSender=!senders.length;
   pane.innerHTML=`<div class="card" style="padding:12px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b>${kind==='cor'?'Email COR / CO':'Subcontractor reminder'}</b><span style="flex:1"></span><button class="btn sm" onclick="$('#em_pane').innerHTML=''">✕</button></div>
+    ${noSender?'<div class="banner warn" style="margin-bottom:8px">You can type and save a draft here, but to <b>send</b> you first need to add a verified sender in <b>Settings → Email</b> (and a Brevo key under Settings → API keys).</div>':''}
     <div class="row2">
-      <div class="field"><label>From</label><select id="em_from">${senders.map(s=>`<option value="${esc(s.email)}" data-name="${esc(s.name||'')}">${esc(s.name?s.name+' <'+s.email+'>':s.email)}</option>`).join('')}</select></div>
+      <div class="field"><label>From</label><select id="em_from">${noSender?'<option value="">— add a sender in Settings —</option>':''}${senders.map(s=>`<option value="${esc(s.email)}" data-name="${esc(s.name||'')}">${esc(s.name?s.name+' <'+s.email+'>':s.email)}</option>`).join('')}</select></div>
       <div class="field"><label>Add saved contact</label><select id="em_pick" onchange="emAddTo(this.value)"><option value="">— pick to add to To —</option>${contacts.map(c=>`<option value="${esc(c.email)}">${esc((c.name||c.company||'')+' <'+c.email+'>')}</option>`).join('')}</select></div>
     </div>
     <div class="field"><label>To (comma-separated)</label><input id="em_to" value="${esc(preTo.join(', '))}"></div>
@@ -3963,7 +4012,7 @@ async function renderAnalytics() {
     <h2 class="section">Pipeline by stage</h2>
     <div class="card">${STAGES.map(([k,l])=>{
       const n = byStage[k]||0; const pct = leads ? Math.round(n/leads*100) : 0;
-      return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px"><b>${l}</b><span class="muted">${n}</span></div>
+      return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px"><b>${esc(stageLabel(k))}</b><span class="muted">${n}</span></div>
         <div style="background:var(--blue-050);border-radius:8px;height:12px;overflow:hidden;margin-top:3px"><div style="width:${pct}%;height:100%;background:var(--blue-600)"></div></div></div>`;
     }).join('')}</div>`;
 }
