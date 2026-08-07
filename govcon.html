@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r35-monitor-leads-2026-07-20';
+const GOVCON_BUILD = 'r36-pipeline-fields-maps-2026-07-20';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -763,6 +763,11 @@ async function openReview(id){
         <div class="field"><label>Site visit date</label><input id="rf_sitevisit" type="date" value="${r.site_visit_date||''}"></div>
       </div>
       <div class="row3">
+        <div class="field"><label>Site visit time <span class="muted" style="font-weight:normal;font-size:11px">(auto)</span></label><input id="rf_sitevisit_time" value="${esc(d.site_visit_time||((d.site_visit&&(d.site_visit.dates||[])[0]||{}).start_time)||'')}" placeholder="e.g. 10:00 AM"></div>
+        <div class="field"><label>Site visit time zone <span class="muted" style="font-weight:normal;font-size:11px">(auto)</span></label><input id="rf_sitevisit_tz" value="${esc(d.site_visit_tz||((d.site_visit&&(d.site_visit.dates||[])[0]||{}).time_zone)||'')}" placeholder="e.g. Eastern (ET)"></div>
+        <div class="field"></div>
+      </div>
+      <div class="row3">
         <div class="field"><label>Place of performance</label><input id="rf_pop" value="${esc(r.place_of_performance_raw||d.place_of_performance||r.location||'')}"></div>
         <div class="field"><label>Type</label><input id="rf_type" value="${esc(r.opportunity_type||'')}" placeholder="RFQ / RFP / combined"></div>
         <div class="field"><label>Est. value ($)</label><input id="rf_value" type="number" value="${r.estimated_value??''}"></div>
@@ -919,6 +924,8 @@ async function rvSaveFields(){
   const r=window._RV.rfp, st=$('#rvActStatus'); st.textContent='Saving…';
   const details=Object.assign({}, r.details||{});
   const sol=$('#rf_solnum').value.trim(); if(sol) details.solicitation_number=sol; else delete details.solicitation_number;
+  const svTime=$('#rf_sitevisit_time')?$('#rf_sitevisit_time').value.trim():''; if(svTime) details.site_visit_time=svTime; else delete details.site_visit_time;
+  const svTz=$('#rf_sitevisit_tz')?$('#rf_sitevisit_tz').value.trim():''; if(svTz) details.site_visit_tz=svTz; else delete details.site_visit_tz;
   const pop=$('#rf_pop').value.trim();
   const patch={
     agency:$('#rf_agency').value.trim()||null, category:$('#rf_naics').value.trim()||null,
@@ -2818,6 +2825,29 @@ async function openLead(itemId) {
         <div class="field"><label>Category / NAICS</label><input id="ld_category" value="${esc(r.category||'')}"></div>
         <div class="field"><label>Set-aside</label><input id="ld_setaside" value="${esc(r.set_aside||'')}"></div>
       </div>
+
+      <h2 class="section">Solicitation details</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 8px">Auto-filled from the analysis / SAM; edit freely. Same fields as RFP Discovery.</div>
+      <div class="row3">
+        <div class="field"><label>Solicitation #</label><input id="ld_det_solnum" value="${esc((r.details||{}).solicitation_number||'')}"></div>
+        <div class="field"><label>PSC</label><input id="ld_det_psc" value="${esc(r.psc||(r.details||{}).psc||'')}"></div>
+        <div class="field"><label>Notice ID</label><input value="${esc(String(r.notice_id||'').replace(/^sam:/,''))}" readonly></div>
+      </div>
+      <div class="row3">
+        <div class="field"><label>Response deadline</label><input id="ld_det_deadline" type="date" value="${r.deadline||''}"></div>
+        <div class="field"><label>Question deadline</label><input id="ld_det_qdeadline" type="date" value="${r.question_deadline||''}"></div>
+        <div class="field"><label>Type</label><input id="ld_det_type" value="${esc(r.opportunity_type||'')}" placeholder="RFQ / RFP / combined"></div>
+      </div>
+      <div class="row3">
+        <div class="field"><label>Site visit date</label><input id="ld_det_svdate" type="date" value="${r.site_visit_date||''}"></div>
+        <div class="field"><label>Site visit time <span class="muted" style="font-weight:normal;font-size:11px">(auto)</span></label><input id="ld_det_svtime" value="${esc((r.details||{}).site_visit_time||(((r.details||{}).site_visit&&((r.details||{}).site_visit.dates||[])[0]||{}).start_time)||'')}" placeholder="e.g. 10:00 AM"></div>
+        <div class="field"><label>Site visit time zone <span class="muted" style="font-weight:normal;font-size:11px">(auto)</span></label><input id="ld_det_svtz" value="${esc((r.details||{}).site_visit_tz||(((r.details||{}).site_visit&&((r.details||{}).site_visit.dates||[])[0]||{}).time_zone)||'')}" placeholder="e.g. Eastern (ET)"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Est. value ($)</label><input id="ld_det_value" type="number" value="${r.estimated_value??''}"></div>
+        <div class="field"><label>Set-aside detail</label><input id="ld_det_setaside" value="${esc(r.set_aside||'')}" readonly></div>
+      </div>
+
       <div class="row2">
         <div class="field"><label>Budget min ($)</label><input id="ld_bmin" type="number" value="${r.budget_min??''}"></div>
         <div class="field"><label>Budget max ($)</label><input id="ld_bmax" type="number" value="${r.budget_max??''}"></div>
@@ -2982,6 +3012,11 @@ async function saveLead(itemId, rfpId) {
   const folderIn = ($('#ld_folder_name') ? $('#ld_folder_name').value : '').trim();
   if(solIn) details.solicitation_number = solIn; else delete details.solicitation_number;
   if(folderIn) details.folder_name = cleanFolder(folderIn); else delete details.folder_name;
+  // solicitation-detail overrides (added: PSC, site-visit time/tz saved to details)
+  const detSol=($('#ld_det_solnum')?$('#ld_det_solnum').value.trim():''); if(detSol) details.solicitation_number=detSol;
+  const detPsc=($('#ld_det_psc')?$('#ld_det_psc').value.trim():''); if(detPsc) details.psc=detPsc; else delete details.psc;
+  const detSvTime=($('#ld_det_svtime')?$('#ld_det_svtime').value.trim():''); if(detSvTime) details.site_visit_time=detSvTime; else delete details.site_visit_time;
+  const detSvTz=($('#ld_det_svtz')?$('#ld_det_svtz').value.trim():''); if(detSvTz) details.site_visit_tz=detSvTz; else delete details.site_visit_tz;
   // contracting officers / points of contact
   const setDet=(k,id)=>{ const v=($('#'+id)?$('#'+id).value:'').trim(); if(v) details[k]=v; else delete details[k]; };
   setDet('contracting_officer','ld_co1');   setDet('co_email','ld_co1_email');   setDet('co_phone','ld_co1_phone');
@@ -2994,6 +3029,11 @@ async function saveLead(itemId, rfpId) {
     budget_min:$('#ld_bmin').value===''?null:+$('#ld_bmin').value,
     budget_max:$('#ld_bmax').value===''?null:+$('#ld_bmax').value,
     url:$('#ld_url').value.trim()||null, description:$('#ld_desc').value.trim()||null,
+    psc: $('#ld_det_psc')?($('#ld_det_psc').value.trim()||null):undefined,
+    question_deadline: $('#ld_det_qdeadline')?($('#ld_det_qdeadline').value||null):undefined,
+    site_visit_date: $('#ld_det_svdate')?($('#ld_det_svdate').value||null):undefined,
+    opportunity_type: $('#ld_det_type')?($('#ld_det_type').value.trim()||null):undefined,
+    estimated_value: $('#ld_det_value')?($('#ld_det_value').value===''?null:+$('#ld_det_value').value):undefined,
     capability_matrix: MATRICES.matrixHost, submission_matrix: MATRICES.submatrixHost,
     details,
     place_of_performance_raw: $('#ld_pop')?($('#ld_pop').value.trim()||null):undefined,
@@ -3494,6 +3534,7 @@ async function renderPartners() {
         <button class="btn primary" onclick="pnImportUI()">⬆ Import companies (CSV)</button>
         <button class="btn" onclick="pnResearchAllPending()">🤖 Research all pending${rc.pending+rc.failed?` (${rc.pending+rc.failed})`:''}</button>
         <button class="btn" onclick="pnResearchUI()">🔎 Find new partners</button>
+        <button class="btn" onclick="pnMapSearchUI()">🗺 Google Maps search</button>
         <button class="btn" onclick="pnYelpUI()">🗺 Yelp</button>
         <button class="btn" onclick="pnCsvDialerUI()">⬆ CSV → Dialer</button>
         <button class="btn" onclick="pnDedupe()">Merge duplicates</button>
@@ -3790,17 +3831,52 @@ async function pushPartnersToDialer(ids){
       or similar) and push rows straight into crm_leads so the dialer can call.
       Columns are read by HEADER NAME, any order. ── */
 const CSV_DIALER_MAP={title:'business_name',business:'business_name','business name':'business_name',company:'business_name',name:'contact_name',contact:'contact_name','contact name':'contact_name',phone:'phone','phone number':'phone',tel:'phone',email:'email','e-mail':'email',address:'address',street:'address',city:'city',state:'state',county:'county',industry:'industry',category:'industry',dispo:'dispo',status:'dispo',notes:'notes',website:'website',site:'website',url:'website'};
+/* ── Google Maps search: find subcontractors by service + zip, get the link ── */
+function pnMapSearchUI(){
+  openModal(`<div class="shd"><h3>🗺 Find subcontractors on Google Maps</h3><button class="sclose" onclick="closeModal()">×</button></div>
+    <div class="sbd">
+      <div class="muted" style="font-size:13px;margin-bottom:10px">Enter the service you need and a ZIP code (or city). It opens a Google Maps search you can browse for local companies, then copy their info into <b>Import companies (CSV)</b> or <b>Add manually</b>.</div>
+      <div class="field"><label>Service / trade *</label><input id="pm_svc" placeholder="e.g. commercial window cleaning"></div>
+      <div class="field"><label>ZIP code or city, state *</label><input id="pm_zip" placeholder="e.g. 08641 or Trenton, NJ"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn primary" id="pm_go">🗺 Open Google Maps search</button>
+        <button class="btn" id="pm_copy">⧉ Copy link</button>
+      </div>
+      <div id="pm_out" class="muted" style="font-size:12px;margin-top:10px;word-break:break-all"></div>
+    </div>`);
+  const buildUrl=()=>{ const s=$('#pm_svc').value.trim(), z=$('#pm_zip').value.trim(); if(!s||!z) return null;
+    return 'https://www.google.com/maps/search/'+encodeURIComponent(s+' near '+z); };
+  $('#pm_go').onclick=()=>{ const u=buildUrl(); if(!u) return alert('Enter a service and a ZIP / city.'); window.open(u,'_blank'); $('#pm_out').innerHTML='Opened: <a href="'+esc(u)+'" target="_blank">'+esc(u)+'</a>'; };
+  $('#pm_copy').onclick=async ()=>{ const u=buildUrl(); if(!u) return alert('Enter a service and a ZIP / city.'); try{ await navigator.clipboard.writeText(u); }catch(_){}; $('#pm_out').innerHTML='Copied: <a href="'+esc(u)+'" target="_blank">'+esc(u)+'</a>'; };
+}
 function pnCsvDialerUI(){
   openModal(`<div class="shd"><h3>Upload CSV → Dialer</h3><button class="sclose" onclick="closeModal()">×</button></div>
     <div class="sbd">
       <div class="muted" style="font-size:13px;margin-bottom:10px">Columns are matched by <b>header name</b> (any order). Recognized: Title/Business · Name/Contact · Phone · Email · Address · City · State · Industry · Dispo · Notes · Website. Rows go straight into the dialer's call list (crm_leads).</div>
+      <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Auto-tag every uploaded lead</div>
+      <div class="row2">
+        <div class="field"><label>Solicitation #</label><input id="cd_sol" placeholder="e.g. FA448426Q0020"></div>
+        <div class="field"><label>State</label><input id="cd_state" placeholder="e.g. NJ"></div>
+      </div>
+      <div class="muted" style="font-size:11px;margin:-4px 0 10px">Each value becomes a tag on every imported lead, so you can sort &amp; filter by solicitation and state in the dialer.</div>
       <input type="file" id="cd_file" accept=".csv" class="field-input" style="border:1px solid var(--line);border-radius:8px;padding:8px">
       <div id="cd_out" style="margin-top:10px"></div>
     </div>`);
-  $('#cd_file').onchange=e=>{ const f=e.target.files?.[0]; if(!f) return; const rd=new FileReader(); rd.onload=ev=>cdParseAndPush(ev.target.result); rd.readAsText(f); };
+  $('#cd_file').onchange=e=>{ const f=e.target.files?.[0]; if(!f) return; const rd=new FileReader(); rd.onload=ev=>cdParseAndPush(ev.target.result, $('#cd_sol').value.trim(), $('#cd_state').value.trim()); rd.readAsText(f); };
+}
+// ensure a crm_tag exists (by name), return its id — mirrors the dialer's tags
+async function cdEnsureTag(name, crmHdrRep){
+  name=(name||'').trim(); if(!name) return null;
+  try{
+    const got=await fetch(`${SB_URL}/rest/v1/crm_tags?name=eq.${encodeURIComponent(name)}&select=id&limit=1`,{headers:crmHdrRep}).then(r=>r.ok?r.json():[]);
+    if(got&&got[0]) return got[0].id;
+    const colors=['#1a73e8','#0f9d58','#d93025','#d97706','#7c3aed','#0891b2'];
+    const r=await fetch(`${SB_URL}/rest/v1/crm_tags`,{method:'POST',headers:crmHdrRep,body:JSON.stringify({name, color:colors[Math.floor(Math.random()*colors.length)]})});
+    const j=r.ok?await r.json():[]; return (j[0]||{}).id||null;
+  }catch(_){ return null; }
 }
 function cdSplit(line){ const out=[];let cur='',q=false; for(let i=0;i<line.length;i++){const c=line[i]; if(c==='"'){ if(q&&line[i+1]==='"'){cur+='"';i++;} else q=!q; } else if(c===','&&!q){out.push(cur);cur='';} else cur+=c;} out.push(cur); return out.map(s=>s.trim()); }
-async function cdParseAndPush(text){
+async function cdParseAndPush(text, solNum, stateTag){
   const out=$('#cd_out'); const lines=text.split(/\r?\n/).filter(l=>l.trim());
   if(!lines.length){ out.innerHTML='<div class="banner bad">Empty file.</div>'; return; }
   const header=cdSplit(lines[0]).map(h=>CSV_DIALER_MAP[h.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim()]||null);
@@ -3810,15 +3886,28 @@ async function cdParseAndPush(text){
     header.forEach((f,i)=>{ if(f&&cols[i]) row[f]=cols[i]; });
     if(!row.business_name) continue;
     if(row.dispo) row.dispo=String(row.dispo).toLowerCase().replace(/\s+/g,'_').replace(/[^a-z_]/g,'')||'new';
+    if(solNum) row.solicitation_number=solNum;   // carried on the lead too
+    if(stateTag && !row.state) row.state=stateTag;
     rows.push(row);
   }
   if(!rows.length){ out.innerHTML='<div class="banner bad">No valid rows.</div>'; return; }
   out.innerHTML=`<div class="muted">Pushing ${rows.length} lead(s) to the dialer…</div>`;
-  const crmHdr={'Content-Type':'application/json',apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,Prefer:'return=minimal'};
-  let ok=0,fail=0;
+  const crmHdrRep={'Content-Type':'application/json',apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,Prefer:'return=representation'};
+  // pre-create the solicitation + state tags once
+  const tagIds=[];
+  if(solNum){ const t=await cdEnsureTag(solNum, crmHdrRep); if(t) tagIds.push(t); }
+  if(stateTag){ const t=await cdEnsureTag(stateTag.toUpperCase(), crmHdrRep); if(t) tagIds.push(t); }
+  let ok=0,fail=0; const newIds=[];
   for(let i=0;i<rows.length;i+=50){ const batch=rows.slice(i,i+50);
-    try{ const r=await fetch(`${SB_URL}/rest/v1/crm_leads`,{method:'POST',headers:crmHdr,body:JSON.stringify(batch)}); r.ok?ok+=batch.length:fail+=batch.length; }catch{ fail+=batch.length; } }
-  out.innerHTML=`<div class="banner info">✓ ${ok} lead(s) pushed to the dialer${fail?` · ${fail} failed`:''}. Open the ConnexionTwo Dialer to start calling.</div>`;
+    try{ const r=await fetch(`${SB_URL}/rest/v1/crm_leads`,{method:'POST',headers:crmHdrRep,body:JSON.stringify(batch)});
+      if(r.ok){ const saved=await r.json().catch(()=>[]); (saved||[]).forEach(l=>l&&l.id&&newIds.push(l.id)); ok+=batch.length; } else fail+=batch.length;
+    }catch{ fail+=batch.length; } }
+  // link the tags to every new lead
+  if(tagIds.length && newIds.length){
+    const links=[]; newIds.forEach(lid=>tagIds.forEach(tid=>links.push({lead_id:lid, tag_id:tid})));
+    for(let i=0;i<links.length;i+=200){ try{ await fetch(`${SB_URL}/rest/v1/crm_lead_tags?on_conflict=lead_id,tag_id`,{method:'POST',headers:{...crmHdrRep,Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify(links.slice(i,i+200))}); }catch(_){} }
+  }
+  out.innerHTML=`<div class="banner info">✓ ${ok} lead(s) pushed to the dialer${fail?` · ${fail} failed`:''}${tagIds.length?` · tagged ${solNum?'“'+esc(solNum)+'”':''}${solNum&&stateTag?' + ':''}${stateTag?'“'+esc(stateTag.toUpperCase())+'”':''}`:''}. Open the ConnexionTwo Dialer to start calling.</div>`;
 }
 /* ── Yelp business import (official Fusion API — needs a "yelp" API key) ── */
 function pnYelpUI(){
