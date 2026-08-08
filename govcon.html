@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r35-monitor-leads-2026-07-20';
+const GOVCON_BUILD = 'r39-full-consolidated-2026-08-08';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -353,7 +353,7 @@ async function renderDashboard() {
   const key=DASH_SORT;
   const STR_COLS=['title','agency','deadline','rec','stage'];
   rows.sort((a,b)=>{ let x=a[key],y=b[key];
-    if(STR_COLS.includes(key)){ x=String(x||' ').toLowerCase(); y=String(y||' ').toLowerCase(); return (x<y?-1:x>y?1:0)*DASH_DIR; }
+    if(STR_COLS.includes(key)){ x=String(x||'￿').toLowerCase(); y=String(y||'￿').toLowerCase(); return (x<y?-1:x>y?1:0)*DASH_DIR; }
     x=x==null?-1:x; y=y==null?-1:y; return (x-y)*DASH_DIR; });
 
   // every column is sortable — active column shows ▲/▼, the rest show a dim ↕
@@ -763,6 +763,11 @@ async function openReview(id){
         <div class="field"><label>Site visit date</label><input id="rf_sitevisit" type="date" value="${r.site_visit_date||''}"></div>
       </div>
       <div class="row3">
+        <div class="field"><label>Site visit time <span class="muted" style="font-weight:normal;font-size:11px">(auto)</span></label><input id="rf_sitevisit_time" value="${esc(d.site_visit_time||((d.site_visit&&(d.site_visit.dates||[])[0]||{}).start_time)||'')}" placeholder="e.g. 10:00 AM"></div>
+        <div class="field"><label>Site visit time zone <span class="muted" style="font-weight:normal;font-size:11px">(auto)</span></label><input id="rf_sitevisit_tz" value="${esc(d.site_visit_tz||((d.site_visit&&(d.site_visit.dates||[])[0]||{}).time_zone)||'')}" placeholder="e.g. Eastern (ET)"></div>
+        <div class="field"></div>
+      </div>
+      <div class="row3">
         <div class="field"><label>Place of performance</label><input id="rf_pop" value="${esc(r.place_of_performance_raw||d.place_of_performance||r.location||'')}"></div>
         <div class="field"><label>Type</label><input id="rf_type" value="${esc(r.opportunity_type||'')}" placeholder="RFQ / RFP / combined"></div>
         <div class="field"><label>Est. value ($)</label><input id="rf_value" type="number" value="${r.estimated_value??''}"></div>
@@ -919,6 +924,8 @@ async function rvSaveFields(){
   const r=window._RV.rfp, st=$('#rvActStatus'); st.textContent='Saving…';
   const details=Object.assign({}, r.details||{});
   const sol=$('#rf_solnum').value.trim(); if(sol) details.solicitation_number=sol; else delete details.solicitation_number;
+  const svTime=$('#rf_sitevisit_time')?$('#rf_sitevisit_time').value.trim():''; if(svTime) details.site_visit_time=svTime; else delete details.site_visit_time;
+  const svTz=$('#rf_sitevisit_tz')?$('#rf_sitevisit_tz').value.trim():''; if(svTz) details.site_visit_tz=svTz; else delete details.site_visit_tz;
   const pop=$('#rf_pop').value.trim();
   const patch={
     agency:$('#rf_agency').value.trim()||null, category:$('#rf_naics').value.trim()||null,
@@ -1859,12 +1866,67 @@ async function renderAutopilot() {
     </div>
     ${aiProviderCard(s)}
     ${partnerResearchCard(s)}
+    <div id="samRegCard"><div class="card" style="margin-top:14px"><div class="muted">Loading SAM registration…</div></div></div>
     <div id="emailSettingsCard"><div class="card" style="margin-top:14px"><div class="muted">Loading email settings…</div></div></div>
     ${automationRulesCard(s)}`;
   wireAutomationRules();
   wireAiProvider();
   aiRefreshStatus();
   renderEmailSettings();
+  renderSamRegistration();
+}
+// ── SAM.gov registration: read your entity, pull NAICS into your profile ─────
+async function renderSamRegistration(){
+  const host=$('#samRegCard'); if(!host) return;
+  let prof={}; try{ const rows=await api(`govcon_profiles?user_id=eq.${SESSION.user.id}&select=uei,cage,primary_naics,secondary_naics,sam_entity`); prof=rows[0]||{}; }catch(_){}
+  window._SAM_PROF=prof; const e=prof.sam_entity||{};
+  const naicsRows=(e.naics||[]).map(n=>`<label class="rfp" style="padding:5px 8px;margin-bottom:4px;display:flex;gap:8px;align-items:center;font-size:12.5px">
+    <input type="checkbox" class="sam_naics" data-code="${esc(n.code)}" checked style="width:auto">
+    <b>${esc(n.code)}</b> <span class="muted">${esc(n.description||'')}</span>${n.primary?'<span class="pill" style="font-size:10px">primary</span>':''}${n.small_business?'<span class="pill" style="font-size:10px;background:#dbeafe;color:#1e40af">SB</span>':''}</label>`).join('');
+  host.innerHTML=`<div class="card" style="margin-top:14px">
+    <h2 class="section" style="margin-top:0">🏛 SAM.gov registration</h2>
+    <div class="muted" style="font-size:12.5px;margin-bottom:10px">Read your own SAM.gov entity to pull your registered <b>NAICS codes</b> (and legal name, CAGE, expiration) directly. Needs your SAM key (Settings → API keys, provider <b>sam.gov</b>) and your UEI.</div>
+    <div class="row2">
+      <div class="field"><label>UEI</label><input id="sam_uei" value="${esc(prof.uei||'')}" placeholder="12-character UEI"></div>
+      <div class="field" style="display:flex;align-items:flex-end;gap:6px"><button class="btn primary" onclick="readSamRegistration()">🔄 Read my SAM.gov registration</button></div>
+    </div>
+    <div id="samRegStatus" class="muted" style="font-size:12px;margin:4px 0"></div>
+    ${e.legal_name?`<div class="banner info" style="font-size:12.5px">${esc(e.legal_name)}${e.cage?' · CAGE '+esc(e.cage):''}${e.active?' · <b style="color:var(--good)">Active</b>':' · <b style="color:var(--bad)">Inactive</b>'}${e.expiration?' · expires '+esc(e.expiration):''}${e.read_at?' · read '+fmtDate(e.read_at):''}</div>`:''}
+    ${(e.naics||[]).length?`<h2 class="section" style="margin-top:8px">Registered NAICS (${e.naics.length})</h2>
+      <div id="samNaicsList">${naicsRows}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+        <button class="btn sm primary" onclick="samApplyNaics('profile')">Set as my profile NAICS</button>
+        <button class="btn sm" onclick="samApplyNaics('watch')">Add to Autopilot watched NAICS</button>
+        <span id="samApplyStatus" class="muted" style="font-size:12px"></span>
+      </div>`:''}
+  </div>`;
+}
+async function readSamRegistration(){
+  const st=$('#samRegStatus'); if(st) st.textContent='Reading from SAM.gov…';
+  const uei=$('#sam_uei')?$('#sam_uei').value.trim():'';
+  try{
+    // save UEI first so the function can find it
+    if(uei) await api('govcon_profiles?on_conflict=user_id',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:JSON.stringify({user_id:SESSION.user.id, uei})});
+    const r=await callFn('govcon-sam-profile',{action:'read', uei});
+    if(st) st.textContent='✓ Read '+((r.entity&&r.entity.naics||[]).length)+' NAICS code(s).';
+    renderSamRegistration();
+  }catch(e){ if(st) st.textContent='✗ '+e.message; }
+}
+async function samApplyNaics(where){
+  const codes=[...document.querySelectorAll('.sam_naics:checked')].map(c=>c.dataset.code);
+  if(!codes.length) return toast('Select at least one NAICS');
+  const st=$('#samApplyStatus'); if(st) st.textContent='Saving…';
+  try{
+    if(where==='profile'){
+      await api('govcon_profiles?on_conflict=user_id',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:JSON.stringify({user_id:SESSION.user.id, primary_naics:[codes[0]], secondary_naics:codes.slice(1)})});
+      if(st) st.textContent='✓ Saved to your profile NAICS.';
+    } else {
+      const rows=await api(`govcon_autopilot_settings?owner=eq.${SESSION.user.id}&select=naics_codes`).catch(()=>[]);
+      const cur=(rows[0]||{}).naics_codes||[]; const merged=[...new Set([...cur.map(String), ...codes])];
+      await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify({owner:SESSION.user.id, naics_codes:merged, updated_at:new Date().toISOString()})});
+      if(st) st.textContent='✓ Added to Autopilot watched NAICS.';
+    }
+  }catch(e){ if(st) st.textContent=/relation|column/.test(e.message)?'Run govcon_migration_21.sql first.':'Failed: '+e.message; }
 }
 // ── Email (Brevo) settings: senders you can send "from" + editable templates ─
 const EMAIL_PLACEHOLDERS = '{{name}} {{company}} {{contract}} {{solicitation}} {{place_of_performance}} {{site_visit_date}} {{quote_deadline}} {{my_name}} {{my_company}}';
@@ -2492,29 +2554,57 @@ async function runAi(toolId) {
 }
 
 /* ═══════════════ PIPELINE ═══════════════ */
-// STAGE KEYS are the permanent IDs (never change — automations & the DB depend
-// on them). The DISPLAY label is editable and stored in settings.pipeline_stage_labels.
-const STAGES = [['lead','Lead'],['qualified','Qualified'],['in_development','In Development'],['submitted','Submitted'],['awarded','Awarded'],['lost','Lost']];
-let STAGE_LABELS = {};   // {stageKey: customLabel}
-const stageLabel = (k) => STAGE_LABELS[k] || (STAGES.find(s=>s[0]===k)?.[1]) || k;
+// Built-in stage IDs are permanent (automations + the DB depend on them). You can
+// RENAME any stage, ADD new stages (each new one gets a numeric ID so automations
+// don't break), and REMOVE stages. The full ordered list lives in
+// settings.pipeline_stages ([[id,label],…]); label-only overrides in
+// pipeline_stage_labels are still honored for backward compatibility.
+const DEFAULT_STAGES = [['lead','Lead'],['qualified','Qualified'],['in_development','In Development'],['submitted','Submitted'],['awarded','Awarded'],['lost','Lost']];
+let STAGES = DEFAULT_STAGES.map(s=>s.slice());
+let STAGE_LABELS = {};   // {stageId: customLabel} (legacy label overrides)
+const stageLabel = (k) => { const s=STAGES.find(x=>x[0]===k); return STAGE_LABELS[k] || (s?s[1]:null) || k; };
 async function loadStageLabels(){
-  try{ const rows=await api(`govcon_autopilot_settings?owner=eq.${SESSION.user.id}&select=pipeline_stage_labels`); STAGE_LABELS=(rows[0]||{}).pipeline_stage_labels||{}; }catch(_){ STAGE_LABELS={}; }
-}
-function editStageNames(){
-  openModal(`<div class="shd"><h3>Edit pipeline stage names</h3><button class="sclose" onclick="closeModal()">×</button></div>
-    <div class="sbd">
-      <div class="muted" style="font-size:12px;margin-bottom:10px">Rename how each stage is shown. The underlying stage <b>ID</b> never changes, so drag-and-drop and automations keep working.</div>
-      ${STAGES.map(([k,def])=>`<div class="field"><label>${esc(def)} <span class="muted" style="font-weight:normal">(id: <code>${k}</code>)</span></label><input id="sl_${k}" value="${esc(stageLabel(k))}"></div>`).join('')}
-      <button class="btn primary" onclick="saveStageNames()">Save names</button>
-      <span id="slStatus" class="muted" style="font-size:12px;margin-left:8px"></span>
-    </div>`);
-}
-async function saveStageNames(){
-  const map={}; STAGES.forEach(([k,def])=>{ const v=($('#sl_'+k)?.value||'').trim(); if(v && v!==def) map[k]=v; });
   try{
-    await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify({owner:SESSION.user.id, pipeline_stage_labels:map, updated_at:new Date().toISOString()})});
-    STAGE_LABELS=map; const st=$('#slStatus'); if(st) st.textContent='✓ Saved'; closeModal(); renderPipeline();
-  }catch(e){ const st=$('#slStatus'); if(st) st.textContent=/column|pipeline_stage_labels/.test(e.message)?'Run govcon_migration_19.sql first.':'Failed: '+e.message; }
+    const rows=await api(`govcon_autopilot_settings?owner=eq.${SESSION.user.id}&select=pipeline_stages,pipeline_stage_labels`);
+    const s=rows[0]||{}; STAGE_LABELS=s.pipeline_stage_labels||{};
+    const custom=s.pipeline_stages;
+    if(Array.isArray(custom) && custom.length){ STAGES = custom.map(x=>[String(x[0]), String(x[1]||x[0])]); }
+    else { STAGES = DEFAULT_STAGES.map(([k,l])=>[k, STAGE_LABELS[k]||l]); }
+  }catch(_){ STAGES=DEFAULT_STAGES.map(s=>s.slice()); STAGE_LABELS={}; }
+}
+// next numeric id not already used (built-ins are words, customs are numbers)
+function nextStageId(list){ let n=0; list.forEach(([id])=>{ if(/^\d+$/.test(id)) n=Math.max(n, +id); }); return String(n+1); }
+let STAGE_EDIT=[];   // working copy while the manager is open
+function editStageNames(){
+  STAGE_EDIT = STAGES.map(s=>s.slice());
+  openModal(`<div class="shd"><h3>Manage pipeline stages</h3><button class="sclose" onclick="closeModal()">×</button></div>
+    <div class="sbd">
+      <div class="muted" style="font-size:12px;margin-bottom:10px">Rename, reorder, add, or remove stages. Built-in stages keep their word ID; new stages get a <b>number ID</b> so drag-and-drop and automations keep working. <b>Removing a stage that still has cards</b> leaves those cards on that hidden stage — move them first.</div>
+      <div id="stageEditList"></div>
+      <button class="btn sm" onclick="stageAdd()" style="margin-top:8px">+ Add stage</button>
+      <div style="display:flex;gap:8px;margin-top:14px"><button class="btn primary" onclick="saveStageNames()">Save stages</button><span id="slStatus" class="muted" style="font-size:12px"></span></div>
+    </div>`);
+  stageEditRender();
+}
+function stageEditRender(){
+  const host=$('#stageEditList'); if(!host) return;
+  host.innerHTML=STAGE_EDIT.map(([id,label],i)=>`<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+    <button class="btn sm" title="Move up" ${i===0?'disabled':''} onclick="stageMove(${i},-1)" style="padding:2px 7px">↑</button>
+    <button class="btn sm" title="Move down" ${i===STAGE_EDIT.length-1?'disabled':''} onclick="stageMove(${i},1)" style="padding:2px 7px">↓</button>
+    <input value="${esc(label)}" oninput="STAGE_EDIT[${i}][1]=this.value" style="flex:1">
+    <span class="muted" style="font-size:11px;white-space:nowrap">id: <code>${esc(id)}</code></span>
+    <button class="btn sm" style="color:var(--bad);padding:2px 8px" title="Remove stage" onclick="stageDel(${i})">✕</button>
+  </div>`).join('');
+}
+function stageAdd(){ STAGE_EDIT.push([nextStageId(STAGE_EDIT), 'New Stage']); stageEditRender(); }
+function stageDel(i){ if(STAGE_EDIT.length<=1) return; STAGE_EDIT.splice(i,1); stageEditRender(); }
+function stageMove(i,d){ const j=i+d; if(j<0||j>=STAGE_EDIT.length) return; const t=STAGE_EDIT[i]; STAGE_EDIT[i]=STAGE_EDIT[j]; STAGE_EDIT[j]=t; stageEditRender(); }
+async function saveStageNames(){
+  const list=STAGE_EDIT.map(([id,label])=>[String(id), String(label||id).trim()||String(id)]);
+  try{
+    await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify({owner:SESSION.user.id, pipeline_stages:list, updated_at:new Date().toISOString()})});
+    STAGES=list; const st=$('#slStatus'); if(st) st.textContent='✓ Saved'; closeModal(); renderPipeline();
+  }catch(e){ const st=$('#slStatus'); if(st) st.textContent=/column|pipeline_stages/.test(e.message)?'Run govcon_migration_20.sql first (adds custom stages).':'Failed: '+e.message; }
 }
 let PIPE_VIEW = 'board';   // 'board' | 'grid'
 let PIPE_ITEMS = [];
@@ -2636,12 +2726,20 @@ async function openDocSigned(storedPath){
 function setPipeView(v){ PIPE_VIEW=v; renderPipeline(); }
 
 function pipeBoard() {
-  return `<div class="board">${STAGES.map(([key,label])=>{
+  const known = new Set(STAGES.map(s=>s[0]));
+  // any card sitting on a stage that no longer exists → catch-all "Unassigned"
+  const orphans = PIPE_ITEMS.filter(i=>!known.has(i.stage));
+  const cols = STAGES.map(([key])=>{
     const col = PIPE_ITEMS.filter(i=>i.stage===key);
     return `<div class="col" data-stage="${key}" ondragover="event.preventDefault()">
       <h4>${esc(stageLabel(key))}<span class="n">${col.length}</span></h4>
       ${col.map(pipeCard).join('')}</div>`;
-  }).join('')}</div>
+  });
+  if(orphans.length){ cols.push(`<div class="col" data-stage="${esc(STAGES[0][0])}" ondragover="event.preventDefault()">
+    <h4 style="color:var(--bad)">Unassigned<span class="n">${orphans.length}</span></h4>
+    <div class="muted" style="font-size:11px;margin-bottom:6px">Stage removed — drag these to a stage.</div>
+    ${orphans.map(pipeCard).join('')}</div>`); }
+  return `<div class="board">${cols.join('')}</div>
   <div class="muted" style="font-size:12px;margin-top:8px">Drag a card between columns to change its stage, or click it to view / edit the full lead.</div>`;
 }
 function pipeCard(i) {
@@ -2658,7 +2756,15 @@ function pipeCard(i) {
       <button class="btn sm" title="Edit / open" onclick="openLead('${i.id}')" style="padding:2px 8px">✎</button>
       <button class="btn sm" title="Remove from pipeline" style="padding:2px 8px;color:var(--bad)" onclick="pipeRemove('${i.id}')">✕</button>
     </div>
+    <div style="margin-top:5px" onclick="event.stopPropagation()">
+      <button class="btn sm" style="width:100%;padding:3px 8px" title="Push this contract's researched partners into the Auto Dialer" onclick="pipeToDialer('${i.id}')">📞 Upload partners to dialer</button>
+    </div>
   </div>`;
+}
+// push a pipeline card's contract partners into the dialer (crm_leads)
+function pipeToDialer(itemId){
+  const it=(PIPE_ITEMS||[]).find(x=>x.id===itemId); if(!it) return;
+  const r=it.govcon_rfps||{}; pushContractPartnersToDialer(it.rfp_id, r.title||null, null);
 }
 // change a pipeline item's stage from the board card (same as dragging it)
 async function pipeSetStage(itemId, stage){
@@ -2818,6 +2924,29 @@ async function openLead(itemId) {
         <div class="field"><label>Category / NAICS</label><input id="ld_category" value="${esc(r.category||'')}"></div>
         <div class="field"><label>Set-aside</label><input id="ld_setaside" value="${esc(r.set_aside||'')}"></div>
       </div>
+
+      <h2 class="section">Solicitation details</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 8px">Auto-filled from the analysis / SAM; edit freely. Same fields as RFP Discovery.</div>
+      <div class="row3">
+        <div class="field"><label>Solicitation #</label><input id="ld_det_solnum" value="${esc((r.details||{}).solicitation_number||'')}"></div>
+        <div class="field"><label>PSC</label><input id="ld_det_psc" value="${esc(r.psc||(r.details||{}).psc||'')}"></div>
+        <div class="field"><label>Notice ID</label><input value="${esc(String(r.notice_id||'').replace(/^sam:/,''))}" readonly></div>
+      </div>
+      <div class="row3">
+        <div class="field"><label>Response deadline</label><input id="ld_det_deadline" type="date" value="${r.deadline||''}"></div>
+        <div class="field"><label>Question deadline</label><input id="ld_det_qdeadline" type="date" value="${r.question_deadline||''}"></div>
+        <div class="field"><label>Type</label><input id="ld_det_type" value="${esc(r.opportunity_type||'')}" placeholder="RFQ / RFP / combined"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Est. value ($)</label><input id="ld_det_value" type="number" value="${r.estimated_value??''}"></div>
+        <div class="field"><label>Set-aside detail</label><input id="ld_det_setaside" value="${esc(r.set_aside||'')}" readonly></div>
+      </div>
+
+      <h2 class="section">Site visits <span class="muted" style="font-weight:normal;font-size:12px">— date, time, time zone &amp; location (add as many as you need)</span></h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 8px">Auto-filled from the analysis; edit freely. The first visit's date/time feeds the calendar and the automated 24h/2h reminders.</div>
+      <div id="ld_sitevisits"></div>
+      <button class="btn sm" onclick="leadSvAdd()" style="margin-top:4px">+ Add site visit</button>
+
       <div class="row2">
         <div class="field"><label>Budget min ($)</label><input id="ld_bmin" type="number" value="${r.budget_min??''}"></div>
         <div class="field"><label>Budget max ($)</label><input id="ld_bmax" type="number" value="${r.budget_max??''}"></div>
@@ -2885,6 +3014,8 @@ async function openLead(itemId) {
         <span class="muted" style="font-size:12px" id="ld_scriptstatus"></span>
       </div>
       <textarea id="ld_script" style="width:100%;min-height:240px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.5">${esc((r.details||{}).call_script||'')}</textarea>
+
+      ${leadFindSubsUI(r)}
 
       <h2 class="section">✉ Emails &amp; reminders</h2>
       <div class="muted" style="font-size:12px;margin:-6px 0 10px">Save subcontractor &amp; COR contacts, send reminders and questions through Brevo (from an address you choose, with CC/BCC), and read the whole conversation as a thread. Set up your sender + templates in <b>Settings → Email</b>.</div>
@@ -2965,6 +3096,12 @@ async function openLead(itemId) {
   $('#ld_pushpartners').onclick = ()=>pushContractPartnersToDialer(r.id, r.title, $('#ld_scriptstatus'));
   // emails & reminders (Brevo threads)
   emLoadContacts(r.id); emLoadThreads(r.id);
+  // multiple site visits editor
+  leadSvInit(r);
+  // find-subcontractors CSV → dialer, auto-tagged with this contract's solicitation + state
+  const lfsCsv=$('#lfs_csv');
+  if(lfsCsv) lfsCsv.onchange=e=>{ const f=e.target.files?.[0]; if(!f) return; const out=$('#lfs_out'); if(out) out.textContent='Uploading…';
+    const rd=new FileReader(); rd.onload=async ev=>{ await cdParseAndPush(ev.target.result, (r.details||{}).solicitation_number||leadSolNum(r)||'', leadContractState(r), out); }; rd.readAsText(f); };
   // template generator (async — fill after the modal is up)
   tplSectionHtml(r).then(html=>{ const host=$('#tplSection'); if(!host) return; host.innerHTML=html;
     if($('#tpl_pick')){ tplRenderFields(); $('#tpl_pick').onchange=tplRenderFields; $('#tpl_gen').onclick=tplGenerate;
@@ -2982,6 +3119,21 @@ async function saveLead(itemId, rfpId) {
   const folderIn = ($('#ld_folder_name') ? $('#ld_folder_name').value : '').trim();
   if(solIn) details.solicitation_number = solIn; else delete details.solicitation_number;
   if(folderIn) details.folder_name = cleanFolder(folderIn); else delete details.folder_name;
+  // solicitation-detail overrides (added: PSC, site-visit time/tz saved to details)
+  const detSol=($('#ld_det_solnum')?$('#ld_det_solnum').value.trim():''); if(detSol) details.solicitation_number=detSol;
+  const detPsc=($('#ld_det_psc')?$('#ld_det_psc').value.trim():''); if(detPsc) details.psc=detPsc; else delete details.psc;
+  // multiple site visits → details.site_visit.dates; first visit feeds calendar/reminders
+  if(document.getElementById('ld_sitevisits')){
+    leadSvCollectFromDom();
+    const visits=_LEAD_SV.filter(v=>v.date||v.start_time||v.meeting_location);
+    const svObj=Object.assign({}, details.site_visit||{});
+    svObj.dates=visits.map(v=>({date:v.date||'', start_time:v.start_time||'', time_zone:v.time_zone||'', meeting_location:v.meeting_location||''}));
+    if(visits.length){ svObj.mentioned=true; if(svObj.status==='none'||!svObj.status) svObj.status='not_stated'; }
+    details.site_visit=svObj;
+    const first=visits[0]||{};
+    if(first.start_time) details.site_visit_time=first.start_time; else delete details.site_visit_time;
+    if(first.time_zone) details.site_visit_tz=first.time_zone; else delete details.site_visit_tz;
+  }
   // contracting officers / points of contact
   const setDet=(k,id)=>{ const v=($('#'+id)?$('#'+id).value:'').trim(); if(v) details[k]=v; else delete details[k]; };
   setDet('contracting_officer','ld_co1');   setDet('co_email','ld_co1_email');   setDet('co_phone','ld_co1_phone');
@@ -2994,6 +3146,11 @@ async function saveLead(itemId, rfpId) {
     budget_min:$('#ld_bmin').value===''?null:+$('#ld_bmin').value,
     budget_max:$('#ld_bmax').value===''?null:+$('#ld_bmax').value,
     url:$('#ld_url').value.trim()||null, description:$('#ld_desc').value.trim()||null,
+    psc: $('#ld_det_psc')?($('#ld_det_psc').value.trim()||null):undefined,
+    question_deadline: $('#ld_det_qdeadline')?($('#ld_det_qdeadline').value||null):undefined,
+    site_visit_date: document.getElementById('ld_sitevisits')?((_LEAD_SV.find(v=>v.date)||{}).date||null):undefined,
+    opportunity_type: $('#ld_det_type')?($('#ld_det_type').value.trim()||null):undefined,
+    estimated_value: $('#ld_det_value')?($('#ld_det_value').value===''?null:+$('#ld_det_value').value):undefined,
     capability_matrix: MATRICES.matrixHost, submission_matrix: MATRICES.submatrixHost,
     details,
     place_of_performance_raw: $('#ld_pop')?($('#ld_pop').value.trim()||null):undefined,
@@ -3087,6 +3244,51 @@ async function removeLead(itemId) {
   toast('Removed from pipeline · Monitor turned off');
   closeModal();
   renderPipeline();
+}
+
+/* ═══════════════ MULTIPLE SITE VISITS (pipeline lead box) ═══════════════ */
+let _LEAD_SV=[];
+function leadSvInit(r){
+  const dates=(((r.details||{}).site_visit)||{}).dates||[];
+  _LEAD_SV = dates.length ? dates.map(d=>({date:d.date||'',start_time:d.start_time||'',time_zone:d.time_zone||'',meeting_location:d.meeting_location||d.full_address||''}))
+    : (r.site_visit_date?[{date:r.site_visit_date, start_time:(r.details||{}).site_visit_time||'', time_zone:(r.details||{}).site_visit_tz||'', meeting_location:''}]:[]);
+  renderLeadSiteVisits();
+}
+function renderLeadSiteVisits(){
+  const host=document.getElementById('ld_sitevisits'); if(!host) return;
+  host.innerHTML = _LEAD_SV.length ? _LEAD_SV.map((v,i)=>`<div class="rfp" style="padding:8px 10px;margin-bottom:6px">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Site visit ${i+1}</div>
+    <div class="row3">
+      <div class="field"><label>Date</label><input type="date" data-sv="${i}" data-k="date" value="${esc(v.date||'')}"></div>
+      <div class="field"><label>Time</label><input data-sv="${i}" data-k="start_time" value="${esc(v.start_time||'')}" placeholder="e.g. 10:00 AM"></div>
+      <div class="field"><label>Time zone</label><input data-sv="${i}" data-k="time_zone" value="${esc(v.time_zone||'')}" placeholder="e.g. Eastern (ET)"></div>
+    </div>
+    <div class="field"><label>Location</label><input data-sv="${i}" data-k="meeting_location" value="${esc(v.meeting_location||'')}" placeholder="Meeting location / full address"></div>
+    <button class="btn sm" style="color:var(--bad);padding:2px 8px" onclick="leadSvDel(${i})">✕ Remove this visit</button>
+  </div>`).join('') : '<div class="muted" style="font-size:13px">No site visit on record. Click “+ Add site visit”.</div>';
+}
+function leadSvCollectFromDom(){ document.querySelectorAll('#ld_sitevisits [data-sv]').forEach(el=>{ const i=+el.dataset.sv, k=el.dataset.k; if(_LEAD_SV[i]) _LEAD_SV[i][k]=el.value; }); }
+function leadSvAdd(){ leadSvCollectFromDom(); _LEAD_SV.push({date:'',start_time:'',time_zone:'',meeting_location:''}); renderLeadSiteVisits(); }
+function leadSvDel(i){ leadSvCollectFromDom(); _LEAD_SV.splice(i,1); renderLeadSiteVisits(); }
+
+/* ═══════════════ FIND SUBCONTRACTORS (Google Maps + CSV→dialer) in the card ═══════════════ */
+function leadContractState(r){ const d=r.details||{}; return (d.pop&&d.pop.state)||r.pop_state||d.pop_state||''; }
+function leadFindSubsUI(r){
+  const state=leadContractState(r); const sol=(r.details||{}).solicitation_number||leadSolNum(r)||'';
+  const build=()=>{ const s=(document.getElementById('lfs_svc').value||'').trim(); const z=(document.getElementById('lfs_zip').value||'').trim(); if(!s||!z) return null; return 'https://www.google.com/maps/search/'+encodeURIComponent(s+' near '+z); };
+  return `<h2 class="section">Find subcontractors for this contract</h2>
+    <div class="muted" style="font-size:12px;margin:-6px 0 8px">Search Google Maps by service + ZIP/county, then upload a CSV of who you find — it goes straight to the Auto Dialer, <b>auto-tagged</b> with this solicitation (${sol?esc(sol):'—'}) and state (${state?esc(state):'—'}).</div>
+    <div class="row3">
+      <div class="field"><label>Service / trade</label><input id="lfs_svc" placeholder="e.g. commercial window cleaning"></div>
+      <div class="field"><label>ZIP or county, state</label><input id="lfs_zip" placeholder="e.g. 08641 or Burlington County, NJ"></div>
+      <div class="field" style="display:flex;align-items:flex-end;gap:6px">
+        <button class="btn" onclick="(function(){const u='https://www.google.com/maps/search/'+encodeURIComponent(($('#lfs_svc').value||'').trim()+' near '+($('#lfs_zip').value||'').trim());if(!($('#lfs_svc').value||'').trim()||!($('#lfs_zip').value||'').trim())return alert('Enter a service and ZIP/county.');window.open(u,'_blank');})()">🗺 Open Maps</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px">
+      <label class="btn sm" style="cursor:pointer">⬆ Upload CSV → Dialer (auto-tag)<input id="lfs_csv" type="file" accept=".csv" hidden></label>
+      <span class="muted" id="lfs_out" style="font-size:12px"></span>
+    </div>`;
 }
 
 /* ═══════════════ EMAILS & REMINDERS (Brevo threads per solicitation) ═══════════════ */
@@ -3494,6 +3696,7 @@ async function renderPartners() {
         <button class="btn primary" onclick="pnImportUI()">⬆ Import companies (CSV)</button>
         <button class="btn" onclick="pnResearchAllPending()">🤖 Research all pending${rc.pending+rc.failed?` (${rc.pending+rc.failed})`:''}</button>
         <button class="btn" onclick="pnResearchUI()">🔎 Find new partners</button>
+        <button class="btn" onclick="pnMapSearchUI()">🗺 Google Maps search</button>
         <button class="btn" onclick="pnYelpUI()">🗺 Yelp</button>
         <button class="btn" onclick="pnCsvDialerUI()">⬆ CSV → Dialer</button>
         <button class="btn" onclick="pnDedupe()">Merge duplicates</button>
@@ -3790,18 +3993,53 @@ async function pushPartnersToDialer(ids){
       or similar) and push rows straight into crm_leads so the dialer can call.
       Columns are read by HEADER NAME, any order. ── */
 const CSV_DIALER_MAP={title:'business_name',business:'business_name','business name':'business_name',company:'business_name',name:'contact_name',contact:'contact_name','contact name':'contact_name',phone:'phone','phone number':'phone',tel:'phone',email:'email','e-mail':'email',address:'address',street:'address',city:'city',state:'state',county:'county',industry:'industry',category:'industry',dispo:'dispo',status:'dispo',notes:'notes',website:'website',site:'website',url:'website'};
+/* ── Google Maps search: find subcontractors by service + zip, get the link ── */
+function pnMapSearchUI(){
+  openModal(`<div class="shd"><h3>🗺 Find subcontractors on Google Maps</h3><button class="sclose" onclick="closeModal()">×</button></div>
+    <div class="sbd">
+      <div class="muted" style="font-size:13px;margin-bottom:10px">Enter the service you need and a ZIP code (or city). It opens a Google Maps search you can browse for local companies, then copy their info into <b>Import companies (CSV)</b> or <b>Add manually</b>.</div>
+      <div class="field"><label>Service / trade *</label><input id="pm_svc" placeholder="e.g. commercial window cleaning"></div>
+      <div class="field"><label>ZIP code or city, state *</label><input id="pm_zip" placeholder="e.g. 08641 or Trenton, NJ"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn primary" id="pm_go">🗺 Open Google Maps search</button>
+        <button class="btn" id="pm_copy">⧉ Copy link</button>
+      </div>
+      <div id="pm_out" class="muted" style="font-size:12px;margin-top:10px;word-break:break-all"></div>
+    </div>`);
+  const buildUrl=()=>{ const s=$('#pm_svc').value.trim(), z=$('#pm_zip').value.trim(); if(!s||!z) return null;
+    return 'https://www.google.com/maps/search/'+encodeURIComponent(s+' near '+z); };
+  $('#pm_go').onclick=()=>{ const u=buildUrl(); if(!u) return alert('Enter a service and a ZIP / city.'); window.open(u,'_blank'); $('#pm_out').innerHTML='Opened: <a href="'+esc(u)+'" target="_blank">'+esc(u)+'</a>'; };
+  $('#pm_copy').onclick=async ()=>{ const u=buildUrl(); if(!u) return alert('Enter a service and a ZIP / city.'); try{ await navigator.clipboard.writeText(u); }catch(_){}; $('#pm_out').innerHTML='Copied: <a href="'+esc(u)+'" target="_blank">'+esc(u)+'</a>'; };
+}
 function pnCsvDialerUI(){
   openModal(`<div class="shd"><h3>Upload CSV → Dialer</h3><button class="sclose" onclick="closeModal()">×</button></div>
     <div class="sbd">
       <div class="muted" style="font-size:13px;margin-bottom:10px">Columns are matched by <b>header name</b> (any order). Recognized: Title/Business · Name/Contact · Phone · Email · Address · City · State · Industry · Dispo · Notes · Website. Rows go straight into the dialer's call list (crm_leads).</div>
+      <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Auto-tag every uploaded lead</div>
+      <div class="row2">
+        <div class="field"><label>Solicitation #</label><input id="cd_sol" placeholder="e.g. FA448426Q0020"></div>
+        <div class="field"><label>State</label><input id="cd_state" placeholder="e.g. NJ"></div>
+      </div>
+      <div class="muted" style="font-size:11px;margin:-4px 0 10px">Each value becomes a tag on every imported lead, so you can sort &amp; filter by solicitation and state in the dialer.</div>
       <input type="file" id="cd_file" accept=".csv" class="field-input" style="border:1px solid var(--line);border-radius:8px;padding:8px">
       <div id="cd_out" style="margin-top:10px"></div>
     </div>`);
-  $('#cd_file').onchange=e=>{ const f=e.target.files?.[0]; if(!f) return; const rd=new FileReader(); rd.onload=ev=>cdParseAndPush(ev.target.result); rd.readAsText(f); };
+  $('#cd_file').onchange=e=>{ const f=e.target.files?.[0]; if(!f) return; const rd=new FileReader(); rd.onload=ev=>cdParseAndPush(ev.target.result, $('#cd_sol').value.trim(), $('#cd_state').value.trim()); rd.readAsText(f); };
+}
+// ensure a crm_tag exists (by name), return its id — mirrors the dialer's tags
+async function cdEnsureTag(name, crmHdrRep){
+  name=(name||'').trim(); if(!name) return null;
+  try{
+    const got=await fetch(`${SB_URL}/rest/v1/crm_tags?name=eq.${encodeURIComponent(name)}&select=id&limit=1`,{headers:crmHdrRep}).then(r=>r.ok?r.json():[]);
+    if(got&&got[0]) return got[0].id;
+    const colors=['#1a73e8','#0f9d58','#d93025','#d97706','#7c3aed','#0891b2'];
+    const r=await fetch(`${SB_URL}/rest/v1/crm_tags`,{method:'POST',headers:crmHdrRep,body:JSON.stringify({name, color:colors[Math.floor(Math.random()*colors.length)]})});
+    const j=r.ok?await r.json():[]; return (j[0]||{}).id||null;
+  }catch(_){ return null; }
 }
 function cdSplit(line){ const out=[];let cur='',q=false; for(let i=0;i<line.length;i++){const c=line[i]; if(c==='"'){ if(q&&line[i+1]==='"'){cur+='"';i++;} else q=!q; } else if(c===','&&!q){out.push(cur);cur='';} else cur+=c;} out.push(cur); return out.map(s=>s.trim()); }
-async function cdParseAndPush(text){
-  const out=$('#cd_out'); const lines=text.split(/\r?\n/).filter(l=>l.trim());
+async function cdParseAndPush(text, solNum, stateTag, outEl){
+  const out=outEl||$('#cd_out'); const lines=text.split(/\r?\n/).filter(l=>l.trim());
   if(!lines.length){ out.innerHTML='<div class="banner bad">Empty file.</div>'; return; }
   const header=cdSplit(lines[0]).map(h=>CSV_DIALER_MAP[h.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim()]||null);
   if(!header.includes('business_name')){ out.innerHTML='<div class="banner bad">No Title/Business/Company column found.</div>'; return; }
@@ -3810,15 +4048,28 @@ async function cdParseAndPush(text){
     header.forEach((f,i)=>{ if(f&&cols[i]) row[f]=cols[i]; });
     if(!row.business_name) continue;
     if(row.dispo) row.dispo=String(row.dispo).toLowerCase().replace(/\s+/g,'_').replace(/[^a-z_]/g,'')||'new';
+    if(solNum) row.solicitation_number=solNum;   // carried on the lead too
+    if(stateTag && !row.state) row.state=stateTag;
     rows.push(row);
   }
   if(!rows.length){ out.innerHTML='<div class="banner bad">No valid rows.</div>'; return; }
   out.innerHTML=`<div class="muted">Pushing ${rows.length} lead(s) to the dialer…</div>`;
-  const crmHdr={'Content-Type':'application/json',apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,Prefer:'return=minimal'};
-  let ok=0,fail=0;
+  const crmHdrRep={'Content-Type':'application/json',apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,Prefer:'return=representation'};
+  // pre-create the solicitation + state tags once
+  const tagIds=[];
+  if(solNum){ const t=await cdEnsureTag(solNum, crmHdrRep); if(t) tagIds.push(t); }
+  if(stateTag){ const t=await cdEnsureTag(stateTag.toUpperCase(), crmHdrRep); if(t) tagIds.push(t); }
+  let ok=0,fail=0; const newIds=[];
   for(let i=0;i<rows.length;i+=50){ const batch=rows.slice(i,i+50);
-    try{ const r=await fetch(`${SB_URL}/rest/v1/crm_leads`,{method:'POST',headers:crmHdr,body:JSON.stringify(batch)}); r.ok?ok+=batch.length:fail+=batch.length; }catch{ fail+=batch.length; } }
-  out.innerHTML=`<div class="banner info">✓ ${ok} lead(s) pushed to the dialer${fail?` · ${fail} failed`:''}. Open the ConnexionTwo Dialer to start calling.</div>`;
+    try{ const r=await fetch(`${SB_URL}/rest/v1/crm_leads`,{method:'POST',headers:crmHdrRep,body:JSON.stringify(batch)});
+      if(r.ok){ const saved=await r.json().catch(()=>[]); (saved||[]).forEach(l=>l&&l.id&&newIds.push(l.id)); ok+=batch.length; } else fail+=batch.length;
+    }catch{ fail+=batch.length; } }
+  // link the tags to every new lead
+  if(tagIds.length && newIds.length){
+    const links=[]; newIds.forEach(lid=>tagIds.forEach(tid=>links.push({lead_id:lid, tag_id:tid})));
+    for(let i=0;i<links.length;i+=200){ try{ await fetch(`${SB_URL}/rest/v1/crm_lead_tags?on_conflict=lead_id,tag_id`,{method:'POST',headers:{...crmHdrRep,Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify(links.slice(i,i+200))}); }catch(_){} }
+  }
+  out.innerHTML=`<div class="banner info">✓ ${ok} lead(s) pushed to the dialer${fail?` · ${fail} failed`:''}${tagIds.length?` · tagged ${solNum?'“'+esc(solNum)+'”':''}${solNum&&stateTag?' + ':''}${stateTag?'“'+esc(stateTag.toUpperCase())+'”':''}`:''}. Open the ConnexionTwo Dialer to start calling.</div>`;
 }
 /* ── Yelp business import (official Fusion API — needs a "yelp" API key) ── */
 function pnYelpUI(){
