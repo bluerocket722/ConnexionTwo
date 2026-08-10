@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r44-dialer-keys-fix-2026-08-10';
+const GOVCON_BUILD = 'r45-rec-override-workflow-2026-08-10';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -1139,6 +1139,7 @@ async function rvRenderAnalysis(){
       <span class="pill">v${a.version} · ${fmtDate(a.completed_at)}</span>
     </div>
     <div class="m" style="margin-bottom:8px">${esc(a.recommendation_reason||'')}</div>
+    ${recOverrideControl(a.recommendation, "rvSetRec(this.value)", 'rvRecStatus')}
     <div class="scores" style="margin-bottom:8px">${(a.hard_gates||[]).map(gateChip).join(' ')}</div>
     ${complianceCard((window._RV.rfp.details||{}).compliance || (a.decision_record||{}).compliance)}
     ${siteVisitCard((window._RV.rfp.details||{}).site_visit || (a.decision_record||{}).site_visit)}
@@ -1158,6 +1159,18 @@ async function rvRenderAnalysis(){
     <div id="rvActs"><div class="muted">Loading…</div></div>`;
   $('#rvWhy').onclick=rvWhy;
   rvLoadRows();
+}
+// Discovery: manually override the recommendation (e.g. Monitor → No-Bid).
+async function rvSetRec(rec){
+  const st=$('#rvRecStatus'); if(st) st.textContent='Saving…';
+  try{
+    await setRecommendation(window._RV.rfp.id, rec);
+    if(window._RV.analysis) window._RV.analysis.recommendation=rec;
+    const sum=Object.assign({}, (window._RV.rfp.details||{}).analysis_summary||{}, {recommendation:rec, recommendation_override:true});
+    window._RV.rfp.details=Object.assign({}, window._RV.rfp.details||{}, {analysis_summary:sum});
+    if(st) st.textContent='✓ Set to '+rec+' (saved)';
+    rvRenderAnalysis();
+  }catch(e){ if(st) st.textContent='Failed: '+e.message; }
 }
 async function rvWhy(){
   const box=$('#rvWhyBox'); const a=window._RV.analysis; if(!a) return;
@@ -1457,6 +1470,45 @@ async function rvArchive(){
 }
 
 const REC_COLOR = {'Strong Pursue':'#0b6b34','Pursue':'#0b6b34','Conditional Pursue':'#7a5b00','Monitor':'#555','Team':'#0054d1','No-Bid':'#b3261e'};
+// Recommendations you can set by hand (drives the boards + Monitor→Lead auto-add)
+const REC_OPTIONS = ['Strong Pursue','Pursue','Conditional Pursue','Monitor','Team','No-Bid'];
+// Manually override the AI recommendation (e.g. Monitor → No-Bid). Writes to
+// BOTH the analysis summary on the RFP (what the Dashboard / Discovery / Pipeline
+// boards read) AND the latest analysis row, so the change shows everywhere and
+// the Monitor→Lead auto-add respects it. No migration needed — existing columns.
+async function setRecommendation(rfpId, rec){
+  let details={};
+  try{ const rows=await api(`govcon_rfps?id=eq.${rfpId}&owner=eq.${SESSION.user.id}&select=details`); details=(rows[0]||{}).details||{}; }catch(_){}
+  const sum=Object.assign({}, details.analysis_summary||{});
+  sum.recommendation=rec; sum.recommendation_override=true; sum.recommendation_override_at=new Date().toISOString();
+  details.analysis_summary=sum;
+  await api(`govcon_rfps?id=eq.${rfpId}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({details})});
+  try{
+    const a=await api(`govcon_opportunity_analysis?rfp_id=eq.${rfpId}&owner=eq.${SESSION.user.id}&select=id&order=version.desc&limit=1`);
+    if(a&&a[0]) await api(`govcon_opportunity_analysis?id=eq.${a[0].id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({recommendation:rec})});
+  }catch(_){}
+  if(window.ANALYSIS_BY_RFP&&window.ANALYSIS_BY_RFP[rfpId]) window.ANALYSIS_BY_RFP[rfpId].recommendation=rec;
+}
+// small reusable override control (a labeled dropdown) for any recommendation value
+function recOverrideControl(current, onchangeCall, statusId){
+  return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 10px">
+    <span class="muted" style="font-size:12px">Recommendation (editable):</span>
+    <select onchange="${onchangeCall}" style="width:auto;font-size:12px">${REC_OPTIONS.map(o=>`<option ${o===current?'selected':''}>${esc(o)}</option>`).join('')}${(current&&!REC_OPTIONS.includes(current))?`<option selected>${esc(current)}</option>`:''}</select>
+    <span id="${statusId}" class="muted" style="font-size:11px"></span>
+  </div>`;
+}
+// Pipeline lead: manually override the recommendation from the card editor.
+async function ldSetRec(rfpId, rec){
+  const st=$('#ld_rec_status'); if(st) st.textContent='Saving…';
+  try{
+    await setRecommendation(rfpId, rec);
+    if(window._LEAD_RFP && window._LEAD_RFP.id===rfpId){
+      const sum=Object.assign({}, (window._LEAD_RFP.details||{}).analysis_summary||{}, {recommendation:rec, recommendation_override:true});
+      window._LEAD_RFP.details=Object.assign({}, window._LEAD_RFP.details||{}, {analysis_summary:sum});
+    }
+    if(st) st.textContent='✓ Set to '+rec+' (saved)';
+  }catch(e){ if(st) st.textContent='Failed: '+e.message; }
+}
 function rfpCard(r) {
   const aa=(window.ANALYSIS_BY_RFP||{})[r.id];
   const sum = (r.details && r.details.analysis_summary) || (aa?{fit:aa.fit_score,readiness:'—',dependency:'—',confidence:aa.analysis_confidence,recommendation:aa.recommendation,version:aa.version}:null);
@@ -2614,11 +2666,11 @@ function nextStageId(list){ let n=0; list.forEach(([id])=>{ if(/^\d+$/.test(id))
 let STAGE_EDIT=[];   // working copy while the manager is open
 function editStageNames(){
   STAGE_EDIT = STAGES.map(s=>s.slice());
-  openModal(`<div class="shd"><h3>Manage pipeline stages</h3><button class="sclose" onclick="closeModal()">×</button></div>
+  openModal(`<div class="shd"><h3>Edit pipeline workflow / stages</h3><button class="sclose" onclick="closeModal()">×</button></div>
     <div class="sbd">
-      <div class="muted" style="font-size:12px;margin-bottom:10px">Rename, reorder, add, or remove stages. Built-in stages keep their word ID; new stages get a <b>number ID</b> so drag-and-drop and automations keep working. <b>Removing a stage that still has cards</b> leaves those cards on that hidden stage — move them first.</div>
+      <div class="muted" style="font-size:12px;margin-bottom:10px">Add, remove, rename, and reorder your pipeline sections (stages). Built-in stages keep their word ID; <b>every new stage you add gets its own unique ID</b> (shown next to it) so drag-and-drop and automations keep working. <b>Removing a stage that still has cards</b> leaves those cards on that hidden stage — move them first. <span style="color:var(--warn)">Adding/removing stages needs govcon_migration_20.sql run once.</span></div>
       <div id="stageEditList"></div>
-      <button class="btn sm" onclick="stageAdd()" style="margin-top:8px">+ Add stage</button>
+      <button class="btn sm" onclick="stageAdd()" style="margin-top:8px">+ Add stage / section</button>
       <div style="display:flex;gap:8px;margin-top:14px"><button class="btn primary" onclick="saveStageNames()">Save stages</button><span id="slStatus" class="muted" style="font-size:12px"></span></div>
     </div>`);
   stageEditRender();
@@ -2689,7 +2741,7 @@ async function renderPipeline() {
       <b class="muted">${PIPE_ITEMS.length} opportunities</b>
       <button class="btn sm primary" onclick="autoRunPipeline()" title="Add the opportunities allowed by your Settings → Pipeline auto-add mode, run their matrices, and write an editable partner call script">⚡ Auto-run (pipeline + matrices + call scripts)</button>
       <span style="flex:1"></span>
-      <button class="btn sm" onclick="editStageNames()" title="Rename how the stages are shown (IDs stay the same)">✎ Stage names</button>
+      <button class="btn sm" onclick="editStageNames()" title="Add, remove, rename & reorder pipeline stages — each new stage gets a unique ID for automations">✎ Edit workflow / stages</button>
       <button class="btn sm ${PIPE_VIEW==='board'?'primary':''}" onclick="setPipeView('board')">▦ Board</button>
       <button class="btn sm ${PIPE_VIEW==='grid'?'primary':''}" onclick="setPipeView('grid')">▤ Grid</button>
     </div>
@@ -2987,6 +3039,10 @@ async function openLead(itemId) {
         <div class="field"><label>Category / NAICS</label><input id="ld_category" value="${esc(r.category||'')}"></div>
         <div class="field"><label>Set-aside</label><input id="ld_setaside" value="${esc(r.set_aside||'')}"></div>
       </div>
+
+      <h2 class="section">Analysis recommendation <span class="muted" style="font-weight:normal;font-size:12px">— change it manually (e.g. Monitor → No-Bid)</span></h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 4px">Overrides the AI recommendation everywhere (Dashboard, Discovery, this board). Setting it to something other than Monitor stops the Monitor→Lead auto-add from re-adding it.</div>
+      ${recOverrideControl(((r.details||{}).analysis_summary||{}).recommendation||'', "ldSetRec('"+r.id+"', this.value)", 'ld_rec_status')}
 
       <h2 class="section">Solicitation details</h2>
       <div class="muted" style="font-size:12px;margin:-6px 0 8px">Auto-filled from the analysis / SAM; edit freely. Same fields as RFP Discovery.</div>
