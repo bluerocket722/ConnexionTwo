@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r41-contract-notes-2026-08-08';
+const GOVCON_BUILD = 'r42-dialer-insert-fix-2026-08-10';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -244,6 +244,31 @@ async function apiPatchTolerant(path, obj) {
     }
   }
   return { skipped, rows: [] };
+}
+// POST into the dialer's crm_leads (or crm_lead_tags) TOLERANTLY: the dialer's
+// table may not have every column GovCon sends (source, solicitation_number,
+// county, rfp_id, solicitation_title…). On a PostgREST "Could not find the 'X'
+// column" 400, drop X from every row and retry, so the insert still lands with
+// whatever columns DO exist. Accepts a single object or an array. Returns
+// {ok, rows, error, dropped[]}.
+async function crmInsert(url, headers, payload){
+  let body = Array.isArray(payload) ? payload.map(o=>({...o})) : {...payload};
+  const dropped=[];
+  for(let i=0;i<12;i++){
+    let r;
+    try{ r=await fetch(url,{method:'POST',headers,body:JSON.stringify(body)}); }
+    catch(e){ return {ok:false, rows:[], error:String(e&&e.message||e), dropped}; }
+    if(r.ok){ let rows=[]; try{ rows=await r.json(); }catch(_){ rows=[]; } return {ok:true, rows:rows||[], dropped}; }
+    let txt=''; try{ txt=await r.text(); }catch(_){}
+    const m=/Could not find the '([^']+)' column|column "?([a-zA-Z0-9_]+)"? of relation|'([a-zA-Z0-9_]+)' column/.exec(txt);
+    const col=m&&(m[1]||m[2]||m[3]);
+    if(col && (Array.isArray(body)?body.some(o=>col in o):(col in body))){
+      if(Array.isArray(body)) body.forEach(o=>{ delete o[col]; }); else delete body[col];
+      dropped.push(col); continue;
+    }
+    return {ok:false, rows:[], error:txt||('HTTP '+r.status), dropped};
+  }
+  return {ok:false, rows:[], error:'too many missing columns', dropped};
 }
 async function callFn(name, body) {
   const token = await freshToken();
@@ -1256,7 +1281,7 @@ async function pushContractPartnersToDialer(rid, title, st){
       city:p.city||null, state:p.state||null, website:p.website||null,
       industry:(p.service_categories||[])[0]||'GovCon subcontractor', dispo:'new', source:'govcon_contract',
       rfp_id:rid, solicitation_title:title, notes:`Quote needed for: ${title||'contract'}` };
-    try{ const r=await fetch(`${SB_URL}/rest/v1/crm_leads`,{method:'POST',headers:crmHdr,body:JSON.stringify(lead)}); r.ok?ok++:fail++; }catch{ fail++; }
+    const res=await crmInsert(`${SB_URL}/rest/v1/crm_leads`, crmHdr, lead); res.ok?ok++:fail++;
   }
   if(st) st.textContent=`✓ ${ok} sent to dialer${fail?`, ${fail} failed`:''} — open the ConnexionTwo Dialer to call them.`;
   toast(`Sent ${ok} partner(s) to the dialer with the call script.`);
@@ -2565,7 +2590,9 @@ let STAGE_LABELS = {};   // {stageId: customLabel} (legacy label overrides)
 const stageLabel = (k) => { const s=STAGES.find(x=>x[0]===k); return STAGE_LABELS[k] || (s?s[1]:null) || k; };
 async function loadStageLabels(){
   try{
-    const rows=await api(`govcon_autopilot_settings?owner=eq.${SESSION.user.id}&select=pipeline_stages,pipeline_stage_labels`);
+    // select=* so a not-yet-migrated column (pipeline_stages / pipeline_stage_labels
+    // before migrations 19/20) can never 400 — we just read whatever exists.
+    const rows=await api(`govcon_autopilot_settings?owner=eq.${SESSION.user.id}&select=*`);
     const s=rows[0]||{}; STAGE_LABELS=s.pipeline_stage_labels||{};
     const custom=s.pipeline_stages;
     if(Array.isArray(custom) && custom.length){ STAGES = custom.map(x=>[String(x[0]), String(x[1]||x[0])]); }
@@ -4016,8 +4043,7 @@ async function pushPartnersToDialer(ids){
       city:p.city||null, state:p.state||null, website:p.website||null,
       industry:(p.service_categories||[])[0]||'GovCon subcontractor', dispo:'new', source:'govcon',
       notes:`Pushed from ConnexionTwo GovCon — ${[...(p.service_categories||[]),...(p.capabilities||[])].slice(0,5).join(', ')||'partner'}${p.research_notes?'\n'+String(p.research_notes).slice(0,200):''}` };
-    try{ const r=await fetch(`${SB_URL}/rest/v1/crm_leads`,{method:'POST',headers:crmHdr,body:JSON.stringify(lead)});
-      r.ok?pushed++:failed++; }catch{ failed++; }
+    const res=await crmInsert(`${SB_URL}/rest/v1/crm_leads`, crmHdr, lead); res.ok?pushed++:failed++;
   }
   toast(`Dialer: ${pushed} pushed${failed?`, ${failed} failed`:''} — open the ConnexionTwo Dialer → Auto Dialer to start calling.`);
 }
@@ -4091,17 +4117,19 @@ async function cdParseAndPush(text, solNum, stateTag, outEl){
   const tagIds=[];
   if(solNum){ const t=await cdEnsureTag(solNum, crmHdrRep); if(t) tagIds.push(t); }
   if(stateTag){ const t=await cdEnsureTag(stateTag.toUpperCase(), crmHdrRep); if(t) tagIds.push(t); }
-  let ok=0,fail=0; const newIds=[];
+  let ok=0,fail=0; const newIds=[]; const droppedCols=new Set();
   for(let i=0;i<rows.length;i+=50){ const batch=rows.slice(i,i+50);
-    try{ const r=await fetch(`${SB_URL}/rest/v1/crm_leads`,{method:'POST',headers:crmHdrRep,body:JSON.stringify(batch)});
-      if(r.ok){ const saved=await r.json().catch(()=>[]); (saved||[]).forEach(l=>l&&l.id&&newIds.push(l.id)); ok+=batch.length; } else fail+=batch.length;
-    }catch{ fail+=batch.length; } }
+    const res=await crmInsert(`${SB_URL}/rest/v1/crm_leads`, crmHdrRep, batch);
+    (res.dropped||[]).forEach(c=>droppedCols.add(c));
+    if(res.ok){ (res.rows||[]).forEach(l=>l&&l.id&&newIds.push(l.id)); ok+=batch.length; }
+    else { fail+=batch.length; if(i===0 && out) out.innerHTML=`<div class="banner bad">Dialer rejected the upload: ${esc(String(res.error||'').slice(0,180))}</div>`; }
+  }
   // link the tags to every new lead
   if(tagIds.length && newIds.length){
     const links=[]; newIds.forEach(lid=>tagIds.forEach(tid=>links.push({lead_id:lid, tag_id:tid})));
     for(let i=0;i<links.length;i+=200){ try{ await fetch(`${SB_URL}/rest/v1/crm_lead_tags?on_conflict=lead_id,tag_id`,{method:'POST',headers:{...crmHdrRep,Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify(links.slice(i,i+200))}); }catch(_){} }
   }
-  out.innerHTML=`<div class="banner info">✓ ${ok} lead(s) pushed to the dialer${fail?` · ${fail} failed`:''}${tagIds.length?` · tagged ${solNum?'“'+esc(solNum)+'”':''}${solNum&&stateTag?' + ':''}${stateTag?'“'+esc(stateTag.toUpperCase())+'”':''}`:''}. Open the ConnexionTwo Dialer to start calling.</div>`;
+  out.innerHTML=`<div class="banner ${ok?'info':'bad'}">✓ ${ok} lead(s) pushed to the dialer${fail?` · ${fail} failed`:''}${tagIds.length?` · tagged ${solNum?'“'+esc(solNum)+'”':''}${solNum&&stateTag?' + ':''}${stateTag?'“'+esc(stateTag.toUpperCase())+'”':''}`:''}. Open the ConnexionTwo Dialer to start calling.${droppedCols.size?`<div class="muted" style="font-size:11px;margin-top:4px">Note: your dialer's lead table has no ${[...droppedCols].map(esc).join(', ')} column${droppedCols.size>1?'s':''}, so ${droppedCols.size>1?'those were':'that was'} skipped — everything else was saved. (The solicitation/state <b>tags</b> still apply.)</div>`:''}</div>`;
 }
 /* ── Yelp business import (official Fusion API — needs a "yelp" API key) ── */
 function pnYelpUI(){
