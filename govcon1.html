@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r43-dialer-constraint-fix-2026-08-10';
+const GOVCON_BUILD = 'r44-dialer-keys-fix-2026-08-10';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -4116,11 +4116,18 @@ async function cdParseAndPush(text, solNum, stateTag, outEl){
     header.forEach((f,i)=>{ if(f&&cols[i]) row[f]=cols[i]; });
     if(!row.business_name) continue;
     if(row.dispo) row.dispo=String(row.dispo).toLowerCase().replace(/\s+/g,'_').replace(/[^a-z_]/g,'')||'new';
-    if(solNum) row.solicitation_number=solNum;   // carried on the lead too
+    // NOTE: the solicitation # + state ride along as CRM TAGS (below), not as
+    // lead columns — the dialer's crm_leads has no solicitation_number column.
     if(stateTag && !row.state) row.state=stateTag;
     rows.push(row);
   }
   if(!rows.length){ out.innerHTML='<div class="banner bad">No valid rows.</div>'; return; }
+  // PostgREST bulk insert requires EVERY object in the array to have the SAME
+  // keys (error PGRST102 "All object keys must match"). CSV rows are sparse —
+  // a company with no email simply has no email key — so normalize every row
+  // to the union of all keys, filling missing ones with null.
+  const allKeys=[...new Set(rows.flatMap(r=>Object.keys(r)))];
+  const normRows=rows.map(r=>{ const o={}; allKeys.forEach(k=>{ o[k]=(k in r)?r[k]:null; }); return o; });
   out.innerHTML=`<div class="muted">Pushing ${rows.length} lead(s) to the dialer…</div>`;
   const crmHdrRep={'Content-Type':'application/json',apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,Prefer:'return=representation'};
   // pre-create the solicitation + state tags once
@@ -4128,7 +4135,7 @@ async function cdParseAndPush(text, solNum, stateTag, outEl){
   if(solNum){ const t=await cdEnsureTag(solNum, crmHdrRep); if(t) tagIds.push(t); }
   if(stateTag){ const t=await cdEnsureTag(stateTag.toUpperCase(), crmHdrRep); if(t) tagIds.push(t); }
   let ok=0,fail=0; const newIds=[]; const droppedCols=new Set(); let lastErr='';
-  for(let i=0;i<rows.length;i+=50){ const batch=rows.slice(i,i+50);
+  for(let i=0;i<normRows.length;i+=50){ const batch=normRows.slice(i,i+50);
     const res=await crmInsert(`${SB_URL}/rest/v1/crm_leads`, crmHdrRep, batch);
     (res.dropped||[]).forEach(c=>droppedCols.add(c));
     if(res.ok){ (res.rows||[]).forEach(l=>l&&l.id&&newIds.push(l.id)); ok+=batch.length; }
