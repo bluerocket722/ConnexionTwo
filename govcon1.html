@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r39-full-consolidated-2026-08-08';
+const GOVCON_BUILD = 'r41-contract-notes-2026-08-08';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -353,7 +353,7 @@ async function renderDashboard() {
   const key=DASH_SORT;
   const STR_COLS=['title','agency','deadline','rec','stage'];
   rows.sort((a,b)=>{ let x=a[key],y=b[key];
-    if(STR_COLS.includes(key)){ x=String(x||'￿').toLowerCase(); y=String(y||'￿').toLowerCase(); return (x<y?-1:x>y?1:0)*DASH_DIR; }
+    if(STR_COLS.includes(key)){ x=String(x||' ').toLowerCase(); y=String(y||' ').toLowerCase(); return (x<y?-1:x>y?1:0)*DASH_DIR; }
     x=x==null?-1:x; y=y==null?-1:y; return (x-y)*DASH_DIR; });
 
   // every column is sortable — active column shows ▲/▼, the rest show a dim ↕
@@ -2759,7 +2759,32 @@ function pipeCard(i) {
     <div style="margin-top:5px" onclick="event.stopPropagation()">
       <button class="btn sm" style="width:100%;padding:3px 8px" title="Push this contract's researched partners into the Auto Dialer" onclick="pipeToDialer('${i.id}')">📞 Upload partners to dialer</button>
     </div>
+    <div class="pcard-notes" id="note-box-${i.id}" style="margin-top:6px" onclick="event.stopPropagation()">
+      ${i.notes && i.notes.trim() ? `<div class="note-preview" title="Click to edit" onclick="pipeNoteEdit('${i.id}')" style="cursor:text;font-size:11px;background:var(--amber-50,#fff8e6);border-left:3px solid #f0a500;padding:5px 7px;border-radius:3px;white-space:pre-wrap;max-height:72px;overflow:auto">${esc(i.notes)}</div>
+      <button class="btn sm" style="width:100%;padding:3px 8px;margin-top:4px" onclick="pipeNoteEdit('${i.id}')">📝 Edit note</button>`
+      : `<button class="btn sm" style="width:100%;padding:3px 8px" onclick="pipeNoteEdit('${i.id}')">📝 Add note</button>`}
+    </div>
   </div>`;
+}
+// quick inline note editor on a pipeline card (no need to open the full lead)
+function pipeNoteEdit(itemId){
+  const it=(PIPE_ITEMS||[]).find(x=>x.id===itemId); if(!it) return;
+  const box=document.getElementById('note-box-'+itemId); if(!box) return;
+  box.innerHTML=`<textarea id="note-ta-${itemId}" rows="3" style="width:100%;font-size:11px;padding:4px;box-sizing:border-box;font-family:inherit" placeholder="Type a note…">${esc(it.notes||'')}</textarea>
+    <div style="display:flex;gap:4px;margin-top:4px">
+      <button class="btn sm" style="flex:1;padding:3px 8px" onclick="pipeSaveNote('${itemId}')">Save note</button>
+      <button class="btn sm" style="padding:3px 8px" onclick="renderPipeline()">Cancel</button>
+    </div>`;
+  const ta=document.getElementById('note-ta-'+itemId); if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+}
+async function pipeSaveNote(itemId){
+  const ta=document.getElementById('note-ta-'+itemId); if(!ta) return;
+  const notes=ta.value;
+  try{
+    await api(`govcon_pipeline_items?id=eq.${itemId}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({notes, notes_updated_at:new Date().toISOString()})});
+    const it=(PIPE_ITEMS||[]).find(x=>x.id===itemId); if(it){ it.notes=notes; it.notes_updated_at=new Date().toISOString(); }
+    toast(notes.trim()?'Note saved':'Note cleared'); renderPipeline();
+  }catch(e){ toast('Failed: '+e.message); }
 }
 // push a pipeline card's contract partners into the dialer (crm_leads)
 function pipeToDialer(itemId){
@@ -2793,14 +2818,15 @@ function pipeGrid() {
       <td>${r.win_probability!=null?r.win_probability+'%':'—'}</td>
       <td>${esc(stageLabel(i.stage))}</td>
       <td><span class="pill" style="cursor:pointer;${nDocs?'background:var(--blue-100);color:var(--blue-900)':''}" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')">${nDocs?`📎 ${nDocs}`:'🔬 view'}</span></td>
+      <td style="max-width:220px" title="${i.notes?esc(i.notes):''}" onclick="event.stopPropagation();openLead('${i.id}')">${i.notes&&i.notes.trim()?`<span style="font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:210px;vertical-align:bottom">📝 ${esc(i.notes.replace(/\s+/g,' ').slice(0,60))}${i.notes.length>60?'…':''}</span>`:'<span class="muted" style="font-size:12px">＋ add</span>'}</td>
     </tr>`;
   }).join('');
   return `<div class="card" style="padding:0;overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:13.5px">
       <thead><tr style="text-align:left;background:var(--blue-050)">
-        ${['Title','Agency','Deadline','Priority','Win %','Stage','Docs'].map(h=>`<th style="padding:10px 12px;border-bottom:1px solid var(--line);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">${h}</th>`).join('')}
+        ${['Title','Agency','Deadline','Priority','Win %','Stage','Docs','Notes'].map(h=>`<th style="padding:10px 12px;border-bottom:1px solid var(--line);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">${h}</th>`).join('')}
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--muted)">Pipeline is empty.</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--muted)">Pipeline is empty.</td></tr>'}</tbody>
     </table></div>`;
 }
 // HTML5 drag-and-drop between stage columns
@@ -2961,6 +2987,11 @@ async function openLead(itemId) {
         <div class="field"><label>Solicitation / Notice #</label><input id="ld_solnum" value="${esc(leadSolNum(r))}" placeholder="e.g. 140P8626Q0042"></div>
         <div class="field"><label>Folder name <span class="muted" style="font-weight:normal">— rename anytime; applies on Save</span></label><input id="ld_folder_name" value="${esc(leadFolder(r))}"></div>
       </div>
+
+      <h2 class="section">Contract notes <span class="muted" style="font-weight:normal;font-size:12px">— your own notes on this contract; saved with the lead</span></h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 8px">Jot anything you want to remember about this contract — key requirements, deadlines, who to call, questions for the CO. It stays here so you can read it every time you open this contract.</div>
+      <div class="field"><textarea id="ld_contract_notes" style="min-height:150px;line-height:1.5" placeholder="Type your contract notes here…">${esc(item.contract_notes||'')}</textarea></div>
+
       <h2 class="section">Contracting officers / points of contact</h2>
       <div class="muted" style="font-size:12px;margin:-6px 0 10px">Auto-filled from SAM when you click “Pull full detail from SAM.gov”. These feed the {{Contracting Officer}}, {{CO Email}}, {{CO Phone}} template fields.</div>
       <div class="row3">
@@ -3161,6 +3192,7 @@ async function saveLead(itemId, rfpId) {
   r.title = title; r.details = details; if(rows[0]) window._LEAD_RFP = Object.assign(r, rows[0]);
   const pipeRes = await apiPatchTolerant(`govcon_pipeline_items?id=eq.${itemId}`, {
     stage:$('#ld_stage').value, priority:$('#ld_prio').value, notes:$('#ld_notes').value.trim()||null,
+    contract_notes:($('#ld_contract_notes')?$('#ld_contract_notes').value:'')||null,
     stage_updated_at:new Date().toISOString(),
   });
   // If NOTHING was updated, the write hit no row — surface it instead of a false "saved".
