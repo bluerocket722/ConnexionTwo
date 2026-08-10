@@ -185,7 +185,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r42-dialer-insert-fix-2026-08-10';
+const GOVCON_BUILD = 'r43-dialer-constraint-fix-2026-08-10';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -254,21 +254,31 @@ async function apiPatchTolerant(path, obj) {
 async function crmInsert(url, headers, payload){
   let body = Array.isArray(payload) ? payload.map(o=>({...o})) : {...payload};
   const dropped=[];
-  for(let i=0;i<12;i++){
+  const keysOf = ()=> Array.isArray(body) ? (body[0]?Object.keys(body[0]):[]) : Object.keys(body);
+  for(let i=0;i<16;i++){
     let r;
     try{ r=await fetch(url,{method:'POST',headers,body:JSON.stringify(body)}); }
     catch(e){ return {ok:false, rows:[], error:String(e&&e.message||e), dropped}; }
     if(r.ok){ let rows=[]; try{ rows=await r.json(); }catch(_){ rows=[]; } return {ok:true, rows:rows||[], dropped}; }
     let txt=''; try{ txt=await r.text(); }catch(_){}
-    const m=/Could not find the '([^']+)' column|column "?([a-zA-Z0-9_]+)"? of relation|'([a-zA-Z0-9_]+)' column/.exec(txt);
-    const col=m&&(m[1]||m[2]||m[3]);
-    if(col && (Array.isArray(body)?body.some(o=>col in o):(col in body))){
+    const keys=keysOf();
+    let col=null, m;
+    // 1) unknown column (schema cache) — PGRST204
+    if((m=/Could not find the '([^']+)' column/.exec(txt))) col=m[1];
+    // 2) CHECK-constraint violation (e.g. crm_leads_source_check rejects our 'source' value)
+    //    → figure out which of OUR columns the constraint is about and drop it.
+    if(!col && (m=/(?:violates check constraint|check constraint) "([a-zA-Z0-9_]+)"/.exec(txt))){
+      col = keys.find(k=>m[1].toLowerCase().includes(k.toLowerCase())) || null;
+    }
+    // 3) invalid-input / type errors that name a column in our body
+    if(!col && (m=/column "?([a-zA-Z0-9_]+)"?/.exec(txt))){ if(keys.includes(m[1])) col=m[1]; }
+    if(col && keys.includes(col)){
       if(Array.isArray(body)) body.forEach(o=>{ delete o[col]; }); else delete body[col];
       dropped.push(col); continue;
     }
     return {ok:false, rows:[], error:txt||('HTTP '+r.status), dropped};
   }
-  return {ok:false, rows:[], error:'too many missing columns', dropped};
+  return {ok:false, rows:[], error:'too many rejected columns', dropped};
 }
 async function callFn(name, body) {
   const token = await freshToken();
@@ -4117,13 +4127,14 @@ async function cdParseAndPush(text, solNum, stateTag, outEl){
   const tagIds=[];
   if(solNum){ const t=await cdEnsureTag(solNum, crmHdrRep); if(t) tagIds.push(t); }
   if(stateTag){ const t=await cdEnsureTag(stateTag.toUpperCase(), crmHdrRep); if(t) tagIds.push(t); }
-  let ok=0,fail=0; const newIds=[]; const droppedCols=new Set();
+  let ok=0,fail=0; const newIds=[]; const droppedCols=new Set(); let lastErr='';
   for(let i=0;i<rows.length;i+=50){ const batch=rows.slice(i,i+50);
     const res=await crmInsert(`${SB_URL}/rest/v1/crm_leads`, crmHdrRep, batch);
     (res.dropped||[]).forEach(c=>droppedCols.add(c));
     if(res.ok){ (res.rows||[]).forEach(l=>l&&l.id&&newIds.push(l.id)); ok+=batch.length; }
-    else { fail+=batch.length; if(i===0 && out) out.innerHTML=`<div class="banner bad">Dialer rejected the upload: ${esc(String(res.error||'').slice(0,180))}</div>`; }
+    else { fail+=batch.length; lastErr=res.error||lastErr; }
   }
+  if(ok===0 && fail){ out.innerHTML=`<div class="banner bad">The dialer rejected all ${fail} lead(s). The database said:<br><code style="font-size:11px;word-break:break-word">${esc(String(lastErr||'unknown error').slice(0,300))}</code></div>`; return; }
   // link the tags to every new lead
   if(tagIds.length && newIds.length){
     const links=[]; newIds.forEach(lid=>tagIds.forEach(tid=>links.push({lead_id:lid, tag_id:tid})));
