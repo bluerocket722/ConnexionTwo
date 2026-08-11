@@ -186,7 +186,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r50-cor-status-tests-2026-08-11';
+const GOVCON_BUILD = 'r51-cor-email-test-2026-08-11';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -2189,6 +2189,8 @@ async function renderEmailSettings(){
     <div class="field"><label>Subject</label><input id="tpl_cor_subject" value="${esc(cor.subject||'')}"></div>
     <div class="field"><label>Body</label><textarea id="tpl_cor_body" style="min-height:150px">${esc(cor.body||'')}</textarea></div>
     <button class="btn sm primary" onclick="saveEmailTemplate('cor','COR / CO email','tpl_cor_subject','tpl_cor_body')">💾 Save COR template</button>
+    <button class="btn sm" onclick="sendTestTemplateBtn('cor','tpl_cor_subject','tpl_cor_body')">📧 Send me a test of this COR email</button>
+    <span id="tpl_cor_test" class="muted" style="font-size:12px"></span>
 
     <h2 class="section" style="margin-top:12px">COR location verification email <span class="muted" style="font-weight:normal;font-size:12px">— sent to both CORs to confirm the site visit</span></h2>
     <div class="muted" style="font-size:12px;margin:-6px 0 8px">Sent to every COR (manually, or automatically when a lead is set to <b>Team</b> and the site visit is fully filled in). Placeholders: ${EMAIL_PLACEHOLDERS}</div>
@@ -2220,10 +2222,11 @@ async function addSender(){
 async function delSender(id){ await api(`govcon_email_senders?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); renderEmailSettings(); }
 // Send a test of a SPECIFIC template (subcontractor or COR) to yourself.
 async function sendTestTemplateBtn(kind, subjId, bodyId){
-  const statId = kind==='cor_location_verification' ? 'tpl_corlv_test' : 'tpl_sub_test';
+  const statId = {cor_location_verification:'tpl_corlv_test', cor:'tpl_cor_test', subcontractor_reminder:'tpl_sub_test'}[kind] || 'tpl_sub_test';
+  const nameFor = {cor_location_verification:'COR location verification', cor:'COR / CO email', subcontractor_reminder:'Subcontractor reminder'}[kind] || 'Subcontractor reminder';
   const st=$('#'+statId); if(st) st.textContent='Saving & sending…';
   // save the template first so the test reflects what you see on screen
-  try{ await saveEmailTemplate(kind, kind==='cor_location_verification'?'COR location verification':'Subcontractor reminder', subjId, bodyId); }catch(_){}
+  try{ await saveEmailTemplate(kind, nameFor, subjId, bodyId); }catch(_){}
   try{
     const r=await callFn('govcon-email-reminders',{action:'test_template', kind});
     if(st) st.textContent = r&&r.sent ? '✓ Test sent — check your inbox (and spam).' : '⚠ '+((r&&r.error)||'Not sent — check your Brevo key + verified sender.');
