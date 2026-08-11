@@ -186,7 +186,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r47-sitevisit-reminders-2026-08-11';
+const GOVCON_BUILD = 'r48-cors-testemail-2026-08-11';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -2118,7 +2118,7 @@ async function samApplyNaics(where){
   }catch(e){ if(st) st.textContent=/relation|column/.test(e.message)?'Run govcon_migration_21.sql first.':'Failed: '+e.message; }
 }
 // ── Email (Brevo) settings: senders you can send "from" + editable templates ─
-const EMAIL_PLACEHOLDERS = '{{name}} {{company}} {{contract}} {{solicitation}} {{place_of_performance}} {{site_visit_date}} {{site_visit_time}} {{site_visit_time_zone}} {{quote_deadline}} {{my_name}} {{my_company}}';
+const EMAIL_PLACEHOLDERS = '{{name}} {{company}} {{contract}} {{solicitation}} {{place_of_performance}} {{site_visit_date}} {{site_visit_time}} {{site_visit_time_zone}} {{quote_deadline}} {{cor_name}} {{cor_email}} {{cor_phone}} {{cor2_name}} {{cor2_email}} {{cor2_phone}} {{site_visit_cor_name}} {{site_visit_cor_email}} {{site_visit_cor_phone}} {{my_name}} {{my_company}}';
 async function renderEmailSettings(){
   const host=$('#emailSettingsCard'); if(!host) return;
   const uid=SESSION.user.id;
@@ -2162,6 +2162,7 @@ async function renderEmailSettings(){
       <label class="toggle" style="margin:0"><input type="checkbox" id="rem_2h" ${S.site_visit_reminder_2h!==false?'checked':''} style="width:auto"> 2-hour reminder</label>
     </div>
     <button class="btn sm primary" onclick="saveReminderSettings()">💾 Save reminder schedule</button>
+    <button class="btn sm" onclick="sendTestReminder()">📧 Send myself a test email</button>
     <span id="remSetStatus" class="muted" style="font-size:12px"></span>
 
     <h2 class="section" style="margin-top:14px">Subcontractor reminder template</h2>
@@ -2195,6 +2196,16 @@ async function addSender(){
   }catch(e){ toast(/duplicate/i.test(e.message)?'That sender is already added':'Failed: '+e.message); }
 }
 async function delSender(id){ await api(`govcon_email_senders?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); renderEmailSettings(); }
+// Send a real test reminder email to yourself (your notification address) via Brevo.
+async function sendTestReminder(){
+  const st=$('#remSetStatus'); if(st) st.textContent='Sending test email…';
+  // save current settings first so the function uses the address/sender you see
+  try{ await saveReminderSettings(); }catch(_){}
+  try{
+    const r=await callFn('govcon-email-reminders',{action:'test_email'});
+    if(st) st.textContent = r&&r.sent ? '✓ Test email sent — check your inbox (and spam).' : '⚠ '+((r&&r.error)||'No email sent — verify your Brevo key + verified sender.');
+  }catch(e){ if(st) st.textContent = /not deployed|Failed to fetch|CORS|404/.test(e.message)?'Deploy the govcon-email-reminders function first (Verify JWT off).':'Failed: '+e.message; }
+}
 async function saveReminderSettings(){
   const st=$('#remSetStatus'); if(st) st.textContent='Saving…';
   const body={ owner:SESSION.user.id,
@@ -3262,6 +3273,11 @@ async function openLead(itemId) {
         <div class="field"><label>CO 2 phone</label><input id="ld_co2_phone" value="${esc((r.details||{}).co2_phone||'')}"></div>
       </div>
 
+      <h2 class="section">CORs / points of contact <span class="muted" style="font-weight:normal;font-size:12px">— add as many as you want; mark who attends the site visit and who is the main contact</span></h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 8px">The <b>primary contact</b> fills the <b>{{cor_name}} {{cor_email}} {{cor_phone}}</b> placeholders; the 2nd fills {{cor2_name}} etc. Anyone marked <b>attending the site visit</b> gets the day-before reminder and fills {{site_visit_cor_name}}.</div>
+      <div id="ld_cors"><div class="muted" style="font-size:13px">Loading…</div></div>
+      <button class="btn sm" id="corAddBtn" style="margin-top:4px">+ Add COR / contact</button>
+
       <h2 class="section">Contract Location and Partner Coverage</h2>
       <div class="row3">
         <div class="field"><label>Place of performance</label><input id="ld_pop" value="${esc(r.place_of_performance_raw||(r.details||{}).place_of_performance||'')}"></div>
@@ -3356,6 +3372,9 @@ async function openLead(itemId) {
   // subcontractors
   renderSubs(item.rfp_id, r);
   $('#subAdd').onclick = ()=>addSub(item.rfp_id, r);
+  // CORs / points of contact
+  renderCors(item.rfp_id);
+  if($('#corAddBtn')) $('#corAddBtn').onclick = ()=>corAdd(item.rfp_id);
   // partner coverage + carried-over research
   renderLeadPartners(r);
   renderLeadResearch(r);
@@ -3579,6 +3598,14 @@ function emResolve(text, rfp, contact){
   const d=rfp.details||{}; const sv=d.site_visit||{}; const svd=(sv.dates||[])[0]||{};
   const svTime = d.site_visit_time || svd.start_time || '';
   const svTz   = d.site_visit_tz   || svd.time_zone  || '';
+  // CORs: primary (or first) → {{cor_*}}, second → {{cor2_*}}, attending → {{site_visit_cor_*}}
+  const cors=(window._LEAD_CORS||[]);
+  const primaryCor=cors.find(c=>c.is_primary_contact)||cors[0]||{};
+  const cor2=cors.filter(c=>c!==primaryCor)[0]||{};
+  const svCor=cors.find(c=>c.attending_site_visit)||{};
+  const corName=primaryCor.name||d.contracting_officer||'';
+  const corEmail=primaryCor.email||d.co_email||'';
+  const corPhone=primaryCor.phone||d.co_phone||'';
   const map={
     '{{name}}': (contact&&contact.name)||(contact&&contact.company)||'there',
     '{{company}}': (contact&&contact.company)||(contact&&contact.name)||'',
@@ -3591,6 +3618,15 @@ function emResolve(text, rfp, contact){
     '{{site_visit_tz}}': svTz || '[time zone]',            // alias
     '{{site_vistit_time_zone}}': svTz || '[time zone]',    // common misspelling, mapped too
     '{{quote_deadline}}': rfp.deadline?fmtDate(rfp.deadline):'[date]',
+    '{{cor_name}}': corName||'[COR name]',
+    '{{cor_email}}': corEmail||'[COR email]',
+    '{{cor_phone}}': corPhone||'[COR phone]',
+    '{{cor2_name}}': cor2.name||'',
+    '{{cor2_email}}': cor2.email||'',
+    '{{cor2_phone}}': cor2.phone||'',
+    '{{site_visit_cor_name}}': svCor.name||corName||'',
+    '{{site_visit_cor_email}}': svCor.email||corEmail||'',
+    '{{site_visit_cor_phone}}': svCor.phone||corPhone||'',
     '{{my_name}}': (PROFILE&&(PROFILE.contact_name||PROFILE.legal_name||PROFILE.company_name))||'',
     '{{my_company}}': (PROFILE&&(PROFILE.company_name||PROFILE.legal_name))||'',
   };
@@ -3600,26 +3636,31 @@ function emResolve(text, rfp, contact){
 // plus the Contracting Officer(s) auto-pulled from SAM. No separate contacts store.
 async function emLoadContacts(rfpId){
   const host=$('#em_contacts'); if(!host) return;
-  const subs=await api(`govcon_subcontractors?owner=eq.${SESSION.user.id}&rfp_id=eq.${rfpId}&select=id,company_name,poc_name,first_name,last_name,email,attending_site_visit&order=created_at`).catch(()=>[]);
+  const [subs, cors]=await Promise.all([
+    api(`govcon_subcontractors?owner=eq.${SESSION.user.id}&rfp_id=eq.${rfpId}&select=id,company_name,poc_name,first_name,last_name,email,attending_site_visit&order=created_at`).catch(()=>[]),
+    api(`govcon_cors?owner=eq.${SESSION.user.id}&rfp_id=eq.${rfpId}&select=*&order=created_at`).catch(()=>[]),
+  ]);
   const d=(window._LEAD_RFP||{}).details||{};
+  const corContacts=(cors||[]).filter(c=>c.email).map(c=>({id:'cor:'+c.id, email:c.email, kind:'cor', name:c.name||'Contracting Officer', company:c.role||'COR', attending:!!c.attending_site_visit}));
   const autos=[];
-  if(d.co_email)  autos.push({id:'auto:'+d.co_email,  name:d.contracting_officer||'Contracting Officer',   email:d.co_email,  kind:'cor', auto:true});
-  if(d.co2_email) autos.push({id:'auto:'+d.co2_email, name:d.contracting_officer_2||'Contracting Officer 2', email:d.co2_email, kind:'cor', auto:true});
+  if(!corContacts.length && d.co_email)  autos.push({id:'auto:'+d.co_email,  name:d.contracting_officer||'Contracting Officer',   email:d.co_email,  kind:'cor', auto:true});
+  if(!corContacts.length && d.co2_email) autos.push({id:'auto:'+d.co2_email, name:d.contracting_officer_2||'Contracting Officer 2', email:d.co2_email, kind:'cor', auto:true});
+  const corList=[...corContacts, ...autos];
   const subContacts=(subs||[]).filter(s=>s.email).map(s=>({
     id:'sub:'+s.id, email:s.email, kind:'subcontractor',
     name:s.poc_name||[s.first_name,s.last_name].filter(Boolean).join(' ')||s.company_name||'',
     company:s.company_name||'', attending:!!s.attending_site_visit,
   }));
-  window._EM_CONTACTS=[...autos, ...subContacts];
+  window._EM_CONTACTS=[...corList, ...subContacts];
   const rowHtml=(c)=>`<label class="rfp" style="padding:5px 8px;margin-bottom:4px;display:flex;gap:8px;align-items:center;font-size:12.5px${c.auto?';background:var(--blue-050)':''}">
     <input type="checkbox" class="em_c_sel" data-id="${esc(c.id)}" style="width:auto">
-    <span class="pill" style="font-size:10px">${c.kind==='cor'?'CO':'Sub'}${c.auto?' · auto':''}</span>
+    <span class="pill" style="font-size:10px">${c.kind==='cor'?'CO/COR':'Sub'}${c.auto?' · auto':''}</span>
     <b>${esc(c.name||c.company||'')}</b> <span class="muted">${esc(c.email)}</span>
     ${c.attending?'<span class="pill" style="font-size:10px;background:#dbeafe;color:#1e40af" title="Attending the site visit — gets a day-before reminder">🏗 site visit</span>':''}
-    <span style="flex:1"></span>${c.auto?'<span class="muted" style="font-size:10px">from solicitation</span>':'<span class="muted" style="font-size:10px">from subcontractors</span>'}</label>`;
+    <span style="flex:1"></span><span class="muted" style="font-size:10px">${c.kind==='cor'?(c.auto?'from solicitation':'from CORs'):'from subcontractors'}</span></label>`;
   const parts=[];
-  if(autos.length) parts.push('<div class="muted" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Contracting officer (auto)</div>'+autos.map(rowHtml).join(''));
-  parts.push(subContacts.length ? ((autos.length?'<div class="muted" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin:6px 0 3px">Subcontractors</div>':'')+subContacts.map(rowHtml).join('')) : (autos.length?'':'<div class="muted" style="font-size:13px">No recipients yet — add subcontractors (with email) in the section below.</div>'));
+  if(corList.length) parts.push('<div class="muted" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Contracting officers / CORs</div>'+corList.map(rowHtml).join(''));
+  parts.push(subContacts.length ? ((corList.length?'<div class="muted" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin:6px 0 3px">Subcontractors</div>':'')+subContacts.map(rowHtml).join('')) : (corList.length?'':'<div class="muted" style="font-size:13px">No recipients yet — add CORs above or subcontractors below (with email).</div>'));
   host.innerHTML=parts.join('');
 }
 async function emLoadThreads(rfpId){
@@ -3823,6 +3864,46 @@ async function extractMatrices(r){
 }
 
 /* ── subcontractors ── */
+/* ── CORs / points of contact (per opportunity) ──────────────────────────── */
+async function renderCors(rfpId){
+  const host=$('#ld_cors'); if(!host) return;
+  const rows=await api(`govcon_cors?owner=eq.${SESSION.user.id}&rfp_id=eq.${rfpId}&select=*&order=created_at`).catch(()=>null);
+  if(rows===null){ host.innerHTML='<div class="banner warn" style="font-size:12px">Run <b>govcon_migration_27.sql</b> to enable extra CORs / contacts.</div>'; window._LEAD_CORS=[]; return; }
+  window._LEAD_CORS=rows;
+  host.innerHTML = rows.length ? rows.map((c,i)=>`<div class="rfp" style="padding:8px 10px;margin-bottom:6px" data-cor="${c.id}">
+    <div class="row3">
+      <div class="field"><label>Name${i===0?' <span class="muted">→ {{cor_name}}</span>':''}</label><input class="cv" data-k="name" value="${esc(c.name||'')}"></div>
+      <div class="field"><label>Email</label><input class="cv" data-k="email" value="${esc(c.email||'')}"></div>
+      <div class="field"><label>Phone</label><input class="cv" data-k="phone" value="${esc(c.phone||'')}"></div>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+      <div class="field" style="margin:0;flex:1;min-width:120px"><label>Role</label><input class="cv" data-k="role" value="${esc(c.role||'')}" placeholder="COR / CO / Site POC"></div>
+      <label class="toggle" style="margin:0"><input type="checkbox" class="cv-bool" data-k="attending_site_visit" ${c.attending_site_visit?'checked':''} style="width:auto"> Attending site visit <span class="muted" style="font-weight:normal;font-size:11px">(day-before reminder)</span></label>
+      <label class="toggle" style="margin:0"><input type="checkbox" class="cv-bool" data-k="is_primary_contact" ${c.is_primary_contact?'checked':''} style="width:auto"> Primary contact</label>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="btn sm primary" onclick="corSave('${c.id}','${rfpId}')">Save</button>
+      <button class="btn sm" style="color:var(--bad)" onclick="corDel('${c.id}','${rfpId}')">Delete</button>
+    </div>
+  </div>`).join('') : '<div class="muted" style="font-size:13px">No CORs yet — click “+ Add COR / contact”.</div>';
+}
+async function corAdd(rfpId){
+  try{ await api('govcon_cors',{method:'POST',prefer:'return=minimal',body:JSON.stringify({owner:SESSION.user.id, rfp_id:rfpId, role:'COR'})}); renderCors(rfpId); }
+  catch(e){ toast(/relation|column/.test(e.message)?'Run govcon_migration_27.sql first':'Failed: '+e.message); }
+}
+async function corSave(id, rfpId){
+  const card=document.querySelector(`[data-cor="${id}"]`); if(!card) return;
+  const body={}; card.querySelectorAll('.cv').forEach(i=>{ body[i.dataset.k]=i.value.trim()||null; });
+  card.querySelectorAll('.cv-bool').forEach(i=>{ body[i.dataset.k]=i.checked; });
+  await api(`govcon_cors?id=eq.${id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify(body)});
+  toast('COR saved'); await renderCors(rfpId);
+  if($('#em_contacts')) emLoadContacts(rfpId);
+}
+async function corDel(id, rfpId){
+  if(!confirm('Delete this COR / contact?')) return;
+  await api(`govcon_cors?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); renderCors(rfpId);
+  if($('#em_contacts')) emLoadContacts(rfpId);
+}
 async function renderSubs(rfpId, r){
   const host=$('#subsHost'); if(!host) return;
   const subs=await api(`govcon_subcontractors?owner=eq.${SESSION.user.id}&rfp_id=eq.${rfpId}&select=*&order=created_at.asc`);
