@@ -186,7 +186,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r46-naics-calendar-dedupe-2026-08-11';
+const GOVCON_BUILD = 'r47-sitevisit-reminders-2026-08-11';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -2118,16 +2118,18 @@ async function samApplyNaics(where){
   }catch(e){ if(st) st.textContent=/relation|column/.test(e.message)?'Run govcon_migration_21.sql first.':'Failed: '+e.message; }
 }
 // ── Email (Brevo) settings: senders you can send "from" + editable templates ─
-const EMAIL_PLACEHOLDERS = '{{name}} {{company}} {{contract}} {{solicitation}} {{place_of_performance}} {{site_visit_date}} {{quote_deadline}} {{my_name}} {{my_company}}';
+const EMAIL_PLACEHOLDERS = '{{name}} {{company}} {{contract}} {{solicitation}} {{place_of_performance}} {{site_visit_date}} {{site_visit_time}} {{site_visit_time_zone}} {{quote_deadline}} {{my_name}} {{my_company}}';
 async function renderEmailSettings(){
   const host=$('#emailSettingsCard'); if(!host) return;
   const uid=SESSION.user.id;
-  const [senders, tpls, keys] = await Promise.all([
+  const [senders, tpls, keys, sset] = await Promise.all([
     api(`govcon_email_senders?owner=eq.${uid}&select=*&order=created_at`).catch(()=>[]),
     api(`govcon_email_templates?owner=eq.${uid}&select=*&order=kind`).catch(()=>[]),
     api(`govcon_api_keys?owner=eq.${uid}&provider=eq.brevo&select=id&limit=1`).catch(()=>[]),
+    api(`govcon_autopilot_settings?owner=eq.${uid}&select=*`).catch(()=>[]),
   ]);
   window._EMAIL_TPLS = tpls||[];
+  const S=(sset||[])[0]||{};
   const sub=(tpls||[]).find(t=>t.kind==='subcontractor_reminder')||{kind:'subcontractor_reminder',name:'Subcontractor reminder',subject:'',body:''};
   const cor=(tpls||[]).find(t=>t.kind==='cor')||{kind:'cor',name:'COR / CO email',subject:'',body:''};
   host.innerHTML=`<div class="card" style="margin-top:14px">
@@ -2143,7 +2145,26 @@ async function renderEmailSettings(){
       <div class="field" style="display:flex;align-items:flex-end"><button class="btn sm primary" onclick="addSender()">+ Add sender</button></div>
     </div>
 
-    <h2 class="section" style="margin-top:10px">Subcontractor reminder template</h2>
+    <h2 class="section" style="margin-top:10px">🔔 Site-visit reminder schedule</h2>
+    <div class="muted" style="font-size:12px;margin:-6px 0 8px">Automated reminders for site visits, sent through Brevo. Change any of these anytime. Reminders go to the <b>notification email</b> below and are CC'd to subcontractors marked <b>Attending the site visit</b>.</div>
+    <div class="row2">
+      <div class="field"><label>Notification email (from + main recipient)</label><input id="rem_notify_email" value="${esc(S.notification_sender_email||'parkerfacilitysolutions@gmail.com')}" placeholder="parkerfacilitysolutions@gmail.com"></div>
+      <div class="field"><label>Send reminders at (time of day)</label><input id="rem_time" type="time" value="${esc(S.site_visit_reminder_time||'08:00')}"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Time zone for the send time</label>
+        <select id="rem_tz">${['America/New_York','America/Chicago','America/Denver','America/Los_Angeles','America/Phoenix','America/Anchorage','Pacific/Honolulu','UTC'].map(z=>`<option ${z===(S.site_visit_reminder_tz||'America/New_York')?'selected':''}>${z}</option>`).join('')}</select></div>
+      <div class="field" style="display:flex;align-items:flex-end"><span class="muted" style="font-size:12px">The daily reminder job checks at this time and sends whatever is due that day.</span></div>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin:6px 0">
+      <label class="toggle" style="margin:0"><input type="checkbox" id="rem_dayb" ${S.site_visit_reminder_dayb!==false?'checked':''} style="width:auto"> Day-before reminder to <b>attending</b> subcontractors (one email)</label>
+      <label class="toggle" style="margin:0"><input type="checkbox" id="rem_24h" ${S.site_visit_reminder_24h!==false?'checked':''} style="width:auto"> 24-hour reminder</label>
+      <label class="toggle" style="margin:0"><input type="checkbox" id="rem_2h" ${S.site_visit_reminder_2h!==false?'checked':''} style="width:auto"> 2-hour reminder</label>
+    </div>
+    <button class="btn sm primary" onclick="saveReminderSettings()">💾 Save reminder schedule</button>
+    <span id="remSetStatus" class="muted" style="font-size:12px"></span>
+
+    <h2 class="section" style="margin-top:14px">Subcontractor reminder template</h2>
     <div class="muted" style="font-size:12px;margin:-6px 0 8px">Placeholders: ${EMAIL_PLACEHOLDERS}</div>
     <div class="field"><label>Subject</label><input id="tpl_sub_subject" value="${esc(sub.subject||'')}"></div>
     <div class="field"><label>Body</label><textarea id="tpl_sub_body" style="min-height:150px">${esc(sub.body||'')}</textarea></div>
@@ -2174,6 +2195,26 @@ async function addSender(){
   }catch(e){ toast(/duplicate/i.test(e.message)?'That sender is already added':'Failed: '+e.message); }
 }
 async function delSender(id){ await api(`govcon_email_senders?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); renderEmailSettings(); }
+async function saveReminderSettings(){
+  const st=$('#remSetStatus'); if(st) st.textContent='Saving…';
+  const body={ owner:SESSION.user.id,
+    notification_sender_email:$('#rem_notify_email').value.trim()||null,
+    site_visit_reminder_time:$('#rem_time').value||'08:00',
+    site_visit_reminder_tz:$('#rem_tz').value,
+    site_visit_reminder_dayb:$('#rem_dayb').checked,
+    site_visit_reminder_24h:$('#rem_24h').checked,
+    site_visit_reminder_2h:$('#rem_2h').checked,
+    updated_at:new Date().toISOString() };
+  try{ await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify(body)});
+    if(st) st.textContent='✓ Saved';
+  }catch(e){
+    // graceful degrade if the columns aren't there yet
+    let retried=false;
+    for(const c of ['notification_sender_email','site_visit_reminder_time','site_visit_reminder_tz','site_visit_reminder_dayb','site_visit_reminder_24h','site_visit_reminder_2h']){ if(new RegExp(c).test(e.message)){ delete body[c]; retried=true; } }
+    if(retried){ try{ await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify(body)}); if(st) st.textContent='Saved — run govcon_migration_26.sql to enable all reminder options.'; }catch(e2){ if(st) st.textContent='Failed: '+e2.message; } }
+    else if(st) st.textContent='Failed: '+e.message;
+  }
+}
 async function setDefaultSender(id){
   await api(`govcon_email_senders?owner=eq.${SESSION.user.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({is_default:false})});
   await api(`govcon_email_senders?id=eq.${id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({is_default:true})});
@@ -3265,18 +3306,12 @@ async function openLead(itemId) {
       ${leadFindSubsUI(r)}
 
       <h2 class="section">✉ Emails &amp; reminders</h2>
-      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Save subcontractor &amp; COR contacts, send reminders and questions through Brevo (from an address you choose, with CC/BCC), and read the whole conversation as a thread. Set up your sender + templates in <b>Settings → Email</b>.</div>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Recipients come from the <b>Subcontractors &amp; quotes</b> section below (plus the Contracting Officer pulled from SAM) — add or edit people there. Send reminders and questions through Brevo (from an address you choose, with CC/BCC) and read the whole conversation as a thread. Set up your sender + templates in <b>Settings → Email</b>.</div>
       <div class="row2" style="align-items:start">
         <div>
-          <div class="field-label" style="font-weight:600;margin-bottom:6px">Contacts</div>
+          <div class="field-label" style="font-weight:600;margin-bottom:6px">Recipients <span class="muted" style="font-weight:normal">— from Subcontractors + CO</span></div>
           <div id="em_contacts"><div class="muted" style="font-size:13px">Loading…</div></div>
-          <div class="row3" style="margin-top:6px">
-            <div class="field"><label>Name</label><input id="em_c_name" placeholder="Contact name"></div>
-            <div class="field"><label>Email</label><input id="em_c_email" placeholder="name@company.com"></div>
-            <div class="field"><label>Type</label><select id="em_c_kind"><option value="subcontractor">Subcontractor</option><option value="cor">COR / CO</option><option value="other">Other</option></select></div>
-          </div>
-          <div class="field"><label>Company (optional)</label><input id="em_c_company" placeholder="Company"></div>
-          <button class="btn sm primary" onclick="emAddContact('${r.id}')">+ Save contact</button>
+          <div class="muted" style="font-size:11px;margin-top:6px">To add a person, scroll to <b>Subcontractors &amp; quotes</b> and add them there (name, email, phone). Anyone with an email shows here as a recipient.</div>
         </div>
         <div>
           <div class="field-label" style="font-weight:600;margin-bottom:6px">Threads for this solicitation</div>
@@ -3542,6 +3577,8 @@ function leadFindSubsUI(r){
 /* ═══════════════ EMAILS & REMINDERS (Brevo threads per solicitation) ═══════════════ */
 function emResolve(text, rfp, contact){
   const d=rfp.details||{}; const sv=d.site_visit||{}; const svd=(sv.dates||[])[0]||{};
+  const svTime = d.site_visit_time || svd.start_time || '';
+  const svTz   = d.site_visit_tz   || svd.time_zone  || '';
   const map={
     '{{name}}': (contact&&contact.name)||(contact&&contact.company)||'there',
     '{{company}}': (contact&&contact.company)||(contact&&contact.name)||'',
@@ -3549,41 +3586,42 @@ function emResolve(text, rfp, contact){
     '{{solicitation}}': d.solicitation_number?(' (Solicitation '+d.solicitation_number+')'):'',
     '{{place_of_performance}}': rfp.place_of_performance_raw||d.place_of_performance||'[location]',
     '{{site_visit_date}}': (svd.date||rfp.site_visit_date)?fmtDate(svd.date||rfp.site_visit_date):'[site visit date]',
+    '{{site_visit_time}}': svTime || '[site visit time]',
+    '{{site_visit_time_zone}}': svTz || '[time zone]',
+    '{{site_visit_tz}}': svTz || '[time zone]',            // alias
+    '{{site_vistit_time_zone}}': svTz || '[time zone]',    // common misspelling, mapped too
     '{{quote_deadline}}': rfp.deadline?fmtDate(rfp.deadline):'[date]',
     '{{my_name}}': (PROFILE&&(PROFILE.contact_name||PROFILE.legal_name||PROFILE.company_name))||'',
     '{{my_company}}': (PROFILE&&(PROFILE.company_name||PROFILE.legal_name))||'',
   };
   return String(text||'').replace(/\{\{[a-z_]+\}\}/g, m=>map[m]!=null?map[m]:m);
 }
+// Recipients now come from the SUBCONTRACTORS section (single source of truth)
+// plus the Contracting Officer(s) auto-pulled from SAM. No separate contacts store.
 async function emLoadContacts(rfpId){
   const host=$('#em_contacts'); if(!host) return;
-  const rows=await api(`govcon_email_contacts?owner=eq.${SESSION.user.id}&rfp_id=eq.${rfpId}&select=*&order=created_at`).catch(()=>null);
-  if(rows===null){ host.innerHTML='<div class="muted" style="font-size:12px">Run govcon_migration_18.sql to enable contacts.</div>'; return; }
-  // Contracting Officer(s) auto-pulled from the solicitation (SAM) — shown here
-  // as ready recipients so you never retype them. Not stored as duplicates.
+  const subs=await api(`govcon_subcontractors?owner=eq.${SESSION.user.id}&rfp_id=eq.${rfpId}&select=id,company_name,poc_name,first_name,last_name,email,attending_site_visit&order=created_at`).catch(()=>[]);
   const d=(window._LEAD_RFP||{}).details||{};
   const autos=[];
   if(d.co_email)  autos.push({id:'auto:'+d.co_email,  name:d.contracting_officer||'Contracting Officer',   email:d.co_email,  kind:'cor', auto:true});
   if(d.co2_email) autos.push({id:'auto:'+d.co2_email, name:d.contracting_officer_2||'Contracting Officer 2', email:d.co2_email, kind:'cor', auto:true});
-  window._EM_CONTACTS=[...autos, ...rows];
+  const subContacts=(subs||[]).filter(s=>s.email).map(s=>({
+    id:'sub:'+s.id, email:s.email, kind:'subcontractor',
+    name:s.poc_name||[s.first_name,s.last_name].filter(Boolean).join(' ')||s.company_name||'',
+    company:s.company_name||'', attending:!!s.attending_site_visit,
+  }));
+  window._EM_CONTACTS=[...autos, ...subContacts];
   const rowHtml=(c)=>`<label class="rfp" style="padding:5px 8px;margin-bottom:4px;display:flex;gap:8px;align-items:center;font-size:12.5px${c.auto?';background:var(--blue-050)':''}">
     <input type="checkbox" class="em_c_sel" data-id="${esc(c.id)}" style="width:auto">
-    <span class="pill" style="font-size:10px">${c.kind==='cor'?'COR':c.kind==='subcontractor'?'Sub':'Other'}${c.auto?' · auto':''}</span>
+    <span class="pill" style="font-size:10px">${c.kind==='cor'?'CO':'Sub'}${c.auto?' · auto':''}</span>
     <b>${esc(c.name||c.company||'')}</b> <span class="muted">${esc(c.email)}</span>
-    <span style="flex:1"></span>${c.auto?'<span class="muted" style="font-size:10px">from solicitation</span>':`<span class="muted" style="cursor:pointer;color:var(--bad)" onclick="emDelContact('${c.id}','${rfpId}')">✕</span>`}</label>`;
+    ${c.attending?'<span class="pill" style="font-size:10px;background:#dbeafe;color:#1e40af" title="Attending the site visit — gets a day-before reminder">🏗 site visit</span>':''}
+    <span style="flex:1"></span>${c.auto?'<span class="muted" style="font-size:10px">from solicitation</span>':'<span class="muted" style="font-size:10px">from subcontractors</span>'}</label>`;
   const parts=[];
   if(autos.length) parts.push('<div class="muted" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Contracting officer (auto)</div>'+autos.map(rowHtml).join(''));
-  parts.push(rows.length ? ((autos.length?'<div class="muted" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin:6px 0 3px">Saved contacts</div>':'')+rows.map(rowHtml).join('')) : (autos.length?'':'<div class="muted" style="font-size:13px">No contacts yet — add subcontractors and CORs below.</div>'));
+  parts.push(subContacts.length ? ((autos.length?'<div class="muted" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin:6px 0 3px">Subcontractors</div>':'')+subContacts.map(rowHtml).join('')) : (autos.length?'':'<div class="muted" style="font-size:13px">No recipients yet — add subcontractors (with email) in the section below.</div>'));
   host.innerHTML=parts.join('');
 }
-async function emAddContact(rfpId){
-  const email=$('#em_c_email').value.trim(); if(!/\S+@\S+\.\S+/.test(email)) return toast('Enter a valid email');
-  const rec={owner:SESSION.user.id, rfp_id:rfpId, kind:$('#em_c_kind').value, name:$('#em_c_name').value.trim()||null, email, company:$('#em_c_company').value.trim()||null};
-  try{ await api('govcon_email_contacts',{method:'POST',prefer:'return=minimal',body:JSON.stringify(rec)});
-    $('#em_c_name').value=$('#em_c_email').value=$('#em_c_company').value=''; toast('Contact saved'); emLoadContacts(rfpId);
-  }catch(e){ toast(/relation|column/.test(e.message)?'Run govcon_migration_18.sql first':'Failed: '+e.message); }
-}
-async function emDelContact(id,rfpId){ await api(`govcon_email_contacts?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); emLoadContacts(rfpId); }
 async function emLoadThreads(rfpId){
   const host=$('#em_threads'); if(!host) return;
   try{ const r=await callFn(EMAIL_FN,{action:'list_threads', rfp_id:rfpId});
@@ -3813,6 +3851,7 @@ function subCard(s){
       <div class="field"><label>Scope of work</label><input class="sv" data-k="scope" value="${esc(s.scope||'')}"></div>
     </div>
     <div class="field"><label>Notes</label><textarea class="sv" data-k="notes">${esc(s.notes||'')}</textarea></div>
+    <label class="toggle" style="margin:4px 0"><input type="checkbox" class="sv-bool" data-k="attending_site_visit" ${s.attending_site_visit?'checked':''} style="width:auto"> <b>Attending the site visit</b> <span class="muted" style="font-weight:normal;font-size:12px">— if on, this person gets ONE reminder the day before the site visit</span></label>
     <div class="muted" style="font-size:12px">Files: ${files.length?files.map(f=>`<a href="#" class="chip sub-dl" data-dl="${esc(f.path)}">${esc(f.name)}</a>`).join(' '):'none'}</div>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       <label class="btn sm" style="cursor:pointer">⬆ Insurance / documents<input type="file" data-subfile="${s.id}" hidden></label>
@@ -3829,8 +3868,10 @@ async function saveSub(id){
   const card=document.querySelector(`[data-sub="${id}"]`); if(!card) return;
   const body={}; card.querySelectorAll('.sv').forEach(i=>{ let v=i.value.trim();
     if(i.dataset.k==='quote_amount') body.quote_amount = v===''?null:+v; else body[i.dataset.k]= v||null; });
-  await api(`govcon_subcontractors?id=eq.${id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify(body)});
-  toast('Subcontractor saved');
+  card.querySelectorAll('.sv-bool').forEach(i=>{ body[i.dataset.k]=i.checked; });
+  const { skipped }=await apiPatchTolerant(`govcon_subcontractors?id=eq.${id}`, body);
+  toast(skipped.includes('attending_site_visit')?'Saved — run govcon_migration_26.sql to enable the site-visit switch':'Subcontractor saved');
+  if($('#em_contacts')) emLoadContacts(window._LEAD_ITEM.rfp_id);   // refresh recipients + attending badge
 }
 async function delSub(id){
   if(!confirm('Delete this subcontractor?'))return;
