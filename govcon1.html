@@ -159,6 +159,7 @@
       <a data-view="sources"><span class="ic">◎</span>Custom Sources</a>
       <a data-view="ai"><span class="ic">✦</span>AI Tools</a>
       <a data-view="pipeline"><span class="ic">▦</span>Pipeline</a>
+      <a data-view="calendar"><span class="ic">📅</span>Site Visit Calendar</a>
       <a data-view="awards"><span class="ic">◆</span>Awards Research</a>
       <a data-view="partners"><span class="ic">◈</span>Partner Network</a>
       <a data-view="analytics"><span class="ic">▲</span>Analytics</a>
@@ -185,7 +186,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r45-rec-override-workflow-2026-08-10';
+const GOVCON_BUILD = 'r46-naics-calendar-dedupe-2026-08-11';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -337,13 +338,13 @@ $('#nav').addEventListener('click', e => {
   const a = e.target.closest('a[data-view]'); if (a) route(a.dataset.view);
 });
 const TITLES = {dashboard:'Dashboard',rfps:'RFP Discovery',research:'Research',autopilot:'Autopilot',sources:'Custom Sources',
-  ai:'AI Tools',pipeline:'Pipeline',awards:'Awards Research',partners:'Partner Network',analytics:'Analytics',
+  ai:'AI Tools',pipeline:'Pipeline',calendar:'Site Visit Calendar',awards:'Awards Research',partners:'Partner Network',analytics:'Analytics',
   editor:'Document Editor',createdoc:'Create & Send',profile:'Profile & Settings'};
 function route(view) {
   $$('#nav a[data-view]').forEach(a => a.classList.toggle('active', a.dataset.view===view));
   $('#viewTitle').textContent = TITLES[view] || view;
   ({dashboard:renderDashboard,rfps:renderRfps,research:renderResearch,autopilot:renderAutopilot,sources:renderSources,
-    ai:renderAi,pipeline:renderPipeline,awards:renderAwards,partners:renderPartners,analytics:renderAnalytics,
+    ai:renderAi,pipeline:renderPipeline,calendar:renderCalendar,awards:renderAwards,partners:renderPartners,analytics:renderAnalytics,
     editor:renderEditor,createdoc:renderCreateDoc,profile:renderProfile}[view]||renderDashboard)();
 }
 const V = () => $('#views');
@@ -428,6 +429,7 @@ async function renderDashboard() {
         <button class="btn primary" onclick="processAllPending()">▶ Download + research ALL (${cntNeedResearch})</button>
         <button class="btn" onclick="downloadAllPending()">⬇ Just download ALL (${cntNeedDownload})</button>
         <button class="btn" onclick="analyzeAllPending()">⚙ Analyze all pending</button>
+        <button class="btn" onclick="dashDedupeRfps()" title="Find opportunities that are duplicates (same notice / same title+agency) and merge them into one">🧹 Merge duplicates</button>
         <button class="btn" onclick="runAutopilotNow()">✈ Run Autopilot</button>
         <button class="btn" onclick="renderDashboard()">↻ Refresh</button>
         <span id="dashPendStatus" class="muted" style="font-size:12px"></span>
@@ -522,6 +524,47 @@ async function analyzeAllPending(){
   }
   say(`✓ Analyzed ${done} opportunit${done===1?'y':'ies'}${fail?`, ${fail} failed`:''}.`);
   if($('#views')) renderDashboard();
+}
+// ── Dashboard: merge duplicate opportunities ────────────────────────────────
+// Groups RFPs by notice id (or title+agency when there's no notice id), keeps
+// the most complete one (analysis > more fields > newest), moves any pipeline
+// entries onto the keeper, and deletes the extras.
+function _rfpDedupKey(r){
+  const nid=String(r.notice_id||'').replace(/^[a-z.]+:/,'').trim().toLowerCase();
+  if(nid) return 'n:'+nid;
+  const sol=((r.details||{}).solicitation_number||'').trim().toLowerCase();
+  if(sol) return 's:'+sol;
+  return 't:'+String(r.title||'').trim().toLowerCase()+'|'+String(r.agency||'').trim().toLowerCase();
+}
+function _rfpScore(r){ let n=0; ['title','agency','deadline','category','psc','set_aside','place_of_performance_raw','description','estimated_value'].forEach(f=>{ if(r[f]!=null&&r[f]!=='') n++; }); if(r.details&&r.details.analysis_summary) n+=5; return n; }
+async function dashDedupeRfps(){
+  const say=(m)=>{ const st=$('#dashPendStatus'); if(st) st.textContent=m; };
+  say('Scanning for duplicates…');
+  let rfps=[];
+  try{ rfps=await api(`govcon_rfps?owner=eq.${SESSION.user.id}&select=id,title,agency,deadline,category,psc,set_aside,place_of_performance_raw,description,estimated_value,notice_id,details,created_at&limit=3000`); }
+  catch(e){ say('Could not load opportunities: '+e.message); return; }
+  const groups={}; rfps.forEach(r=>{ const k=_rfpDedupKey(r); (groups[k]=groups[k]||[]).push(r); });
+  const dupGroups=Object.values(groups).filter(g=>g.length>1);
+  if(!dupGroups.length){ say('✓ No duplicate opportunities found.'); return; }
+  const totalExtra=dupGroups.reduce((s,g)=>s+g.length-1,0);
+  if(!confirm(`Found ${dupGroups.length} duplicate group(s) — ${totalExtra} extra record(s). Merge each group into its most complete opportunity and delete the extras? Pipeline entries are moved to the keeper. This cannot be undone.`)) { say(''); return; }
+  let merged=0, removed=0, failed=0;
+  for(const g of dupGroups){
+    const sorted=[...g].sort((a,b)=>{ const s=_rfpScore(b)-_rfpScore(a); return s!==0?s:(new Date(b.created_at||0)-new Date(a.created_at||0)); });
+    const keep=sorted[0], losers=sorted.slice(1);
+    say(`Merging “${String(keep.title||'').slice(0,40)}” (${losers.length} dup)…`);
+    for(const l of losers){
+      try{
+        // move any pipeline items from the loser onto the keeper, then drop the loser
+        try{ await api(`govcon_pipeline_items?rfp_id=eq.${l.id}&owner=eq.${SESSION.user.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({rfp_id:keep.id})}); }catch(_){}
+        await api(`govcon_rfps?id=eq.${l.id}`,{method:'DELETE',prefer:'return=minimal'});
+        removed++;
+      }catch(_){ failed++; }
+    }
+    merged++;
+  }
+  say(`✓ Merged ${merged} group(s) · removed ${removed} duplicate(s)${failed?` · ${failed} failed`:''}.`);
+  setTimeout(renderDashboard, 1200);
 }
 const kpi = (l,v,s) => `<div class="card kpi"><div class="lbl">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`;
 
@@ -1641,6 +1684,8 @@ async function addToPipeline(rfpId) {
     await api('govcon_pipeline_items?on_conflict=owner,rfp_id', {method:'POST',
       prefer:'resolution=ignore-duplicates,return=minimal',
       body:JSON.stringify({owner:SESSION.user.id, rfp_id:rfpId, stage:'lead'})});
+    // manual add clears any prior "removed" exclusion so it behaves normally again
+    try{ await apiPatchTolerant(`govcon_rfps?id=eq.${rfpId}`,{pipeline_excluded:false}); }catch(_){}
     toast('Added to pipeline');
   } catch(e){ if(/23505|duplicate/i.test(e.message)) toast('Already in pipeline'); else alert(e.message); }
 }
@@ -1902,9 +1947,18 @@ async function renderAutopilot() {
       </div>
       <div class="field"><label>Keywords (comma-separated — add as many as you want, up to 12 searched per run)</label>
         <input id="ap_keywords" value="${esc((s.keywords||[]).join(', '))}" placeholder="janitorial, grounds maintenance, custodial, window cleaning, …"></div>
-      <div class="field"><label>NAICS codes to watch (comma-separated — more than 5 is fine, up to 12 searched per run)</label>
+      <div class="field"><label>NAICS codes to watch (quick edit — comma-separated)</label>
         <input id="ap_naics" value="${esc((s.naics_codes||[]).join(', '))}" placeholder="561720, 561730, 236220, 238220, 561210, 561790, …">
-        <div class="muted" style="font-size:12px;margin-top:2px">Searched in addition to the NAICS codes on your company profile.</div></div>
+        <div class="muted" style="font-size:12px;margin-top:2px">Searched in addition to the NAICS codes on your company profile. For a managed, unlimited, add/remove list use the editor just below.</div></div>
+      <h2 class="section" style="margin-top:8px">🔎 Searched NAICS codes <span class="muted" style="font-weight:normal;font-size:12px">— add / remove as many as you want; each is searched automatically</span></h2>
+      <div id="naicsMgrAuto"><div class="muted">Loading NAICS…</div></div>
+
+      <h2 class="section" style="margin-top:8px">📅 Auto-add Monitor leads by site-visit date</h2>
+      <label class="toggle"><input type="checkbox" id="ap_sv_enabled" ${s.pipeline_monitor_sitevisit_enabled?'checked':''}> Automatically add a <b>Monitor</b> opportunity to the pipeline when its <b>site visit</b> is within…</label>
+      <div class="row2" style="margin-top:6px">
+        <div class="field"><label>Days until site visit (X)</label><input id="ap_sv_days" type="number" min="0" max="120" value="${s.pipeline_monitor_sitevisit_days??5}"></div>
+        <div class="field" style="display:flex;align-items:flex-end"><span class="muted" style="font-size:12px">e.g. 5 = add it once the site visit is 5 days away or sooner. Removed opportunities are never re-added.</span></div>
+      </div>
 
       <h2 class="section" style="margin-top:8px">Bid window — only keep opportunities due within…</h2>
       <div class="row2">
@@ -1961,8 +2015,56 @@ async function renderAutopilot() {
   aiRefreshStatus();
   renderEmailSettings();
   renderSamRegistration();
+  renderNaicsManager('naicsMgrAuto');
 }
 // ── SAM.gov registration: read your entity, pull NAICS into your profile ─────
+/* ═══════════ WATCHED NAICS MANAGER (editable, unlimited, DB-backed) ═══════════
+   Stored in govcon_watched_naics (add/remove as many as you want). The ACTIVE
+   codes are mirrored into govcon_autopilot_settings.naics_codes so the existing
+   autopilot discovery searches them. Reused in Autopilot AND Profile settings. */
+async function loadWatchedNaics(){ try{ return (await api(`govcon_watched_naics?owner=eq.${SESSION.user.id}&select=*&order=code`))||[]; }catch(_){ return null; } }
+// mirror the active watched codes into the autopilot search list
+async function syncNaicsToAutopilot(){
+  const rows=await loadWatchedNaics(); if(rows===null) return;
+  const codes=[...new Set(rows.filter(n=>n.active!==false).map(n=>String(n.code)))];
+  try{ await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify({owner:SESSION.user.id, naics_codes:codes, updated_at:new Date().toISOString()})}); }catch(_){}
+}
+async function renderNaicsManager(hostId){
+  const host=$('#'+hostId); if(!host) return;
+  const rows=await loadWatchedNaics();
+  if(rows===null){ host.innerHTML='<div class="banner warn" style="font-size:12px">Run <b>govcon_migration_25.sql</b> to enable the editable NAICS list.</div>'; return; }
+  const list=rows.length?rows.map(n=>`<div class="rfp" style="padding:5px 8px;margin-bottom:4px;display:flex;gap:8px;align-items:center;font-size:12.5px">
+    <input type="checkbox" ${n.active!==false?'checked':''} title="Search this code" onchange="naicsToggle('${n.id}',this.checked,'${hostId}')" style="width:auto">
+    <b>${esc(n.code)}</b> <span class="muted" style="flex:1">${esc(n.description||'')}</span>
+    <button class="btn sm" style="color:var(--bad);padding:2px 8px" onclick="naicsDel('${n.id}','${hostId}')">✕</button>
+  </div>`).join(''):'<div class="muted" style="font-size:12.5px">No NAICS codes yet — add as many as you want below.</div>';
+  host.innerHTML=`
+    <div class="muted" style="font-size:12px;margin-bottom:8px">These are searched automatically by Autopilot. Add as many as you like (no 12-code limit) — unchecking one keeps it on file but stops searching it. Saved to your database.</div>
+    <div id="${hostId}_list">${list}</div>
+    <div class="row3" style="margin-top:8px">
+      <div class="field"><label>NAICS code</label><input id="${hostId}_code" placeholder="e.g. 561720"></div>
+      <div class="field"><label>Description (optional)</label><input id="${hostId}_desc" placeholder="Janitorial services"></div>
+      <div class="field" style="display:flex;align-items:flex-end"><button class="btn primary" onclick="naicsAdd('${hostId}')">+ Add NAICS</button></div>
+    </div>
+    <div id="${hostId}_status" class="muted" style="font-size:12px"></div>`;
+}
+async function naicsAdd(hostId){
+  const code=($('#'+hostId+'_code')?$('#'+hostId+'_code').value:'').trim();
+  const desc=($('#'+hostId+'_desc')?$('#'+hostId+'_desc').value:'').trim();
+  const st=$('#'+hostId+'_status');
+  if(!/^\d{2,6}$/.test(code)){ if(st) st.textContent='Enter a valid NAICS code (2–6 digits).'; return; }
+  try{
+    await api('govcon_watched_naics?on_conflict=owner,code',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:JSON.stringify({owner:SESSION.user.id, code, description:desc||null, active:true})});
+    await syncNaicsToAutopilot(); await renderNaicsManager(hostId);
+    const s2=$('#'+hostId+'_status'); if(s2) s2.textContent='✓ Added '+code+' — now searched automatically.';
+  }catch(e){ if(st) st.textContent=/relation|column/.test(e.message)?'Run govcon_migration_25.sql first.':'Failed: '+e.message; }
+}
+async function naicsDel(id, hostId){
+  try{ await api(`govcon_watched_naics?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); await syncNaicsToAutopilot(); await renderNaicsManager(hostId); }catch(e){ toast('Failed: '+e.message); }
+}
+async function naicsToggle(id, active, hostId){
+  try{ await api(`govcon_watched_naics?id=eq.${id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({active})}); await syncNaicsToAutopilot(); }catch(e){ toast('Failed: '+e.message); }
+}
 async function renderSamRegistration(){
   const host=$('#samRegCard'); if(!host) return;
   let prof={}; try{ const rows=await api(`govcon_profiles?user_id=eq.${SESSION.user.id}&select=uei,cage,primary_naics,secondary_naics,sam_entity`); prof=rows[0]||{}; }catch(_){}
@@ -2507,6 +2609,8 @@ async function saveAutopilot() {
     pipeline_auto_add_mode: $('#ap_pipemode') ? $('#ap_pipemode').value : undefined,
     pipeline_auto_min_fit: $('#ap_pipeminfit') ? Math.max(0, Math.min(100, +$('#ap_pipeminfit').value||55)) : undefined,
     pipeline_auto_generate_script: $('#ap_pipescript') ? $('#ap_pipescript').value==='yes' : undefined,
+    pipeline_monitor_sitevisit_enabled: $('#ap_sv_enabled') ? $('#ap_sv_enabled').checked : undefined,
+    pipeline_monitor_sitevisit_days: $('#ap_sv_days') ? Math.max(0, Math.min(120, +$('#ap_sv_days').value||5)) : undefined,
     updated_at: new Date().toISOString(),
   };
   Object.keys(body).forEach(k=>body[k]===undefined&&delete body[k]);
@@ -2516,7 +2620,7 @@ async function saveAutopilot() {
   } catch(e){
     // graceful degrade when a migration hasn't been run yet — save what we can
     let retried=false;
-    for (const col of ['naics_codes','download_interval_minutes','autopilot_mode','pipeline_auto_add_mode','pipeline_auto_min_fit','pipeline_auto_generate_script']) {
+    for (const col of ['naics_codes','download_interval_minutes','autopilot_mode','pipeline_auto_add_mode','pipeline_auto_min_fit','pipeline_auto_generate_script','pipeline_monitor_sitevisit_enabled','pipeline_monitor_sitevisit_days']) {
       if (new RegExp(col).test(e.message)) { delete body[col]; retried=true; }
     }
     if (retried) {
@@ -2701,17 +2805,35 @@ let PIPE_DOCS = {};   // rfp_id -> [documents]
 // Any opportunity scored "Monitor" whose due date is still 14+ days out
 // automatically becomes a Lead in the pipeline. This runs client-side so it
 // works for opportunities that were ALREADY scored (not only future analyses).
+// first site-visit date on a stored opportunity (date | details.site_visit_date | details.site_visit.dates[0])
+function rfpSiteVisitDate(r){
+  const d=r.details||{}; const sv=d.site_visit||{};
+  return r.site_visit_date || d.site_visit_date || ((sv.dates||[])[0]||{}).date || '';
+}
 async function backfillMonitorLeads(inPipe){
   try{
-    const rfps=await api(`govcon_rfps?owner=eq.${SESSION.user.id}&select=id,deadline,review_stage,details&limit=1000`).catch(()=>[]);
+    // pipeline_excluded is tolerated if the column isn't there yet (select falls back)
+    let rfps=await api(`govcon_rfps?owner=eq.${SESSION.user.id}&select=id,deadline,review_stage,details,site_visit_date,pipeline_excluded&limit=1000`).catch(()=>null);
+    if(rfps===null) rfps=await api(`govcon_rfps?owner=eq.${SESSION.user.id}&select=id,deadline,review_stage,details,site_visit_date&limit=1000`).catch(()=>[]);
+    // site-visit auto-add settings
+    let svEnabled=false, svDays=5;
+    try{ const sset=await api(`govcon_autopilot_settings?owner=eq.${SESSION.user.id}&select=pipeline_monitor_sitevisit_enabled,pipeline_monitor_sitevisit_days`); const S=(sset||[])[0]||{}; svEnabled=!!S.pipeline_monitor_sitevisit_enabled; svDays=S.pipeline_monitor_sitevisit_days??5; }catch(_){}
     const today=Date.now(); const toAdd=[];
     for(const r of rfps){
+      if(r.pipeline_excluded) continue;                     // removed → never auto re-add
       const rec=(r.details&&r.details.analysis_summary&&r.details.analysis_summary.recommendation)||'';
       if(rec!=='Monitor') continue;
       if(['Archived','Rejected / No-Bid'].includes(r.review_stage||'')) continue;
       if(inPipe.has(r.id)) continue;
       const days=r.deadline?Math.ceil((new Date(r.deadline+'T23:59:59').getTime()-today)/86400000):null;
-      if(days==null||days<14) continue;
+      // Rule A: deadline still 14+ days out. Rule B (optional): a site visit is
+      // within the configured window (0..X days away).
+      let ok = (days!=null && days>=14);
+      if(!ok && svEnabled){
+        const svd=rfpSiteVisitDate(r);
+        if(svd){ const sdays=Math.ceil((new Date(svd+'T23:59:59').getTime()-today)/86400000); if(sdays!=null && sdays>=0 && sdays<=svDays) ok=true; }
+      }
+      if(!ok) continue;
       toAdd.push({owner:SESSION.user.id, rfp_id:r.id, stage:'lead'});
     }
     if(toAdd.length) await api('govcon_pipeline_items?on_conflict=owner,rfp_id',{method:'POST',prefer:'resolution=ignore-duplicates,return=minimal',body:JSON.stringify(toAdd)});
@@ -2887,13 +3009,14 @@ async function pipeSetStage(itemId, stage){
     toast('Stage → '+stageLabel(stage)); renderPipeline();
   }catch(e){ toast('Failed: '+e.message); }
 }
-// remove a pipeline card from the board (turns Monitor off so it won't re-add)
+// remove a pipeline card from the board — marks it EXCLUDED so no auto-add
+// (Monitor or site-visit) ever brings it back until you clear the flag.
 async function pipeRemove(itemId){
-  if(!confirm('Remove this opportunity from the pipeline? (It stays in Discovery. Monitor is turned off so auto-add won’t bring it back.)')) return;
+  if(!confirm('Remove this opportunity from the pipeline? It stays in Discovery, and it will NOT be auto-added back (Monitor + site-visit auto-add are both blocked for it).')) return;
   const it=(PIPE_ITEMS||[]).find(x=>x.id===itemId); const rfpId=it&&it.rfp_id;
   await api(`govcon_pipeline_items?id=eq.${itemId}`,{method:'DELETE',prefer:'return=minimal'});
-  if(rfpId){ try{ await api(`govcon_rfps?id=eq.${rfpId}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({monitored:false, monitored_at:null})}); }catch(_){} }
-  toast('Removed'); renderPipeline();
+  if(rfpId){ try{ await apiPatchTolerant(`govcon_rfps?id=eq.${rfpId}`,{monitored:false, monitored_at:null, pipeline_excluded:true}); }catch(_){} }
+  toast('Removed — won’t auto re-add'); renderPipeline();
 }
 function pipeGrid() {
   const rows = PIPE_ITEMS.map(i=>{
@@ -3359,14 +3482,14 @@ async function leadWonWith(r){
   };
 }
 async function removeLead(itemId) {
-  if(!confirm('Remove this opportunity from the pipeline? (The RFP stays in Discovery. Monitor is turned off so the auto-add won’t bring it back.)')) return;
+  if(!confirm('Remove this opportunity from the pipeline? It stays in Discovery, and it will NOT be auto-added back (Monitor + site-visit auto-add are blocked for it).')) return;
   const item=(PIPE_ITEMS||[]).find(i=>i.id===itemId);
   let rfpId=item&&item.rfp_id;
   if(!rfpId){ try{ const rows=await api(`govcon_pipeline_items?id=eq.${itemId}&select=rfp_id`); rfpId=(rows[0]||{}).rfp_id; }catch(_){} }
   await api(`govcon_pipeline_items?id=eq.${itemId}`, {method:'DELETE', prefer:'return=minimal'});
-  // stop the background sync / auto-run from re-adding a removed opportunity
-  if(rfpId){ try{ await api(`govcon_rfps?id=eq.${rfpId}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({monitored:false, monitored_at:null})}); }catch(_){} }
-  toast('Removed from pipeline · Monitor turned off');
+  // mark EXCLUDED so no auto-add (Monitor or site-visit) re-adds it
+  if(rfpId){ try{ await apiPatchTolerant(`govcon_rfps?id=eq.${rfpId}`,{monitored:false, monitored_at:null, pipeline_excluded:true}); }catch(_){} }
+  toast('Removed — won’t auto re-add');
   closeModal();
   renderPipeline();
 }
@@ -3727,6 +3850,87 @@ async function uploadSubFile(subId, r, file){
 
 /* ═══════════════ AWARDS RESEARCH ═══════════════ */
 let AWARD_SORT = 'amount';
+/* ═══════════════ SITE VISIT CALENDAR ═══════════════
+   Shows every site visit for your pipeline leads on a month calendar + an
+   upcoming list. Filter by stage, NAICS category, or name — leads show BY NAME
+   (IDs are used only on the back end). Multiple site visits per lead supported. */
+let CAL_MONTH = new Date(); CAL_MONTH.setDate(1);
+let CAL_STAGE='', CAL_CAT='', CAL_Q='';
+function calCollectVisits(items){
+  const visits=[];
+  (items||[]).forEach(it=>{
+    const r=it.govcon_rfps||{}; const d=r.details||{}; const dates=((d.site_visit||{}).dates)||[];
+    const push=(date,time,tz,loc)=>{ if(!date) return; visits.push({date, time:time||'', tz:tz||'', loc:loc||'', title:r.title||'Opportunity', agency:r.agency||'', category:r.category||'', stage:it.stage, rfp_id:r.id}); };
+    if(dates.length) dates.forEach(v=>push(v.date, v.start_time, v.time_zone, v.meeting_location||v.full_address));
+    else push(r.site_visit_date || d.site_visit_date, d.site_visit_time, d.site_visit_tz, d.place_of_performance);
+  });
+  return visits;
+}
+async function renderCalendar(){
+  loading();
+  await loadStageLabels();
+  const uid=SESSION.user.id;
+  const items=await api(`govcon_pipeline_items?owner=eq.${uid}&select=rfp_id,stage,govcon_rfps(id,title,agency,category,deadline,site_visit_date,details)`).catch(()=>[]);
+  let visits=calCollectVisits(items);
+  const cats=[...new Set(visits.map(v=>v.category).filter(Boolean))].sort();
+  const q=CAL_Q.toLowerCase();
+  visits=visits.filter(v=>{
+    if(CAL_STAGE && v.stage!==CAL_STAGE) return false;
+    if(CAL_CAT && v.category!==CAL_CAT) return false;
+    if(q && !`${v.title} ${v.agency} ${v.loc}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const byDay={}; visits.forEach(v=>{ (byDay[v.date]=byDay[v.date]||[]).push(v); });
+  const y=CAL_MONTH.getFullYear(), m=CAL_MONTH.getMonth();
+  const first=new Date(y,m,1), startDow=first.getDay(), daysIn=new Date(y,m+1,0).getDate();
+  const monthName=CAL_MONTH.toLocaleString(undefined,{month:'long',year:'numeric'});
+  const todayStr=new Date().toISOString().slice(0,10);
+  const cells=[];
+  for(let i=0;i<startDow;i++) cells.push('<div style="min-height:74px"></div>');
+  for(let day=1;day<=daysIn;day++){
+    const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const dv=byDay[ds]||[];
+    cells.push(`<div style="min-height:74px;border:1px solid var(--line);border-radius:8px;padding:5px;${ds===todayStr?'outline:2px solid var(--blue-500);outline-offset:-2px':''};background:${dv.length?'var(--blue-050)':'#fff'}">
+      <div style="font-size:11px;color:var(--muted);font-weight:600">${day}</div>
+      ${dv.slice(0,3).map(v=>`<div title="${esc(v.title)}${v.time?' · '+esc(v.time):''}${v.loc?' · '+esc(v.loc):''}" onclick="openReview('${v.rfp_id}')" style="cursor:pointer;font-size:10.5px;background:#fff;border:1px solid var(--line);border-left:3px solid #0054d1;border-radius:4px;padding:2px 4px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🏗 ${esc(v.title)}</div>`).join('')}
+      ${dv.length>3?`<div class="muted" style="font-size:10px;margin-top:2px">+${dv.length-3} more</div>`:''}
+    </div>`);
+  }
+  const upcoming=visits.filter(v=>v.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
+  const past=visits.filter(v=>v.date<todayStr).sort((a,b)=>b.date.localeCompare(a.date));
+  const visitRow=(v)=>`<div class="rfp" style="padding:8px 10px;margin-bottom:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;cursor:pointer" onclick="openReview('${v.rfp_id}')">
+    <div style="text-align:center;min-width:52px"><div style="font-size:11px;color:var(--muted)">${new Date(v.date+'T00:00:00').toLocaleString(undefined,{month:'short'})}</div><div style="font-size:20px;font-weight:800;color:var(--blue-800);line-height:1">${new Date(v.date+'T00:00:00').getDate()}</div></div>
+    <div style="flex:1;min-width:160px"><b>${esc(v.title)}</b><div class="muted" style="font-size:12px">${esc(v.agency||'')}${v.time?' · '+esc(v.time):''}${v.tz?' '+esc(v.tz):''}${v.loc?' · '+esc(v.loc):''}</div></div>
+    <span class="pill">${esc(stageLabel(v.stage))}</span>${v.category?`<span class="pill">${esc(v.category)}</span>`:''}
+  </div>`;
+  V().innerHTML=`
+    <div class="banner info">Every <b>site visit</b> for your pipeline leads, shown by name. Filter by stage, NAICS category, or search — pick exactly which leads appear. Click any visit to open the opportunity. Add or edit visits inside a Pipeline card (multiple visits per lead supported).</div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn sm" onclick="calMove(-1)">←</button>
+        <b style="min-width:150px;text-align:center">${monthName}</b>
+        <button class="btn sm" onclick="calMove(1)">→</button>
+        <button class="btn sm" onclick="calToday()">Today</button>
+        <span style="flex:1"></span>
+        <select id="calStage" style="width:auto;font-size:12px"><option value="">All stages</option>${STAGES.map(([k,l])=>`<option value="${k}" ${k===CAL_STAGE?'selected':''}>${esc(stageLabel(k))}</option>`).join('')}</select>
+        <select id="calCat" style="width:auto;font-size:12px"><option value="">All categories</option>${cats.map(c=>`<option ${c===CAL_CAT?'selected':''}>${esc(c)}</option>`).join('')}</select>
+        <input id="calQ" placeholder="Search name / location…" value="${esc(CAL_Q)}" style="width:200px">
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div style="font-size:11px;color:var(--muted);text-align:center;font-weight:600">${d}</div>`).join('')}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">${cells.join('')}</div>
+    </div>
+    <h2 class="section">Upcoming site visits (${upcoming.length})</h2>
+    <div>${upcoming.map(visitRow).join('')||'<div class="card center muted">No upcoming site visits match these filters.</div>'}</div>
+    ${past.length?`<h2 class="section">Past (${past.length})</h2><div style="opacity:.75">${past.slice(0,30).map(visitRow).join('')}</div>`:''}`;
+  $('#calStage').onchange=e=>{ CAL_STAGE=e.target.value; renderCalendar(); };
+  $('#calCat').onchange=e=>{ CAL_CAT=e.target.value; renderCalendar(); };
+  $('#calQ').oninput=e=>{ CAL_Q=e.target.value; clearTimeout(window._calt); window._calt=setTimeout(renderCalendar,300); };
+}
+function calMove(delta){ CAL_MONTH.setMonth(CAL_MONTH.getMonth()+delta); renderCalendar(); }
+function calToday(){ CAL_MONTH=new Date(); CAL_MONTH.setDate(1); renderCalendar(); }
+
 async function renderAwards() {
   loading();
   const order = AWARD_SORT==='amount' ? 'amount.desc.nullslast' : 'award_date.desc.nullslast';
@@ -4417,8 +4621,10 @@ async function renderProfile() {
       <div class="field"><label>UEI</label><input id="pf_uei" value="${esc(p.uei||'')}"></div>
       <div class="field"><label>CAGE code</label><input id="pf_cage" value="${esc(p.cage||'')}"></div>
     </div>
-    <div class="field"><label>NAICS codes (comma-separated, up to 5)</label><input id="pf_naics" value="${esc((p.naics||[]).join(', '))}"></div>
-    <div class="row2">
+    <div class="field"><label>NAICS codes for your profile (comma-separated)</label><input id="pf_naics" value="${esc((p.naics||[]).join(', '))}"></div>
+    <h2 class="section">🔎 NAICS codes Autopilot searches for <span class="muted" style="font-weight:normal;font-size:13px">— add / remove as many as you want; stored in your database</span></h2>
+    <div id="naicsMgrProfile"><div class="muted">Loading NAICS…</div></div>
+    <div class="row2" style="margin-top:12px">
       <div class="field"><label>Business size</label><input id="pf_size" value="${esc(p.business_size||'')}" placeholder="Small / Large"></div>
       <div class="field"><label>Certifications (comma-separated)</label><input id="pf_certs" value="${esc((p.certifications||[]).join(', '))}" placeholder="8(a), WOSB, HUBZone, SDVOSB"></div>
     </div>
@@ -4504,6 +4710,7 @@ async function renderProfile() {
   };
   loadKeys();
   loadScraping();
+  renderNaicsManager('naicsMgrProfile');
 }
 
 /* Scraping settings: portals, weekly schedule, ingest token */
