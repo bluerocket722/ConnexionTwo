@@ -186,7 +186,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r49-cor-locverify-branding-2026-08-11';
+const GOVCON_BUILD = 'r50-cor-status-tests-2026-08-11';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -2182,6 +2182,8 @@ async function renderEmailSettings(){
     <div class="field"><label>Subject</label><input id="tpl_sub_subject" value="${esc(sub.subject||'')}"></div>
     <div class="field"><label>Body</label><textarea id="tpl_sub_body" style="min-height:150px">${esc(sub.body||'')}</textarea></div>
     <button class="btn sm primary" onclick="saveEmailTemplate('subcontractor_reminder','Subcontractor reminder','tpl_sub_subject','tpl_sub_body')">💾 Save reminder template</button>
+    <button class="btn sm" onclick="sendTestTemplateBtn('subcontractor_reminder','tpl_sub_subject','tpl_sub_body')">📧 Send me a test of this email</button>
+    <span id="tpl_sub_test" class="muted" style="font-size:12px"></span>
 
     <h2 class="section" style="margin-top:12px">COR / CO email template</h2>
     <div class="field"><label>Subject</label><input id="tpl_cor_subject" value="${esc(cor.subject||'')}"></div>
@@ -2193,6 +2195,8 @@ async function renderEmailSettings(){
     <div class="field"><label>Subject</label><input id="tpl_corlv_subject" value="${esc(corlv.subject||'')}" placeholder="Site visit confirmation for {{contract}}"></div>
     <div class="field"><label>Body</label><textarea id="tpl_corlv_body" style="min-height:150px" placeholder="Hello,&#10;&#10;Confirming the site visit for {{contract}} on {{site_visit_date}} at {{site_visit_time}} {{site_visit_time_zone}}, at {{place_of_performance}}. Please confirm the location and any check-in requirements.">${esc(corlv.body||'')}</textarea></div>
     <button class="btn sm primary" onclick="saveEmailTemplate('cor_location_verification','COR location verification','tpl_corlv_subject','tpl_corlv_body')">💾 Save location verification template</button>
+    <button class="btn sm" onclick="sendTestTemplateBtn('cor_location_verification','tpl_corlv_subject','tpl_corlv_body')">📧 Send me a test of this COR email</button>
+    <span id="tpl_corlv_test" class="muted" style="font-size:12px"></span>
     <div id="emailSetStatus" class="muted" style="font-size:12px;margin-top:8px"></div>
   </div>`;
   renderSenderList(senders||[]);
@@ -2214,6 +2218,17 @@ async function addSender(){
   }catch(e){ toast(/duplicate/i.test(e.message)?'That sender is already added':'Failed: '+e.message); }
 }
 async function delSender(id){ await api(`govcon_email_senders?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); renderEmailSettings(); }
+// Send a test of a SPECIFIC template (subcontractor or COR) to yourself.
+async function sendTestTemplateBtn(kind, subjId, bodyId){
+  const statId = kind==='cor_location_verification' ? 'tpl_corlv_test' : 'tpl_sub_test';
+  const st=$('#'+statId); if(st) st.textContent='Saving & sending…';
+  // save the template first so the test reflects what you see on screen
+  try{ await saveEmailTemplate(kind, kind==='cor_location_verification'?'COR location verification':'Subcontractor reminder', subjId, bodyId); }catch(_){}
+  try{
+    const r=await callFn('govcon-email-reminders',{action:'test_template', kind});
+    if(st) st.textContent = r&&r.sent ? '✓ Test sent — check your inbox (and spam).' : '⚠ '+((r&&r.error)||'Not sent — check your Brevo key + verified sender.');
+  }catch(e){ if(st) st.textContent = /not deployed|Failed to fetch|CORS|404/.test(e.message)?'Deploy govcon-email-reminders (Verify JWT off) first.':'Failed: '+e.message; }
+}
 // Send a real test reminder email to yourself (your notification address) via Brevo.
 async function sendTestReminder(){
   const st=$('#remSetStatus'); if(st) st.textContent='Sending test email…';
@@ -2875,6 +2890,18 @@ async function saveStageNames(){
 let PIPE_VIEW = 'board';   // 'board' | 'grid'
 let PIPE_ITEMS = [];
 let PIPE_DOCS = {};   // rfp_id -> [documents]
+let PIPE_COR = {};    // rfp_id -> [cors with email_status]
+// aggregate COR email status for a lead → {label,color} (its own field in the pipeline)
+function pipeCorStatus(rfpId){
+  const cors=(PIPE_COR[rfpId]||[]).filter(c=>c.email);
+  if(!cors.length) return {label:'—', color:'#9aa0a6', title:'No COR emails on file'};
+  const statuses=cors.map(c=>c.email_status||'');
+  if(statuses.some(s=>s==='bounced'||s==='spam'||s==='failed')) return {label:'COR bounced ✗', color:'#b3261e', title:'A COR email bounced or failed'};
+  if(statuses.length && statuses.every(s=>s==='delivered'||s==='opened')) return {label:'COR received ✓', color:'#0b6b34', title:'All CORs received it'};
+  if(statuses.some(s=>s==='delivered'||s==='opened')) return {label:'Partly received', color:'#0b6b34', title:'Some CORs received it'};
+  if(statuses.some(s=>s==='sent')) return {label:'COR sent', color:'#7a5b00', title:'Sent — awaiting delivery confirmation'};
+  return {label:'not emailed', color:'#9aa0a6', title:'CORs on file, no email sent yet'};
+}
 // Any opportunity scored "Monitor" whose due date is still 14+ days out
 // automatically becomes a Lead in the pipeline. This runs client-side so it
 // works for opportunities that were ALREADY scored (not only future analyses).
@@ -2923,12 +2950,15 @@ async function renderPipeline() {
   // pull downloaded documents for every opportunity in the pipeline so the
   // cards can show a clickable doc count and the side viewer can list them.
   PIPE_DOCS = {};
+  PIPE_COR = {};
   const rids = PIPE_ITEMS.map(i=>i.rfp_id).filter(Boolean);
   if (rids.length) {
     for (let n=0;n<rids.length;n+=60){
       const chunk = rids.slice(n,n+60);
       const docs = await api(`govcon_source_documents?owner=eq.${SESSION.user.id}&rfp_id=in.(${chunk.join(',')})&select=id,rfp_id,original_filename,document_type,stored_path&order=downloaded_at.desc.nullslast`).catch(()=>[]);
       (docs||[]).forEach(d=>{ (PIPE_DOCS[d.rfp_id]=PIPE_DOCS[d.rfp_id]||[]).push(d); });
+      const cors = await api(`govcon_cors?owner=eq.${SESSION.user.id}&rfp_id=in.(${chunk.join(',')})&select=rfp_id,email,email_status,email_status_at`).catch(()=>[]);
+      (cors||[]).forEach(c=>{ (PIPE_COR[c.rfp_id]=PIPE_COR[c.rfp_id]||[]).push(c); });
     }
   }
   const toggle = `<div class="card" style="margin-bottom:14px">
@@ -3035,6 +3065,7 @@ function pipeCard(i) {
     <span class="pill ${i.priority}">${i.priority}</span>
     ${r.win_probability!=null?`<span class="pill">Win ${r.win_probability}%</span>`:''}
     ${nDocs?`<span class="pill" style="cursor:pointer;background:var(--blue-100);color:var(--blue-900)" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')" title="View downloaded documents & research">📎 ${nDocs} doc${nDocs!==1?'s':''}</span>`:`<span class="pill" style="cursor:pointer" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')" title="View / research">🔬 view</span>`}
+    ${(()=>{ const cs=pipeCorStatus(i.rfp_id); return cs.label==='—'?'':`<span class="pill" title="COR email status — ${esc(cs.title)}" style="background:${cs.color};color:#fff">✉ ${esc(cs.label)}</span>`; })()}
     <div class="pcard-edit" style="display:flex;gap:4px;align-items:center;margin-top:6px" onclick="event.stopPropagation()">
       <select class="pstage" data-id="${i.id}" title="Change stage" style="flex:1;font-size:11px;padding:2px 4px" onchange="pipeSetStage('${i.id}', this.value)">${STAGES.map(([k,l])=>`<option value="${k}" ${k===i.stage?'selected':''}>${esc(stageLabel(k))}</option>`).join('')}</select>
       <button class="btn sm" title="Edit / open" onclick="openLead('${i.id}')" style="padding:2px 8px">✎</button>
@@ -3103,15 +3134,16 @@ function pipeGrid() {
       <td>${r.win_probability!=null?r.win_probability+'%':'—'}</td>
       <td>${esc(stageLabel(i.stage))}</td>
       <td><span class="pill" style="cursor:pointer;${nDocs?'background:var(--blue-100);color:var(--blue-900)':''}" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')">${nDocs?`📎 ${nDocs}`:'🔬 view'}</span></td>
+      ${(()=>{ const cs=pipeCorStatus(i.rfp_id); return `<td title="${esc(cs.title)}"><span class="pill" style="font-size:11px;background:${cs.color};color:#fff">${esc(cs.label)}</span></td>`; })()}
       <td style="max-width:220px" title="${i.notes?esc(i.notes):''}" onclick="event.stopPropagation();openLead('${i.id}')">${i.notes&&i.notes.trim()?`<span style="font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:210px;vertical-align:bottom">📝 ${esc(i.notes.replace(/\s+/g,' ').slice(0,60))}${i.notes.length>60?'…':''}</span>`:'<span class="muted" style="font-size:12px">＋ add</span>'}</td>
     </tr>`;
   }).join('');
   return `<div class="card" style="padding:0;overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:13.5px">
       <thead><tr style="text-align:left;background:var(--blue-050)">
-        ${['Title','Agency','Deadline','Priority','Win %','Stage','Docs','Notes'].map(h=>`<th style="padding:10px 12px;border-bottom:1px solid var(--line);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">${h}</th>`).join('')}
+        ${['Title','Agency','Deadline','Priority','Win %','Stage','Docs','COR email','Notes'].map(h=>`<th style="padding:10px 12px;border-bottom:1px solid var(--line);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">${h}</th>`).join('')}
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--muted)">Pipeline is empty.</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--muted)">Pipeline is empty.</td></tr>'}</tbody>
     </table></div>`;
 }
 // HTML5 drag-and-drop between stage columns
@@ -3896,6 +3928,15 @@ async function extractMatrices(r){
 
 /* ── subcontractors ── */
 /* ── CORs / points of contact (per opportunity) ──────────────────────────── */
+// delivery-status pill for a COR: shows whether the COR received the email.
+const COR_STATUS_COLOR={sent:'#7a5b00',delivered:'#0b6b34',opened:'#0b6b34',bounced:'#b3261e',spam:'#b3261e',deferred:'#7a5b00',failed:'#b3261e'};
+const COR_STATUS_LABEL={sent:'Sent',delivered:'Delivered ✓',opened:'Opened ✓',bounced:'Bounced ✗',spam:'Marked spam',deferred:'Deferred',failed:'Failed ✗'};
+function corStatusPill(c){
+  const s=c.email_status;
+  if(!s) return '<span class="pill" style="font-size:10px">not emailed yet</span>';
+  const col=COR_STATUS_COLOR[s]||'#555';
+  return `<span class="pill" style="font-size:10px;background:${col};color:#fff" title="${c.email_status_at?fmtDate(c.email_status_at):''}">${esc(COR_STATUS_LABEL[s]||s)}</span>`;
+}
 async function renderCors(rfpId){
   const host=$('#ld_cors'); if(!host) return;
   const rows=await api(`govcon_cors?owner=eq.${SESSION.user.id}&rfp_id=eq.${rfpId}&select=*&order=created_at`).catch(()=>null);
@@ -3912,9 +3953,11 @@ async function renderCors(rfpId){
       <label class="toggle" style="margin:0"><input type="checkbox" class="cv-bool" data-k="attending_site_visit" ${c.attending_site_visit?'checked':''} style="width:auto"> Attending site visit <span class="muted" style="font-weight:normal;font-size:11px">(day-before reminder)</span></label>
       <label class="toggle" style="margin:0"><input type="checkbox" class="cv-bool" data-k="is_primary_contact" ${c.is_primary_contact?'checked':''} style="width:auto"> Primary contact</label>
     </div>
-    <div style="display:flex;gap:8px;margin-top:6px">
+    <div style="display:flex;gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap">
       <button class="btn sm primary" onclick="corSave('${c.id}','${rfpId}')">Save</button>
       <button class="btn sm" style="color:var(--bad)" onclick="corDel('${c.id}','${rfpId}')">Delete</button>
+      <span style="flex:1"></span>
+      <span class="muted" style="font-size:11px">Email received:</span> ${corStatusPill(c)}
     </div>
   </div>`).join('') : '<div class="muted" style="font-size:13px">No CORs yet — click “+ Add COR / contact”.</div>';
 }
