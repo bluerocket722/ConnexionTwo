@@ -186,7 +186,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r48-cors-testemail-2026-08-11';
+const GOVCON_BUILD = 'r49-cor-locverify-branding-2026-08-11';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -1212,6 +1212,7 @@ async function rvSetRec(rec){
     const sum=Object.assign({}, (window._RV.rfp.details||{}).analysis_summary||{}, {recommendation:rec, recommendation_override:true});
     window._RV.rfp.details=Object.assign({}, window._RV.rfp.details||{}, {analysis_summary:sum});
     if(st) st.textContent='✓ Set to '+rec+' (saved)';
+    if(rec==='Team') maybeAutoCorVerify(window._RV.rfp.id);
     rvRenderAnalysis();
   }catch(e){ if(st) st.textContent='Failed: '+e.message; }
 }
@@ -1550,6 +1551,7 @@ async function ldSetRec(rfpId, rec){
       window._LEAD_RFP.details=Object.assign({}, window._LEAD_RFP.details||{}, {analysis_summary:sum});
     }
     if(st) st.textContent='✓ Set to '+rec+' (saved)';
+    if(rec==='Team') maybeAutoCorVerify(rfpId);
   }catch(e){ if(st) st.textContent='Failed: '+e.message; }
 }
 function rfpCard(r) {
@@ -2118,7 +2120,7 @@ async function samApplyNaics(where){
   }catch(e){ if(st) st.textContent=/relation|column/.test(e.message)?'Run govcon_migration_21.sql first.':'Failed: '+e.message; }
 }
 // ── Email (Brevo) settings: senders you can send "from" + editable templates ─
-const EMAIL_PLACEHOLDERS = '{{name}} {{company}} {{contract}} {{solicitation}} {{place_of_performance}} {{site_visit_date}} {{site_visit_time}} {{site_visit_time_zone}} {{quote_deadline}} {{cor_name}} {{cor_email}} {{cor_phone}} {{cor2_name}} {{cor2_email}} {{cor2_phone}} {{site_visit_cor_name}} {{site_visit_cor_email}} {{site_visit_cor_phone}} {{my_name}} {{my_company}}';
+const EMAIL_PLACEHOLDERS = '{{name}} {{company}} {{contract}} {{solicitation}} {{place_of_performance}} {{site_visit_date}} {{site_visit_time}} {{site_visit_time_zone}} {{quote_deadline}} {{cor_name}} {{cor_email}} {{cor_phone}} {{cor2_name}} {{cor2_email}} {{cor2_phone}} {{site_visit_cor_name}} {{site_visit_cor_email}} {{site_visit_cor_phone}} {{my_name}} {{my_company}} {{signature}}';
 async function renderEmailSettings(){
   const host=$('#emailSettingsCard'); if(!host) return;
   const uid=SESSION.user.id;
@@ -2132,6 +2134,8 @@ async function renderEmailSettings(){
   const S=(sset||[])[0]||{};
   const sub=(tpls||[]).find(t=>t.kind==='subcontractor_reminder')||{kind:'subcontractor_reminder',name:'Subcontractor reminder',subject:'',body:''};
   const cor=(tpls||[]).find(t=>t.kind==='cor')||{kind:'cor',name:'COR / CO email',subject:'',body:''};
+  const corlv=(tpls||[]).find(t=>t.kind==='cor_location_verification')||{kind:'cor_location_verification',name:'COR location verification',subject:'',body:''};
+  window._EMAIL_BRANDING={ from_name:S.email_from_name||'', signature:S.email_signature||'' };
   host.innerHTML=`<div class="card" style="margin-top:14px">
     <h2 class="section" style="margin-top:0">✉ Email &amp; reminders (Brevo)</h2>
     <div class="muted" style="font-size:12.5px;margin-bottom:10px">Send subcontractor reminders and COR/CO emails through <b>Brevo</b>, from an address you choose. ${keys.length?'<b style="color:var(--good)">Brevo key detected.</b>':'<b style="color:var(--bad)">No Brevo key yet</b> — add one under <b>Settings → API keys</b> with provider <b>brevo</b>.'} <button class="btn sm" onclick="testBrevo()">Test connection</button> <span id="brevoTest" class="muted"></span></div>
@@ -2161,7 +2165,15 @@ async function renderEmailSettings(){
       <label class="toggle" style="margin:0"><input type="checkbox" id="rem_24h" ${S.site_visit_reminder_24h!==false?'checked':''} style="width:auto"> 24-hour reminder</label>
       <label class="toggle" style="margin:0"><input type="checkbox" id="rem_2h" ${S.site_visit_reminder_2h!==false?'checked':''} style="width:auto"> 2-hour reminder</label>
     </div>
-    <button class="btn sm primary" onclick="saveReminderSettings()">💾 Save reminder schedule</button>
+    <h2 class="section" style="margin-top:10px">Your branding <span class="muted" style="font-weight:normal;font-size:12px">— fill these in; automated emails have NO built-in branding</span></h2>
+    <div class="muted" style="font-size:12px;margin:-6px 0 8px">Automated emails contain no logos, emojis, or company names unless you add them here. Leave blank for plain, unbranded emails. Use <b>{{signature}}</b> in a template to place the block yourself; otherwise it's appended at the end.</div>
+    <div class="row2">
+      <div class="field"><label>From name (sender display name)</label><input id="rem_from_name" value="${esc(S.email_from_name||'')}" placeholder="e.g. Parker Facility Solutions"></div>
+      <div class="field"></div>
+    </div>
+    <div class="field"><label>Signature / footer block (appended to automated emails)</label><textarea id="rem_signature" style="min-height:90px" placeholder="Your name&#10;Your Company&#10;Phone · Email">${esc(S.email_signature||'')}</textarea></div>
+
+    <button class="btn sm primary" onclick="saveReminderSettings()">💾 Save reminder schedule &amp; branding</button>
     <button class="btn sm" onclick="sendTestReminder()">📧 Send myself a test email</button>
     <span id="remSetStatus" class="muted" style="font-size:12px"></span>
 
@@ -2175,6 +2187,12 @@ async function renderEmailSettings(){
     <div class="field"><label>Subject</label><input id="tpl_cor_subject" value="${esc(cor.subject||'')}"></div>
     <div class="field"><label>Body</label><textarea id="tpl_cor_body" style="min-height:150px">${esc(cor.body||'')}</textarea></div>
     <button class="btn sm primary" onclick="saveEmailTemplate('cor','COR / CO email','tpl_cor_subject','tpl_cor_body')">💾 Save COR template</button>
+
+    <h2 class="section" style="margin-top:12px">COR location verification email <span class="muted" style="font-weight:normal;font-size:12px">— sent to both CORs to confirm the site visit</span></h2>
+    <div class="muted" style="font-size:12px;margin:-6px 0 8px">Sent to every COR (manually, or automatically when a lead is set to <b>Team</b> and the site visit is fully filled in). Placeholders: ${EMAIL_PLACEHOLDERS}</div>
+    <div class="field"><label>Subject</label><input id="tpl_corlv_subject" value="${esc(corlv.subject||'')}" placeholder="Site visit confirmation for {{contract}}"></div>
+    <div class="field"><label>Body</label><textarea id="tpl_corlv_body" style="min-height:150px" placeholder="Hello,&#10;&#10;Confirming the site visit for {{contract}} on {{site_visit_date}} at {{site_visit_time}} {{site_visit_time_zone}}, at {{place_of_performance}}. Please confirm the location and any check-in requirements.">${esc(corlv.body||'')}</textarea></div>
+    <button class="btn sm primary" onclick="saveEmailTemplate('cor_location_verification','COR location verification','tpl_corlv_subject','tpl_corlv_body')">💾 Save location verification template</button>
     <div id="emailSetStatus" class="muted" style="font-size:12px;margin-top:8px"></div>
   </div>`;
   renderSenderList(senders||[]);
@@ -2215,13 +2233,16 @@ async function saveReminderSettings(){
     site_visit_reminder_dayb:$('#rem_dayb').checked,
     site_visit_reminder_24h:$('#rem_24h').checked,
     site_visit_reminder_2h:$('#rem_2h').checked,
+    email_from_name: $('#rem_from_name')?($('#rem_from_name').value.trim()||null):undefined,
+    email_signature: $('#rem_signature')?($('#rem_signature').value||null):undefined,
     updated_at:new Date().toISOString() };
+  Object.keys(body).forEach(k=>body[k]===undefined&&delete body[k]);
   try{ await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify(body)});
     if(st) st.textContent='✓ Saved';
   }catch(e){
     // graceful degrade if the columns aren't there yet
     let retried=false;
-    for(const c of ['notification_sender_email','site_visit_reminder_time','site_visit_reminder_tz','site_visit_reminder_dayb','site_visit_reminder_24h','site_visit_reminder_2h']){ if(new RegExp(c).test(e.message)){ delete body[c]; retried=true; } }
+    for(const c of ['notification_sender_email','site_visit_reminder_time','site_visit_reminder_tz','site_visit_reminder_dayb','site_visit_reminder_24h','site_visit_reminder_2h','email_from_name','email_signature']){ if(new RegExp(c).test(e.message)){ delete body[c]; retried=true; } }
     if(retried){ try{ await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify(body)}); if(st) st.textContent='Saved — run govcon_migration_26.sql to enable all reminder options.'; }catch(e2){ if(st) st.textContent='Failed: '+e2.message; } }
     else if(st) st.textContent='Failed: '+e.message;
   }
@@ -3276,7 +3297,12 @@ async function openLead(itemId) {
       <h2 class="section">CORs / points of contact <span class="muted" style="font-weight:normal;font-size:12px">— add as many as you want; mark who attends the site visit and who is the main contact</span></h2>
       <div class="muted" style="font-size:12px;margin:-6px 0 8px">The <b>primary contact</b> fills the <b>{{cor_name}} {{cor_email}} {{cor_phone}}</b> placeholders; the 2nd fills {{cor2_name}} etc. Anyone marked <b>attending the site visit</b> gets the day-before reminder and fills {{site_visit_cor_name}}.</div>
       <div id="ld_cors"><div class="muted" style="font-size:13px">Loading…</div></div>
-      <button class="btn sm" id="corAddBtn" style="margin-top:4px">+ Add COR / contact</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
+        <button class="btn sm" id="corAddBtn">+ Add COR / contact</button>
+        <button class="btn sm primary" id="corVerifyBtn" title="Email the site visit date/time/location to the CORs for confirmation">Send location verification to CORs</button>
+        <span class="muted" id="corVerifyStatus" style="font-size:12px"></span>
+      </div>
+      <div class="muted" style="font-size:11px;margin-top:4px">Sends to every COR with an email. It also sends automatically when you set the recommendation to <b>Team</b> — but only if the site visit date, time, time zone, and location are all filled in.</div>
 
       <h2 class="section">Contract Location and Partner Coverage</h2>
       <div class="row3">
@@ -3375,6 +3401,10 @@ async function openLead(itemId) {
   // CORs / points of contact
   renderCors(item.rfp_id);
   if($('#corAddBtn')) $('#corAddBtn').onclick = ()=>corAdd(item.rfp_id);
+  if($('#corVerifyBtn')) $('#corVerifyBtn').onclick = ()=>corSendLocationVerify(item.rfp_id, false);
+  // show the last known send status if we have one
+  (function(){ const lv=((r.details||{}).cor_locverify)||null; const st=$('#corVerifyStatus');
+    if(lv&&st) st.innerHTML=`last: ${lv.sent||0} sent${lv.failed?` · ${lv.failed} failed`:''} (${lv.at?fmtDate(lv.at):''})`; })();
   // partner coverage + carried-over research
   renderLeadPartners(r);
   renderLeadResearch(r);
@@ -3628,9 +3658,10 @@ function emResolve(text, rfp, contact){
     '{{site_visit_cor_email}}': svCor.email||corEmail||'',
     '{{site_visit_cor_phone}}': svCor.phone||corPhone||'',
     '{{my_name}}': (PROFILE&&(PROFILE.contact_name||PROFILE.legal_name||PROFILE.company_name))||'',
-    '{{my_company}}': (PROFILE&&(PROFILE.company_name||PROFILE.legal_name))||'',
+    '{{my_company}}': ((window._EMAIL_BRANDING&&window._EMAIL_BRANDING.from_name)||(PROFILE&&(PROFILE.company_name||PROFILE.legal_name)))||'',
+    '{{signature}}': (window._EMAIL_BRANDING&&window._EMAIL_BRANDING.signature)||'',
   };
-  return String(text||'').replace(/\{\{[a-z_]+\}\}/g, m=>map[m]!=null?map[m]:m);
+  return String(text||'').replace(/\{\{[a-z_0-9]+\}\}/g, m=>map[m]!=null?map[m]:m);
 }
 // Recipients now come from the SUBCONTRACTORS section (single source of truth)
 // plus the Contracting Officer(s) auto-pulled from SAM. No separate contacts store.
@@ -3903,6 +3934,30 @@ async function corDel(id, rfpId){
   if(!confirm('Delete this COR / contact?')) return;
   await api(`govcon_cors?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); renderCors(rfpId);
   if($('#em_contacts')) emLoadContacts(rfpId);
+}
+// Send the location-verification email to the CORs and report sent/failed/bounced.
+async function corSendLocationVerify(rfpId, force){
+  const st=$('#corVerifyStatus'); if(st) st.textContent='Sending…';
+  try{
+    const r=await callFn('govcon-email-reminders',{action:'cor_location_verify', rfp_id:rfpId, force:force===true});
+    if(r&&r.skipped){ if(st) st.textContent='⚠ '+(r.error||'Not sent — fill in the site visit date, time, time zone & location.'); return r; }
+    if(r&&r.error&&!r.results){ if(st) st.textContent='⚠ '+r.error; return r; }
+    const parts=(r.results||[]).map(x=>`${x.email}: ${x.status==='sent'?'✓ sent':'✗ '+(x.error?x.error.slice(0,70):'failed/bounced')}`);
+    if(st) st.innerHTML=`${r.sent?('✓ '+r.sent+' sent'):''}${r.failed?` · ✗ ${r.failed} failed/bounced`:''}${parts.length?`<div style="font-size:11px;margin-top:2px">${parts.map(esc).join('<br>')}</div>`:''}`;
+    toast(r.sent?`Location verification sent to ${r.sent} COR(s)${r.failed?`, ${r.failed} failed`:''}`:`Send failed (${r.failed||0})`);
+    return r;
+  }catch(e){ if(st) st.textContent = /not deployed|Failed to fetch|CORS|404/.test(e.message)?'Deploy govcon-email-reminders (Verify JWT off) to enable this.':'Failed: '+e.message; }
+}
+// Auto-send when a lead is set to "Team" — only if the site visit is complete
+// (the function enforces that) and we haven't already sent one.
+async function maybeAutoCorVerify(rfpId){
+  try{
+    const rows=await api(`govcon_rfps?id=eq.${rfpId}&owner=eq.${SESSION.user.id}&select=details`);
+    if(((rows[0]||{}).details||{}).cor_locverify) return;   // already sent once
+    const r=await callFn('govcon-email-reminders',{action:'cor_location_verify', rfp_id:rfpId, force:false});
+    if(r&&r.sent){ toast(`Team — location verification auto-sent to ${r.sent} COR(s)`); const st=$('#corVerifyStatus'); if(st) st.innerHTML=`✓ auto-sent to ${r.sent}${r.failed?` · ✗ ${r.failed} failed`:''}`; }
+    // if skipped due to an incomplete site visit → stay silent (per your instruction)
+  }catch(_){}
 }
 async function renderSubs(rfpId, r){
   const host=$('#subsHost'); if(!host) return;
