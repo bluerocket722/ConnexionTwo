@@ -160,6 +160,7 @@
       <a data-view="ai"><span class="ic">✦</span>AI Tools</a>
       <a data-view="pipeline"><span class="ic">▦</span>Pipeline</a>
       <a data-view="calendar"><span class="ic">📅</span>Site Visit Calendar</a>
+      <a data-view="emails"><span class="ic">✉</span>Emails</a>
       <a data-view="awards"><span class="ic">◆</span>Awards Research</a>
       <a data-view="partners"><span class="ic">◈</span>Partner Network</a>
       <a data-view="analytics"><span class="ic">▲</span>Analytics</a>
@@ -186,7 +187,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r51-cor-email-test-2026-08-11';
+const GOVCON_BUILD = 'r52-subreminders-emailstab-2026-08-11';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -338,13 +339,13 @@ $('#nav').addEventListener('click', e => {
   const a = e.target.closest('a[data-view]'); if (a) route(a.dataset.view);
 });
 const TITLES = {dashboard:'Dashboard',rfps:'RFP Discovery',research:'Research',autopilot:'Autopilot',sources:'Custom Sources',
-  ai:'AI Tools',pipeline:'Pipeline',calendar:'Site Visit Calendar',awards:'Awards Research',partners:'Partner Network',analytics:'Analytics',
+  ai:'AI Tools',pipeline:'Pipeline',calendar:'Site Visit Calendar',emails:'Emails',awards:'Awards Research',partners:'Partner Network',analytics:'Analytics',
   editor:'Document Editor',createdoc:'Create & Send',profile:'Profile & Settings'};
 function route(view) {
   $$('#nav a[data-view]').forEach(a => a.classList.toggle('active', a.dataset.view===view));
   $('#viewTitle').textContent = TITLES[view] || view;
   ({dashboard:renderDashboard,rfps:renderRfps,research:renderResearch,autopilot:renderAutopilot,sources:renderSources,
-    ai:renderAi,pipeline:renderPipeline,calendar:renderCalendar,awards:renderAwards,partners:renderPartners,analytics:renderAnalytics,
+    ai:renderAi,pipeline:renderPipeline,calendar:renderCalendar,emails:renderEmails,awards:renderAwards,partners:renderPartners,analytics:renderAnalytics,
     editor:renderEditor,createdoc:renderCreateDoc,profile:renderProfile}[view]||renderDashboard)();
 }
 const V = () => $('#views');
@@ -2120,7 +2121,7 @@ async function samApplyNaics(where){
   }catch(e){ if(st) st.textContent=/relation|column/.test(e.message)?'Run govcon_migration_21.sql first.':'Failed: '+e.message; }
 }
 // ── Email (Brevo) settings: senders you can send "from" + editable templates ─
-const EMAIL_PLACEHOLDERS = '{{name}} {{company}} {{contract}} {{solicitation}} {{place_of_performance}} {{site_visit_date}} {{site_visit_time}} {{site_visit_time_zone}} {{quote_deadline}} {{cor_name}} {{cor_email}} {{cor_phone}} {{cor2_name}} {{cor2_email}} {{cor2_phone}} {{site_visit_cor_name}} {{site_visit_cor_email}} {{site_visit_cor_phone}} {{my_name}} {{my_company}} {{signature}}';
+const EMAIL_PLACEHOLDERS = '{{name}} {{company}} {{contract}} {{solicitation}} {{place_of_performance}} {{site_visit_location}} {{site_visit_date}} {{site_visit_time}} {{site_visit_time_zone}} {{quote_deadline}} {{cor_name}} {{cor_email}} {{cor_phone}} {{cor2_name}} {{cor2_email}} {{cor2_phone}} {{site_visit_cor_name}} {{site_visit_cor_email}} {{site_visit_cor_phone}} {{my_name}} {{my_company}} {{signature}}';
 async function renderEmailSettings(){
   const host=$('#emailSettingsCard'); if(!host) return;
   const uid=SESSION.user.id;
@@ -2161,9 +2162,16 @@ async function renderEmailSettings(){
       <div class="field" style="display:flex;align-items:flex-end"><span class="muted" style="font-size:12px">The daily reminder job checks at this time and sends whatever is due that day.</span></div>
     </div>
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin:6px 0">
-      <label class="toggle" style="margin:0"><input type="checkbox" id="rem_dayb" ${S.site_visit_reminder_dayb!==false?'checked':''} style="width:auto"> Day-before reminder to <b>attending</b> subcontractors (one email)</label>
-      <label class="toggle" style="margin:0"><input type="checkbox" id="rem_24h" ${S.site_visit_reminder_24h!==false?'checked':''} style="width:auto"> 24-hour reminder</label>
-      <label class="toggle" style="margin:0"><input type="checkbox" id="rem_2h" ${S.site_visit_reminder_2h!==false?'checked':''} style="width:auto"> 2-hour reminder</label>
+      <label class="toggle" style="margin:0"><input type="checkbox" id="rem_dayb" ${S.site_visit_reminder_dayb!==false?'checked':''} style="width:auto"> Day-before summary to <b>my notification email</b> (CCs attending subs + CORs)</label>
+    </div>
+
+    <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
+      <label class="toggle" style="margin:0"><input type="checkbox" id="rem_sub_enabled" ${S.subcontractor_reminder_enabled?'checked':''} style="width:auto"> <b>Email attending subcontractors before the site visit</b> — at the times I set below</label>
+      <div class="row2" style="margin-top:6px">
+        <div class="field"><label>First reminder — hours before the visit</label><input id="rem_sub_hours" type="number" min="0" max="336" value="${S.subcontractor_reminder_hours??24}"></div>
+        <div class="field"><label>Second reminder — hours before (optional, blank = off)</label><input id="rem_sub_hours2" type="number" min="0" max="336" value="${S.subcontractor_reminder_hours2??''}"></div>
+      </div>
+      <div class="muted" style="font-size:11px">Example: 24 = one day before. If the site visit has a <b>time + time zone</b>, it sends exactly that many hours before; if only a date is filled in, it sends that many whole days before at your send time above. Only subcontractors with <b>Attending the site visit</b> checked get these. (Needs the reminder cron running every ~15 min.)</div>
     </div>
     <h2 class="section" style="margin-top:10px">Your branding <span class="muted" style="font-weight:normal;font-size:12px">— fill these in; automated emails have NO built-in branding</span></h2>
     <div class="muted" style="font-size:12px;margin:-6px 0 8px">Automated emails contain no logos, emojis, or company names unless you add them here. Leave blank for plain, unbranded emails. Use <b>{{signature}}</b> in a template to place the block yourself; otherwise it's appended at the end.</div>
@@ -2248,9 +2256,10 @@ async function saveReminderSettings(){
     notification_sender_email:$('#rem_notify_email').value.trim()||null,
     site_visit_reminder_time:$('#rem_time').value||'08:00',
     site_visit_reminder_tz:$('#rem_tz').value,
-    site_visit_reminder_dayb:$('#rem_dayb').checked,
-    site_visit_reminder_24h:$('#rem_24h').checked,
-    site_visit_reminder_2h:$('#rem_2h').checked,
+    site_visit_reminder_dayb: $('#rem_dayb')?$('#rem_dayb').checked:undefined,
+    subcontractor_reminder_enabled: $('#rem_sub_enabled')?$('#rem_sub_enabled').checked:undefined,
+    subcontractor_reminder_hours: $('#rem_sub_hours')?Math.max(0,Math.min(336,+$('#rem_sub_hours').value||24)):undefined,
+    subcontractor_reminder_hours2: $('#rem_sub_hours2')?($('#rem_sub_hours2').value===''?null:Math.max(0,Math.min(336,+$('#rem_sub_hours2').value))):undefined,
     email_from_name: $('#rem_from_name')?($('#rem_from_name').value.trim()||null):undefined,
     email_signature: $('#rem_signature')?($('#rem_signature').value||null):undefined,
     updated_at:new Date().toISOString() };
@@ -2260,8 +2269,8 @@ async function saveReminderSettings(){
   }catch(e){
     // graceful degrade if the columns aren't there yet
     let retried=false;
-    for(const c of ['notification_sender_email','site_visit_reminder_time','site_visit_reminder_tz','site_visit_reminder_dayb','site_visit_reminder_24h','site_visit_reminder_2h','email_from_name','email_signature']){ if(new RegExp(c).test(e.message)){ delete body[c]; retried=true; } }
-    if(retried){ try{ await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify(body)}); if(st) st.textContent='Saved — run govcon_migration_26.sql to enable all reminder options.'; }catch(e2){ if(st) st.textContent='Failed: '+e2.message; } }
+    for(const c of ['notification_sender_email','site_visit_reminder_time','site_visit_reminder_tz','site_visit_reminder_dayb','subcontractor_reminder_enabled','subcontractor_reminder_hours','subcontractor_reminder_hours2','email_from_name','email_signature']){ if(new RegExp(c).test(e.message)){ delete body[c]; retried=true; } }
+    if(retried){ try{ await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify(body)}); if(st) st.textContent='Saved — run govcon_migration_26.sql & 30 to enable all reminder options.'; }catch(e2){ if(st) st.textContent='Failed: '+e2.message; } }
     else if(st) st.textContent='Failed: '+e.message;
   }
 }
@@ -3677,6 +3686,7 @@ function emResolve(text, rfp, contact){
     '{{contract}}': rfp.title||'this contract',
     '{{solicitation}}': d.solicitation_number?(' (Solicitation '+d.solicitation_number+')'):'',
     '{{place_of_performance}}': rfp.place_of_performance_raw||d.place_of_performance||'[location]',
+    '{{site_visit_location}}': svd.meeting_location||svd.full_address||rfp.place_of_performance_raw||d.place_of_performance||'[site visit location]',
     '{{site_visit_date}}': (svd.date||rfp.site_visit_date)?fmtDate(svd.date||rfp.site_visit_date):'[site visit date]',
     '{{site_visit_time}}': svTime || '[site visit time]',
     '{{site_visit_time_zone}}': svTz || '[time zone]',
@@ -4073,6 +4083,78 @@ async function uploadSubFile(subId, r, file){
 
 /* ═══════════════ AWARDS RESEARCH ═══════════════ */
 let AWARD_SORT = 'amount';
+/* ═══════════════ EMAILS — custom emails organized by contract ═══════════════
+   Send a custom email to anyone, grouped by contract; filter by contract name
+   and by pipeline stage. Reuses the per-solicitation thread/compose machinery,
+   so everything you send stays organized under its contract. */
+let EM_STAGE='', EM_Q='', EM_SEL_RFP=null;
+async function renderEmails(){
+  loading();
+  await loadStageLabels();
+  const uid=SESSION.user.id;
+  const items=await api(`govcon_pipeline_items?owner=eq.${uid}&select=rfp_id,stage,govcon_rfps(id,title,agency)&order=stage_updated_at.desc`).catch(()=>[]);
+  const q=EM_Q.toLowerCase();
+  const shown=(items||[]).filter(it=>{ const r=it.govcon_rfps||{};
+    if(EM_STAGE && it.stage!==EM_STAGE) return false;
+    if(q && !`${r.title||''} ${r.agency||''}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const list=shown.map(it=>{ const r=it.govcon_rfps||{};
+    return `<div class="rfp" style="padding:8px 10px;margin-bottom:6px;cursor:pointer;${EM_SEL_RFP===r.id?'border-color:var(--blue-500);background:var(--blue-050)':''}" onclick="emSelectContract('${r.id}')">
+      <b style="font-size:13px">${esc(r.title||'Contract')}</b>
+      <div class="muted" style="font-size:11px">${esc(r.agency||'')} · ${esc(stageLabel(it.stage))}</div></div>`;
+  }).join('')||'<div class="muted" style="font-size:13px">No contracts match. Adjust the filters.</div>';
+  V().innerHTML=`
+    <div class="banner info">Send custom emails to anyone — organized by contract. Pick a contract on the left (filter by stage or name), then compose. Everything you send is threaded under that contract so the whole conversation stays in one place.</div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <b class="muted">Filter contracts:</b>
+        <select id="em_stage" style="width:auto;font-size:12px"><option value="">All pipeline stages</option>${STAGES.map(([k,l])=>`<option value="${k}" ${k===EM_STAGE?'selected':''}>${esc(stageLabel(k))}</option>`).join('')}</select>
+        <input id="em_q" placeholder="Search contract name / agency…" value="${esc(EM_Q)}" style="width:240px">
+      </div>
+    </div>
+    <div class="row2" style="align-items:start;gap:16px">
+      <div>
+        <div class="field-label" style="font-weight:600;margin-bottom:6px">Contracts (${shown.length})</div>
+        <div style="max-height:70vh;overflow:auto">${list}</div>
+      </div>
+      <div>
+        <div id="em_contract_head" class="muted" style="font-size:13px;margin-bottom:8px">Select a contract to email its people or anyone you choose.</div>
+        <div class="field-label" style="font-weight:600;margin-bottom:6px">Recipients (from this contract)</div>
+        <div id="em_contacts"><div class="muted" style="font-size:13px">—</div></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">
+          <button class="btn sm primary" id="em_new_custom" disabled onclick="emComposeCustom()">✉ New custom email</button>
+          <button class="btn sm" id="em_new_sub" disabled onclick="emCompose(EM_SEL_RFP,'subcontractor')">Subcontractor template</button>
+          <button class="btn sm" id="em_new_cor" disabled onclick="emCompose(EM_SEL_RFP,'cor')">COR template</button>
+        </div>
+        <div class="field-label" style="font-weight:600;margin:8px 0 6px">Threads for this contract</div>
+        <div id="em_threads"><div class="muted" style="font-size:13px">—</div></div>
+        <div id="em_pane" style="margin-top:12px"></div>
+      </div>
+    </div>`;
+  $('#em_stage').onchange=e=>{ EM_STAGE=e.target.value; renderEmails(); };
+  $('#em_q').oninput=e=>{ EM_Q=e.target.value; clearTimeout(window._emt); window._emt=setTimeout(renderEmails,300); };
+  if(EM_SEL_RFP) emSelectContract(EM_SEL_RFP);   // restore selection after re-render
+}
+async function emSelectContract(rfpId){
+  EM_SEL_RFP=rfpId;
+  const rows=await api(`govcon_rfps?id=eq.${rfpId}&owner=eq.${SESSION.user.id}&select=*`).catch(()=>[]);
+  const r=(rows||[])[0]; if(!r) return;
+  window._LEAD_RFP=r; window._LEAD_ITEM={rfp_id:rfpId};
+  const head=$('#em_contract_head'); if(head) head.innerHTML=`<b>${esc(r.title||'Contract')}</b> <span class="muted">${esc(r.agency||'')}</span>`;
+  ['em_new_custom','em_new_sub','em_new_cor'].forEach(id=>{ const b=$('#'+id); if(b) b.disabled=false; });
+  // highlight selection
+  $$('#views .rfp').forEach(el=>{});   // (list re-render handles highlight on next filter)
+  await emLoadContacts(rfpId); await emLoadThreads(rfpId);
+}
+// blank custom email (no template pre-fill) to whoever you type
+function emComposeCustom(){
+  if(!EM_SEL_RFP) return;
+  emCompose(EM_SEL_RFP, 'other');
+  // clear the template-filled subject/body so it starts blank for a custom message
+  setTimeout(()=>{ const s=$('#em_subject'), b=$('#em_body'); if(s&&!s.value)s.value=''; if(b)b.value=''; }, 60);
+}
+
 /* ═══════════════ SITE VISIT CALENDAR ═══════════════
    Shows every site visit for your pipeline leads on a month calendar + an
    upcoming list. Filter by stage, NAICS category, or name — leads show BY NAME
