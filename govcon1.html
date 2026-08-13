@@ -187,7 +187,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r52-subreminders-emailstab-2026-08-11';
+const GOVCON_BUILD = 'r53-replyto-cortrigger-2026-08-11';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -1213,7 +1213,7 @@ async function rvSetRec(rec){
     const sum=Object.assign({}, (window._RV.rfp.details||{}).analysis_summary||{}, {recommendation:rec, recommendation_override:true});
     window._RV.rfp.details=Object.assign({}, window._RV.rfp.details||{}, {analysis_summary:sum});
     if(st) st.textContent='✓ Set to '+rec+' (saved)';
-    if(rec==='Team') maybeAutoCorVerify(window._RV.rfp.id);
+    if(rec==='Team') maybeAutoCorVerify(window._RV.rfp.id, 'team');
     rvRenderAnalysis();
   }catch(e){ if(st) st.textContent='Failed: '+e.message; }
 }
@@ -1552,7 +1552,7 @@ async function ldSetRec(rfpId, rec){
       window._LEAD_RFP.details=Object.assign({}, window._LEAD_RFP.details||{}, {analysis_summary:sum});
     }
     if(st) st.textContent='✓ Set to '+rec+' (saved)';
-    if(rec==='Team') maybeAutoCorVerify(rfpId);
+    if(rec==='Team') maybeAutoCorVerify(rfpId, 'team');
   }catch(e){ if(st) st.textContent='Failed: '+e.message; }
 }
 function rfpCard(r) {
@@ -2154,7 +2154,11 @@ async function renderEmailSettings(){
     <div class="muted" style="font-size:12px;margin:-6px 0 8px">Automated reminders for site visits, sent through Brevo. Change any of these anytime. Reminders go to the <b>notification email</b> below and are CC'd to subcontractors marked <b>Attending the site visit</b>.</div>
     <div class="row2">
       <div class="field"><label>Notification email (from + main recipient)</label><input id="rem_notify_email" value="${esc(S.notification_sender_email||'parkerfacilitysolutions@gmail.com')}" placeholder="parkerfacilitysolutions@gmail.com"></div>
+      <div class="field"><label>Reply-to address <span class="muted" style="font-weight:normal">— where replies go</span></label><input id="rem_reply_to" value="${esc(S.email_reply_to||'')}" placeholder="you@yourdomain.com"></div>
+    </div>
+    <div class="row2">
       <div class="field"><label>Send reminders at (time of day)</label><input id="rem_time" type="time" value="${esc(S.site_visit_reminder_time||'08:00')}"></div>
+      <div class="field"></div>
     </div>
     <div class="row2">
       <div class="field"><label>Time zone for the send time</label>
@@ -2172,6 +2176,17 @@ async function renderEmailSettings(){
         <div class="field"><label>Second reminder — hours before (optional, blank = off)</label><input id="rem_sub_hours2" type="number" min="0" max="336" value="${S.subcontractor_reminder_hours2??''}"></div>
       </div>
       <div class="muted" style="font-size:11px">Example: 24 = one day before. If the site visit has a <b>time + time zone</b>, it sends exactly that many hours before; if only a date is filled in, it sends that many whole days before at your send time above. Only subcontractors with <b>Attending the site visit</b> checked get these. (Needs the reminder cron running every ~15 min.)</div>
+    </div>
+
+    <h2 class="section" style="margin-top:12px">📨 COR location-verification — auto-send trigger</h2>
+    <div class="muted" style="font-size:12px;margin:-6px 0 8px">Choose what automatically emails the location-verification to <b>all CORs</b> on an opportunity. It only sends when the site visit has a <b>date and a location</b>, and only once per opportunity. You can always send it by hand with the button on the pipeline card.</div>
+    <div class="row2">
+      <div class="field"><label>Trigger</label>
+        <select id="rem_cor_trigger">
+          ${[['team','When I set the recommendation to Team'],['sitevisit','As soon as a site visit date + location is set'],['stage','When it reaches a specific pipeline stage'],['pipeline_add','When it is added to the pipeline (any)'],['off','Off — I will send it manually']].map(([v,l])=>`<option value="${v}" ${v===(S.cor_autoemail_trigger||'team')?'selected':''}>${esc(l)}</option>`).join('')}
+        </select></div>
+      <div class="field"><label>Stage <span class="muted" style="font-weight:normal">— used only for “specific stage”</span></label>
+        <select id="rem_cor_stage">${STAGES.map(([k,l])=>`<option value="${k}" ${k===(S.cor_autoemail_stage||'')?'selected':''}>${esc(stageLabel(k))}</option>`).join('')}</select></div>
     </div>
     <h2 class="section" style="margin-top:10px">Your branding <span class="muted" style="font-weight:normal;font-size:12px">— fill these in; automated emails have NO built-in branding</span></h2>
     <div class="muted" style="font-size:12px;margin:-6px 0 8px">Automated emails contain no logos, emojis, or company names unless you add them here. Leave blank for plain, unbranded emails. Use <b>{{signature}}</b> in a template to place the block yourself; otherwise it's appended at the end.</div>
@@ -2257,6 +2272,9 @@ async function saveReminderSettings(){
     site_visit_reminder_time:$('#rem_time').value||'08:00',
     site_visit_reminder_tz:$('#rem_tz').value,
     site_visit_reminder_dayb: $('#rem_dayb')?$('#rem_dayb').checked:undefined,
+    email_reply_to: $('#rem_reply_to')?($('#rem_reply_to').value.trim()||null):undefined,
+    cor_autoemail_trigger: $('#rem_cor_trigger')?$('#rem_cor_trigger').value:undefined,
+    cor_autoemail_stage: $('#rem_cor_stage')?$('#rem_cor_stage').value:undefined,
     subcontractor_reminder_enabled: $('#rem_sub_enabled')?$('#rem_sub_enabled').checked:undefined,
     subcontractor_reminder_hours: $('#rem_sub_hours')?Math.max(0,Math.min(336,+$('#rem_sub_hours').value||24)):undefined,
     subcontractor_reminder_hours2: $('#rem_sub_hours2')?($('#rem_sub_hours2').value===''?null:Math.max(0,Math.min(336,+$('#rem_sub_hours2').value))):undefined,
@@ -2269,7 +2287,7 @@ async function saveReminderSettings(){
   }catch(e){
     // graceful degrade if the columns aren't there yet
     let retried=false;
-    for(const c of ['notification_sender_email','site_visit_reminder_time','site_visit_reminder_tz','site_visit_reminder_dayb','subcontractor_reminder_enabled','subcontractor_reminder_hours','subcontractor_reminder_hours2','email_from_name','email_signature']){ if(new RegExp(c).test(e.message)){ delete body[c]; retried=true; } }
+    for(const c of ['notification_sender_email','site_visit_reminder_time','site_visit_reminder_tz','site_visit_reminder_dayb','subcontractor_reminder_enabled','subcontractor_reminder_hours','subcontractor_reminder_hours2','email_from_name','email_signature','email_reply_to','cor_autoemail_trigger','cor_autoemail_stage']){ if(new RegExp(c).test(e.message)){ delete body[c]; retried=true; } }
     if(retried){ try{ await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify(body)}); if(st) st.textContent='Saved — run govcon_migration_26.sql & 30 to enable all reminder options.'; }catch(e2){ if(st) st.textContent='Failed: '+e2.message; } }
     else if(st) st.textContent='Failed: '+e.message;
   }
@@ -3121,7 +3139,7 @@ function pipeToDialer(itemId){
 // change a pipeline item's stage from the board card (same as dragging it)
 async function pipeSetStage(itemId, stage){
   try{ await api(`govcon_pipeline_items?id=eq.${itemId}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({stage, stage_updated_at:new Date().toISOString()})});
-    const it=(PIPE_ITEMS||[]).find(x=>x.id===itemId); if(it) it.stage=stage;
+    const it=(PIPE_ITEMS||[]).find(x=>x.id===itemId); if(it){ it.stage=stage; if(it.rfp_id) maybeAutoCorVerify(it.rfp_id, 'stage:'+stage); }
     toast('Stage → '+stageLabel(stage)); renderPipeline();
   }catch(e){ toast('Failed: '+e.message); }
 }
@@ -3179,6 +3197,7 @@ function wireDnd() {
 }
 async function moveStage(id, stage) {
   await api(`govcon_pipeline_items?id=eq.${id}`, {method:'PATCH', prefer:'return=minimal', body:JSON.stringify({stage, stage_updated_at:new Date().toISOString()})});
+  const it=(PIPE_ITEMS||[]).find(x=>x.id===id); if(it&&it.rfp_id) maybeAutoCorVerify(it.rfp_id, 'stage:'+stage);
   renderPipeline();
 }
 /* view / edit the full lead (pipeline item + its RFP) */
@@ -3346,7 +3365,7 @@ async function openLead(itemId) {
         <button class="btn sm primary" id="corVerifyBtn" title="Email the site visit date/time/location to the CORs for confirmation">Send location verification to CORs</button>
         <span class="muted" id="corVerifyStatus" style="font-size:12px"></span>
       </div>
-      <div class="muted" style="font-size:11px;margin-top:4px">Sends to every COR with an email. It also sends automatically when you set the recommendation to <b>Team</b> — but only if the site visit date, time, time zone, and location are all filled in.</div>
+      <div class="muted" style="font-size:11px;margin-top:4px">Sends to every COR with an email. It also sends automatically based on your <b>Settings → Autopilot → COR auto-send trigger</b> (default: when set to Team) — as long as the site visit has a <b>date and a location</b>. Sends once per opportunity.</div>
 
       <h2 class="section">Contract Location and Partner Coverage</h2>
       <div class="row3">
@@ -3547,6 +3566,14 @@ async function saveLead(itemId, rfpId) {
   } else {
     toast('Lead saved ✓');
   }
+  // fire the COR auto-email triggers (setting decides which one actually sends)
+  try{
+    const sv=(details.site_visit||{}); const firstV=(sv.dates||[])[0]||{};
+    const svHasDate=!!(firstV.date || details.site_visit_date || $('#ld_deadline'));
+    const svHasLoc=!!(firstV.meeting_location || firstV.full_address || ($('#ld_pop')&&$('#ld_pop').value.trim()) || details.place_of_performance);
+    if((firstV.date||details.site_visit_date) && svHasLoc) maybeAutoCorVerify(rfpId, 'sitevisit');
+    const stg=$('#ld_stage')?$('#ld_stage').value:null; if(stg) maybeAutoCorVerify(rfpId, 'stage:'+stg);
+  }catch(_){}
   renderPipeline();   // refresh the board behind the pop-up; pop-up stays open
 }
 async function renderLeadResearch(r){
@@ -4004,15 +4031,26 @@ async function corSendLocationVerify(rfpId, force){
     return r;
   }catch(e){ if(st) st.textContent = /not deployed|Failed to fetch|CORS|404/.test(e.message)?'Deploy govcon-email-reminders (Verify JWT off) to enable this.':'Failed: '+e.message; }
 }
-// Auto-send when a lead is set to "Team" — only if the site visit is complete
-// (the function enforces that) and we haven't already sent one.
-async function maybeAutoCorVerify(rfpId){
+// Auto-send the COR location verification when the configured trigger fires.
+// `event` is one of: 'team', 'sitevisit', 'stage:<id>', 'pipeline_add'.
+// Only sends if the settings trigger matches, the site visit has a date+location
+// (the edge function enforces that), and one hasn't already gone out.
+async function maybeAutoCorVerify(rfpId, event){
   try{
+    let trig='team', stageSel='';
+    try{ const s=await api(`govcon_autopilot_settings?owner=eq.${SESSION.user.id}&select=cor_autoemail_trigger,cor_autoemail_stage`); const S=(s[0]||{}); trig=S.cor_autoemail_trigger||'team'; stageSel=S.cor_autoemail_stage||''; }catch(_){}
+    if(trig==='off') return;
+    let match=false;
+    if(trig==='team' && event==='team') match=true;
+    else if(trig==='sitevisit' && event==='sitevisit') match=true;
+    else if(trig==='pipeline_add' && event==='pipeline_add') match=true;
+    else if(trig==='stage' && typeof event==='string' && event.indexOf('stage:')===0 && event.slice(6)===stageSel) match=true;
+    if(!match) return;
     const rows=await api(`govcon_rfps?id=eq.${rfpId}&owner=eq.${SESSION.user.id}&select=details`);
     if(((rows[0]||{}).details||{}).cor_locverify) return;   // already sent once
     const r=await callFn('govcon-email-reminders',{action:'cor_location_verify', rfp_id:rfpId, force:false});
-    if(r&&r.sent){ toast(`Team — location verification auto-sent to ${r.sent} COR(s)`); const st=$('#corVerifyStatus'); if(st) st.innerHTML=`✓ auto-sent to ${r.sent}${r.failed?` · ✗ ${r.failed} failed`:''}`; }
-    // if skipped due to an incomplete site visit → stay silent (per your instruction)
+    if(r&&r.sent){ toast(`Location verification auto-sent to ${r.sent} COR(s)`); const st=$('#corVerifyStatus'); if(st) st.innerHTML=`✓ auto-sent to ${r.sent}${r.failed?` · ✗ ${r.failed} failed`:''}`; }
+    // if skipped (incomplete site visit / no CORs) → stay silent
   }catch(_){}
 }
 async function renderSubs(rfpId, r){
