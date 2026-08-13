@@ -187,7 +187,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r58-followup-email-2026-08-12';
+const GOVCON_BUILD = 'r59-followup-subs-onetime-cor-2026-08-12';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -2183,7 +2183,7 @@ async function renderEmailSettings(){
       <label class="toggle" style="margin:0"><input type="checkbox" id="rem_followup_enabled" ${S.followup_reminder_enabled?'checked':''} style="width:auto"> <b>Send a follow-up email AFTER the site visit</b></label>
       <div class="row2" style="margin-top:6px">
         <div class="field"><label>Hours after the visit</label><input id="rem_followup_hours" type="number" min="0" max="336" value="${S.followup_reminder_hours??24}"></div>
-        <div class="field" style="display:flex;align-items:flex-end"><span class="muted" style="font-size:12px">e.g. 24 = one day after. Goes to attending subcontractors + CORs, timezone-aware.</span></div>
+        <div class="field" style="display:flex;align-items:flex-end"><span class="muted" style="font-size:12px">e.g. 24 = one day after. Goes to <b>attending subcontractors only</b>, timezone-aware.</span></div>
       </div>
       <div class="muted" style="font-size:11px">If the visit has a <b>time + time zone</b>, it sends exactly that many hours after; if only a date is set, it sends that many whole days after at your send time. Uses the <b>Follow-up email</b> template below.</div>
     </div>
@@ -2233,7 +2233,7 @@ async function renderEmailSettings(){
     <button class="btn sm" onclick="sendTestTemplateBtn('cor_location_verification','tpl_corlv_subject','tpl_corlv_body')">📧 Send me a test of this COR email</button>
     <span id="tpl_corlv_test" class="muted" style="font-size:12px"></span>
 
-    <h2 class="section" style="margin-top:12px">Follow-up email <span class="muted" style="font-weight:normal;font-size:12px">— sent AFTER the site visit to attending subs + CORs</span></h2>
+    <h2 class="section" style="margin-top:12px">Follow-up email <span class="muted" style="font-weight:normal;font-size:12px">— sent AFTER the site visit to attending subcontractors only</span></h2>
     <div class="muted" style="font-size:12px;margin:-6px 0 8px">Sent the number of hours after the visit you set above. Placeholders: ${EMAIL_PLACEHOLDERS}</div>
     <div class="field"><label>Subject</label><input id="tpl_fup_subject" value="${esc(fup.subject||'')}" placeholder="Following up on the site visit for {{contract}}"></div>
     <div class="field"><label>Body</label><textarea id="tpl_fup_body" style="min-height:150px" placeholder="Hello,&#10;&#10;Thank you for attending the site visit for {{contract}} on {{site_visit_date}} at {{site_visit_location}}. Please send over any quotes or questions.">${esc(fup.body||'')}</textarea></div>
@@ -4060,17 +4060,30 @@ async function maybeAutoCorVerify(rfpId, event){
     let trig='team', stageSel='';
     try{ const s=await api(`govcon_autopilot_settings?owner=eq.${SESSION.user.id}&select=cor_autoemail_trigger,cor_autoemail_stage`); const S=(s[0]||{}); trig=S.cor_autoemail_trigger||'team'; stageSel=S.cor_autoemail_stage||''; }catch(_){}
     if(trig==='off') return;
-    let match=false;
-    if(trig==='team' && event==='team') match=true;
-    else if(trig==='sitevisit' && event==='sitevisit') match=true;
-    else if(trig==='pipeline_add' && event==='pipeline_add') match=true;
-    else if(trig==='stage' && typeof event==='string' && event.indexOf('stage:')===0 && event.slice(6)===stageSel) match=true;
-    if(!match) return;
+    // dedup: read once — the verification is ONE-TIME, marked in the DB
+    // (govcon_rfps.details.cor_locverify). Never resends once that flag is set.
     const rows=await api(`govcon_rfps?id=eq.${rfpId}&owner=eq.${SESSION.user.id}&select=details`);
-    if(((rows[0]||{}).details||{}).cor_locverify) return;   // already sent once
+    const det=(rows[0]||{}).details||{};
+    if(det.cor_locverify) return;   // already sent once — do not resend, ever
+    const curRec=(det.analysis_summary||{}).recommendation||'';
+    let match=false;
+    // Fires when BOTH conditions are true (in any order): the trigger has been hit
+    // AND the site visit has a location+date (enforced by the edge function).
+    if(trig==='team'){
+      if(event==='team') match=true;                                  // recommendation just set to Team
+      else if(event==='sitevisit' && curRec==='Team') match=true;      // location just set, already Team
+    } else if(trig==='sitevisit'){
+      if(event==='sitevisit') match=true;
+    } else if(trig==='pipeline_add'){
+      if(event==='pipeline_add') match=true;
+    } else if(trig==='stage'){
+      if(typeof event==='string' && event.indexOf('stage:')===0 && event.slice(6)===stageSel) match=true;
+    }
+    if(!match) return;
     const r=await callFn('govcon-email-reminders',{action:'cor_location_verify', rfp_id:rfpId, force:false});
     if(r&&r.sent){ toast(`Location verification auto-sent to ${r.sent} COR(s)`); const st=$('#corVerifyStatus'); if(st) st.innerHTML=`✓ auto-sent to ${r.sent}${r.failed?` · ✗ ${r.failed} failed`:''}`; }
-    // if skipped (incomplete site visit / no CORs) → stay silent
+    // if skipped (incomplete site visit / no CORs) → stay silent; the DB flag is
+    // only set once an email actually goes out, so it will fire when ready.
   }catch(_){}
 }
 async function renderSubs(rfpId, r){
