@@ -187,7 +187,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r56-createsend-embedded-2026-08-12';
+const GOVCON_BUILD = 'r58-followup-email-2026-08-12';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -2136,6 +2136,7 @@ async function renderEmailSettings(){
   const sub=(tpls||[]).find(t=>t.kind==='subcontractor_reminder')||{kind:'subcontractor_reminder',name:'Subcontractor reminder',subject:'',body:''};
   const cor=(tpls||[]).find(t=>t.kind==='cor')||{kind:'cor',name:'COR / CO email',subject:'',body:''};
   const corlv=(tpls||[]).find(t=>t.kind==='cor_location_verification')||{kind:'cor_location_verification',name:'COR location verification',subject:'',body:''};
+  const fup=(tpls||[]).find(t=>t.kind==='followup')||{kind:'followup',name:'Follow-up email',subject:'',body:''};
   window._EMAIL_BRANDING={ from_name:S.email_from_name||'', signature:S.email_signature||'' };
   host.innerHTML=`<div class="card" style="margin-top:14px">
     <h2 class="section" style="margin-top:0">✉ Email &amp; reminders (Brevo)</h2>
@@ -2176,6 +2177,15 @@ async function renderEmailSettings(){
         <div class="field"><label>Second reminder — hours before (optional, blank = off)</label><input id="rem_sub_hours2" type="number" min="0" max="336" value="${S.subcontractor_reminder_hours2??''}"></div>
       </div>
       <div class="muted" style="font-size:11px">Example: 24 = one day before. If the site visit has a <b>time + time zone</b>, it sends exactly that many hours before; if only a date is filled in, it sends that many whole days before at your send time above. Only subcontractors with <b>Attending the site visit</b> checked get these. (Needs the reminder cron running every ~15 min.)</div>
+    </div>
+
+    <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
+      <label class="toggle" style="margin:0"><input type="checkbox" id="rem_followup_enabled" ${S.followup_reminder_enabled?'checked':''} style="width:auto"> <b>Send a follow-up email AFTER the site visit</b></label>
+      <div class="row2" style="margin-top:6px">
+        <div class="field"><label>Hours after the visit</label><input id="rem_followup_hours" type="number" min="0" max="336" value="${S.followup_reminder_hours??24}"></div>
+        <div class="field" style="display:flex;align-items:flex-end"><span class="muted" style="font-size:12px">e.g. 24 = one day after. Goes to attending subcontractors + CORs, timezone-aware.</span></div>
+      </div>
+      <div class="muted" style="font-size:11px">If the visit has a <b>time + time zone</b>, it sends exactly that many hours after; if only a date is set, it sends that many whole days after at your send time. Uses the <b>Follow-up email</b> template below.</div>
     </div>
 
     <h2 class="section" style="margin-top:12px">📨 COR location-verification — auto-send trigger</h2>
@@ -2222,6 +2232,14 @@ async function renderEmailSettings(){
     <button class="btn sm primary" onclick="saveEmailTemplate('cor_location_verification','COR location verification','tpl_corlv_subject','tpl_corlv_body')">💾 Save location verification template</button>
     <button class="btn sm" onclick="sendTestTemplateBtn('cor_location_verification','tpl_corlv_subject','tpl_corlv_body')">📧 Send me a test of this COR email</button>
     <span id="tpl_corlv_test" class="muted" style="font-size:12px"></span>
+
+    <h2 class="section" style="margin-top:12px">Follow-up email <span class="muted" style="font-weight:normal;font-size:12px">— sent AFTER the site visit to attending subs + CORs</span></h2>
+    <div class="muted" style="font-size:12px;margin:-6px 0 8px">Sent the number of hours after the visit you set above. Placeholders: ${EMAIL_PLACEHOLDERS}</div>
+    <div class="field"><label>Subject</label><input id="tpl_fup_subject" value="${esc(fup.subject||'')}" placeholder="Following up on the site visit for {{contract}}"></div>
+    <div class="field"><label>Body</label><textarea id="tpl_fup_body" style="min-height:150px" placeholder="Hello,&#10;&#10;Thank you for attending the site visit for {{contract}} on {{site_visit_date}} at {{site_visit_location}}. Please send over any quotes or questions.">${esc(fup.body||'')}</textarea></div>
+    <button class="btn sm primary" onclick="saveEmailTemplate('followup','Follow-up email','tpl_fup_subject','tpl_fup_body')">💾 Save follow-up template</button>
+    <button class="btn sm" onclick="sendTestTemplateBtn('followup','tpl_fup_subject','tpl_fup_body')">📧 Send me a test of this follow-up email</button>
+    <span id="tpl_fup_test" class="muted" style="font-size:12px"></span>
     <div id="emailSetStatus" class="muted" style="font-size:12px;margin-top:8px"></div>
   </div>`;
   renderSenderList(senders||[]);
@@ -2245,8 +2263,8 @@ async function addSender(){
 async function delSender(id){ await api(`govcon_email_senders?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal'}); renderEmailSettings(); }
 // Send a test of a SPECIFIC template (subcontractor or COR) to yourself.
 async function sendTestTemplateBtn(kind, subjId, bodyId){
-  const statId = {cor_location_verification:'tpl_corlv_test', cor:'tpl_cor_test', subcontractor_reminder:'tpl_sub_test'}[kind] || 'tpl_sub_test';
-  const nameFor = {cor_location_verification:'COR location verification', cor:'COR / CO email', subcontractor_reminder:'Subcontractor reminder'}[kind] || 'Subcontractor reminder';
+  const statId = {cor_location_verification:'tpl_corlv_test', cor:'tpl_cor_test', subcontractor_reminder:'tpl_sub_test', followup:'tpl_fup_test'}[kind] || 'tpl_sub_test';
+  const nameFor = {cor_location_verification:'COR location verification', cor:'COR / CO email', subcontractor_reminder:'Subcontractor reminder', followup:'Follow-up email'}[kind] || 'Subcontractor reminder';
   const st=$('#'+statId); if(st) st.textContent='Saving & sending…';
   // save the template first so the test reflects what you see on screen
   try{ await saveEmailTemplate(kind, nameFor, subjId, bodyId); }catch(_){}
@@ -2278,6 +2296,8 @@ async function saveReminderSettings(){
     subcontractor_reminder_enabled: $('#rem_sub_enabled')?$('#rem_sub_enabled').checked:undefined,
     subcontractor_reminder_hours: $('#rem_sub_hours')?Math.max(0,Math.min(336,+$('#rem_sub_hours').value||24)):undefined,
     subcontractor_reminder_hours2: $('#rem_sub_hours2')?($('#rem_sub_hours2').value===''?null:Math.max(0,Math.min(336,+$('#rem_sub_hours2').value))):undefined,
+    followup_reminder_enabled: $('#rem_followup_enabled')?$('#rem_followup_enabled').checked:undefined,
+    followup_reminder_hours: $('#rem_followup_hours')?Math.max(0,Math.min(336,+$('#rem_followup_hours').value||24)):undefined,
     email_from_name: $('#rem_from_name')?($('#rem_from_name').value.trim()||null):undefined,
     email_signature: $('#rem_signature')?($('#rem_signature').value||null):undefined,
     updated_at:new Date().toISOString() };
@@ -2287,7 +2307,7 @@ async function saveReminderSettings(){
   }catch(e){
     // graceful degrade if the columns aren't there yet
     let retried=false;
-    for(const c of ['notification_sender_email','site_visit_reminder_time','site_visit_reminder_tz','site_visit_reminder_dayb','subcontractor_reminder_enabled','subcontractor_reminder_hours','subcontractor_reminder_hours2','email_from_name','email_signature','email_reply_to','cor_autoemail_trigger','cor_autoemail_stage']){ if(new RegExp(c).test(e.message)){ delete body[c]; retried=true; } }
+    for(const c of ['notification_sender_email','site_visit_reminder_time','site_visit_reminder_tz','site_visit_reminder_dayb','subcontractor_reminder_enabled','subcontractor_reminder_hours','subcontractor_reminder_hours2','followup_reminder_enabled','followup_reminder_hours','email_from_name','email_signature','email_reply_to','cor_autoemail_trigger','cor_autoemail_stage']){ if(new RegExp(c).test(e.message)){ delete body[c]; retried=true; } }
     if(retried){ try{ await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify(body)}); if(st) st.textContent='Saved — run govcon_migration_26.sql & 30 to enable all reminder options.'; }catch(e2){ if(st) st.textContent='Failed: '+e2.message; } }
     else if(st) st.textContent='Failed: '+e.message;
   }
