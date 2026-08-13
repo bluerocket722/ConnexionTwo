@@ -187,7 +187,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r54-calendar-createsend-editorfilter-2026-08-12';
+const GOVCON_BUILD = 'r53-replyto-cortrigger-2026-08-11';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -4228,17 +4228,15 @@ async function renderCalendar(){
   const first=new Date(y,m,1), startDow=first.getDay(), daysIn=new Date(y,m+1,0).getDate();
   const monthName=CAL_MONTH.toLocaleString(undefined,{month:'long',year:'numeric'});
   const todayStr=new Date().toISOString().slice(0,10);
-  window._CAL_BYDAY=byDay;
   const cells=[];
-  for(let i=0;i<startDow;i++) cells.push('<div></div>');
+  for(let i=0;i<startDow;i++) cells.push('<div style="min-height:74px"></div>');
   for(let day=1;day<=daysIn;day++){
     const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
     const dv=byDay[ds]||[];
-    cells.push(`<div style="min-width:0;overflow:hidden;min-height:78px;border:1px solid var(--line);border-radius:8px;padding:4px;box-sizing:border-box;${ds===todayStr?'outline:2px solid var(--blue-500);outline-offset:-2px':''};background:${dv.length?'var(--blue-050)':'#fff'}">
-      <div onclick="calDayDetail('${ds}')" title="See this day" style="cursor:pointer;font-size:11px;font-weight:700;color:${ds===todayStr?'var(--blue-700)':'var(--muted)'};display:flex;justify-content:space-between;align-items:center">
-        <span>${day}</span>${dv.length?`<span class="pill" style="font-size:9px;padding:0 5px">${dv.length}</span>`:''}</div>
-      ${dv.slice(0,2).map(v=>`<div title="${esc(v.title)}" onclick="event.stopPropagation();closeModal();openReview('${v.rfp_id}')" style="cursor:pointer;font-size:10px;background:#fff;border:1px solid var(--line);border-left:3px solid #0054d1;border-radius:4px;padding:2px 4px;margin-top:3px;max-width:100%;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.title)}</div>`).join('')}
-      ${dv.length>2?`<div onclick="calDayDetail('${ds}')" class="muted" style="cursor:pointer;font-size:9.5px;margin-top:2px">+${dv.length-2} more…</div>`:''}
+    cells.push(`<div style="min-height:74px;border:1px solid var(--line);border-radius:8px;padding:5px;${ds===todayStr?'outline:2px solid var(--blue-500);outline-offset:-2px':''};background:${dv.length?'var(--blue-050)':'#fff'}">
+      <div style="font-size:11px;color:var(--muted);font-weight:600">${day}</div>
+      ${dv.slice(0,3).map(v=>`<div title="${esc(v.title)}${v.time?' · '+esc(v.time):''}${v.loc?' · '+esc(v.loc):''}" onclick="openReview('${v.rfp_id}')" style="cursor:pointer;font-size:10.5px;background:#fff;border:1px solid var(--line);border-left:3px solid #0054d1;border-radius:4px;padding:2px 4px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🏗 ${esc(v.title)}</div>`).join('')}
+      ${dv.length>3?`<div class="muted" style="font-size:10px;margin-top:2px">+${dv.length-3} more</div>`:''}
     </div>`);
   }
   const upcoming=visits.filter(v=>v.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
@@ -4262,10 +4260,9 @@ async function renderCalendar(){
         <input id="calQ" placeholder="Search name / location…" value="${esc(CAL_Q)}" style="width:200px">
       </div>
     </div>
-    <div class="card" style="margin-bottom:14px;overflow:hidden">
-      <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-bottom:4px">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div style="font-size:11px;color:var(--muted);text-align:center;font-weight:600">${d}</div>`).join('')}</div>
-      <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px">${cells.join('')}</div>
-      <div class="muted" style="font-size:11px;margin-top:8px">Click a date to see all its site visits · click a visit name to open the opportunity.</div>
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div style="font-size:11px;color:var(--muted);text-align:center;font-weight:600">${d}</div>`).join('')}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">${cells.join('')}</div>
     </div>
     <h2 class="section">Upcoming site visits (${upcoming.length})</h2>
     <div>${upcoming.map(visitRow).join('')||'<div class="card center muted">No upcoming site visits match these filters.</div>'}</div>
@@ -4273,19 +4270,6 @@ async function renderCalendar(){
   $('#calStage').onchange=e=>{ CAL_STAGE=e.target.value; renderCalendar(); };
   $('#calCat').onchange=e=>{ CAL_CAT=e.target.value; renderCalendar(); };
   $('#calQ').oninput=e=>{ CAL_Q=e.target.value; clearTimeout(window._calt); window._calt=setTimeout(renderCalendar,300); };
-}
-function calDayDetail(ds){
-  const dv=(window._CAL_BYDAY||{})[ds]||[];
-  const dt=new Date(ds+'T00:00:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'});
-  openModal(`<div class="shd"><h3>Site visits — ${esc(dt)}</h3><button class="sclose" onclick="closeModal()">×</button></div>
-    <div class="sbd">${dv.length?dv.map(v=>`<div class="rfp" style="padding:12px;margin-bottom:8px;cursor:pointer" onclick="closeModal();openReview('${v.rfp_id}')">
-      <b style="font-size:14px">${esc(v.title)}</b>
-      <div class="muted" style="font-size:12.5px;margin-top:4px">${esc(v.agency||'')}${v.category?' · NAICS '+esc(v.category):''}</div>
-      <div style="font-size:12.5px;margin-top:6px">🕒 <b>Time:</b> ${esc(v.time||'not set')}${v.tz?' '+esc(v.tz):''}</div>
-      <div style="font-size:12.5px;margin-top:2px">📍 <b>Location:</b> ${esc(v.loc||'not set')}</div>
-      <div style="margin-top:8px"><span class="pill">${esc(stageLabel(v.stage))}</span></div>
-      <div class="muted" style="font-size:11px;margin-top:6px">Click to open the full opportunity →</div>
-    </div>`).join(''):'<div class="muted">No site visits on this day.</div>'}</div>`);
 }
 function calMove(delta){ CAL_MONTH.setMonth(CAL_MONTH.getMonth()+delta); renderCalendar(); }
 function calToday(){ CAL_MONTH=new Date(); CAL_MONTH.setDate(1); renderCalendar(); }
@@ -5192,7 +5176,7 @@ function embed(src, label) {
         allow="clipboard-read; clipboard-write"></iframe>
     </div>`;
 }
-function renderCreateDoc(){ embed('document-creation-govcon.html', 'Create & Send'); }
+function renderCreateDoc(){ embed('document-creation.html', 'Create & Send'); }
 
 /* ═══════════════ DOCUMENT EDITOR (real OnlyOffice · your GovCon login) ═══════
    Library backed by this project's private "documents" bucket. Files open in
@@ -5239,16 +5223,6 @@ async function renderEditor() {
   catch(e){ bucketErr=e.message; }
   const folders = items.filter(f=>!f.id), files = items.filter(f=>f.id);
   try { templates = await api(`govcon_templates?owner=eq.${SESSION.user.id}&select=id,name,tokens,created_at&order=created_at.desc`); } catch(e){}
-  // pipeline contracts → their document folders (for the "filter by pipeline" jump)
-  let pipeFolders=[];
-  try{
-    const pit=await api(`govcon_pipeline_items?owner=eq.${SESSION.user.id}&select=rfp_id&order=stage_updated_at.desc`);
-    const rids=[...new Set((pit||[]).map(i=>i.rfp_id).filter(Boolean))];
-    if(rids.length){ for(let n=0;n<rids.length;n+=60){ const chunk=rids.slice(n,n+60);
-      const rr=await api(`govcon_rfps?id=in.(${chunk.join(',')})&owner=eq.${SESSION.user.id}&select=id,title,notice_id,details`).catch(()=>[]);
-      (rr||[]).forEach(r=>pipeFolders.push({title:r.title||'Opportunity', folder:leadFolder(r)})); } }
-    pipeFolders.sort((a,b)=>a.title.localeCompare(b.title));
-  }catch(_){}
   const crumbs = ED_PATH ? ED_PATH.split('/') : [];
   const crumbHtml = `<span class="ed-crumb" data-path="" style="cursor:pointer;font-weight:700">All documents</span>` +
     crumbs.map((c,i)=>` / <span class="ed-crumb" data-path="${esc(crumbs.slice(0,i+1).join('/'))}" style="cursor:pointer">${esc(c)}</span>`).join('');
@@ -5258,12 +5232,8 @@ async function renderEditor() {
         <label class="btn primary" style="cursor:pointer">⬆ Upload document
           <input type="file" id="edFile" accept=".docx,.xlsx,.pptx,.doc,.xls,.ppt,.odt,.ods,.odp,.txt,.csv,.pdf" hidden></label>
         <button class="btn" id="edRefresh">Refresh</button>
-        <select id="edPipeFilter" style="width:auto;font-size:12px;max-width:280px" title="Jump to a pipeline contract's document folder">
-          <option value="">📂 Filter by pipeline contract…</option>
-          ${pipeFolders.map(p=>`<option value="${esc(p.folder)}" ${ED_PATH===p.folder?'selected':''}>${esc(p.title)}</option>`).join('')}
-        </select>
         <span style="flex:1"></span>
-        <input id="edSearch" placeholder="Search…" style="width:200px;max-width:50vw">
+        <input id="edSearch" placeholder="Search…" style="width:220px;max-width:50vw">
       </div>
       <div style="margin-top:10px;font-size:13px;display:flex;align-items:center;gap:8px">
         ${ED_PATH?`<button class="btn sm" id="edBack">← Back</button>`:''}
@@ -5305,7 +5275,6 @@ async function renderEditor() {
   // documents
   $('#edFile').onchange = e=>{ if(e.target.files[0]) edUploadDoc(e.target.files[0]); };
   $('#edRefresh').onclick = renderEditor;
-  if($('#edPipeFilter')) $('#edPipeFilter').onchange = e=>{ ED_PATH = e.target.value||''; renderEditor(); };
   $('#edSearch').oninput = e=>{ const q=e.target.value.toLowerCase(); $$('#edGrid .tool').forEach(el=>{ const n=(el.dataset.open||el.dataset.folder||'').toLowerCase(); el.style.display = n.includes(q)?'':'none'; }); };
   $('#edGrid').addEventListener('click', e=>{
     const del=e.target.closest('[data-del]'); if(del){ e.stopPropagation(); edDeleteDoc(del.dataset.del); return; }
