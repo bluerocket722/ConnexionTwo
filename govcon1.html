@@ -187,7 +187,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r59-followup-subs-onetime-cor-2026-08-12';
+const GOVCON_BUILD = 'r60-prime-eligibility-gate-2026-08-14';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -1167,12 +1167,183 @@ function complianceCard(c){
     ${src?`<div style="margin-top:6px"><b style="font-size:12px">Source documents</b>${src}</div>`:''}
   </div>`;
 }
+
+/* ═══════════════ CANONICAL PRIME ELIGIBILITY GATE (spec §13–§30) ═══════════════
+   ONE deterministic function used by Discovery, backfillMonitorLeads,
+   autoRunCandidates and manual Pipeline approval. It AGGREGATES the
+   server-computed compliance/hard_gates with deterministic set-aside / U.S. /
+   contract-value / bonding checks — it never re-derives legal facts the engine
+   already produced, and it never lets an AI fit score or recommendation override
+   a confirmed hard gate. Three-state logic (PASS / FAIL / UNKNOWN): UNKNOWN
+   keeps an opportunity in Research and OUT of the auto-Pipeline until resolved.
+   No migration — reads existing columns; strategy config lives in the existing
+   automation_rules JSON (automation_rules.strategy). */
+const US_STATE_NAMES=['alabama','alaska','arizona','arkansas','california','colorado','connecticut','delaware','florida','georgia','hawaii','idaho','illinois','indiana','iowa','kansas','kentucky','louisiana','maine','maryland','massachusetts','michigan','minnesota','mississippi','missouri','montana','nebraska','nevada','new hampshire','new jersey','new mexico','new york','north carolina','north dakota','ohio','oklahoma','oregon','pennsylvania','rhode island','south carolina','south dakota','tennessee','texas','utah','vermont','virginia','washington','west virginia','wisconsin','wyoming','district of columbia'];
+const US_STATE_ABBR=['al','ak','az','ar','ca','co','ct','de','fl','ga','hi','id','il','in','ia','ks','ky','la','me','md','ma','mi','mn','ms','mo','mt','ne','nv','nh','nj','nm','ny','nc','nd','oh','ok','or','pa','ri','sc','sd','tn','tx','ut','vt','va','wa','wv','wi','wy','dc'];
+// Foreign / out-of-target markers (target = 50 states + DC only; territories excluded).
+const FOREIGN_MARKERS=['germany','japan','south korea',' korea','italy','united kingdom',' u.k.','england','scotland','iraq','afghanistan','kuwait','qatar','bahrain','saudi','uae','united arab','okinawa','spain','portugal','poland','romania','belgium','netherlands','turkey','greece','djibouti','honduras','panama','colombia','philippines','singapore','australia','new zealand','canada','mexico','guam','puerto rico','virgin islands','american samoa','northern mariana','overseas','outside the united states','oconus','outside conus'];
+function strategyCfg(settings){
+  const st=((settings||{}).automation_rules||{}).strategy||{};
+  return {
+    enabled: st.enabled!==false,
+    max_total_value: st.max_total_value!=null? +st.max_total_value : 250000,
+    usa_only: st.usa_only!==false,
+    bonding_hard_fail: st.bonding_hard_fail!==false,
+    min_days_remaining: st.min_days_remaining!=null? +st.min_days_remaining : 14,
+  };
+}
+// Set-aside eligibility → {category, status:PASS/FAIL/UNKNOWN, reason}. Deterministic.
+function classifySetAside(text, settings){
+  const cp=((settings||{}).automation_rules||{}).competition_policy||{};
+  const ct=((settings||{}).automation_rules||{}).certifications||{};
+  const t=String(text||'').toLowerCase().trim();
+  if(!t) return {category:'', status:'UNKNOWN', reason:'Set-aside not specified'};
+  const restricted=[
+    {re:/8\s*\(?a\)?\b|8a set/, held:ct.has_8a, name:'8(a)'},
+    {re:/hubzone/, held:ct.has_hubzone, name:'HUBZone'},
+    {re:/edwosb|economically disadvantaged women/, held:ct.has_edwosb, name:'EDWOSB'},
+    {re:/wosb|women[- ]owned/, held:ct.has_wosb, name:'WOSB'},
+    {re:/sdvosb|service[- ]disabled/, held:ct.has_sdvosb, name:'SDVOSB'},
+    {re:/\bvosb\b|veteran[- ]owned/, held:ct.has_vosb, name:'VOSB'},
+    {re:/tribal|native[- ]owned|indian[- ]owned|native american/, held:false, name:'Tribal/Native-owned'},
+    {re:/abilityone|ability one|javits|jwod/, held:false, name:'AbilityOne'},
+  ];
+  for(const r of restricted){ if(r.re.test(t)){
+    if(r.held) return {category:r.name, status:'PASS', reason:`${r.name} set-aside — you hold this certification`};
+    return {category:r.name, status:'FAIL', reason:`Ineligible set-aside: ${r.name}`}; } }
+  if(/total small business/.test(t)) return {category:'Total Small Business', status: cp.allow_total_small_business!==false?'PASS':'FAIL', reason:'Total Small Business set-aside'};
+  if(/partial small business/.test(t)) return {category:'Partial Small Business', status: cp.allow_partial_small_business?'PASS':'FAIL', reason:'Partial Small Business set-aside'};
+  if(/small business/.test(t)) return {category:'Small Business', status:'PASS', reason:'Small Business set-aside'};
+  if(/full and open|full & open|unrestricted|no set[- ]?aside|not set[- ]?aside/.test(t)) return {category:'Full & Open', status: cp.allow_full_and_open!==false?'PASS':'FAIL', reason:'Full & Open / Unrestricted'};
+  return {category:t, status:'UNKNOWN', reason:'Set-aside category unrecognized — verify before promoting'};
+}
+// U.S. place of performance → {status, reason}. 50 states + DC only. U.S.
+// indicators are checked FIRST so "New Mexico", "District of Columbia" and
+// "Panama City, Florida" are never mis-flagged as foreign by a substring.
+function classifyUSA(text){
+  const t=String(text||'').toLowerCase();
+  if(!t.trim()) return {status:'UNKNOWN', reason:'Place of performance not specified'};
+  // Explicit OCONUS/overseas language is decisive.
+  if(/\boconus\b|overseas|outside the united states|outside conus/.test(t)) return {status:'FAIL', reason:'Explicitly outside CONUS / the United States'};
+  // U.S. indicators win over any foreign-looking substring.
+  if(/united states of america|united states|u\.s\.a\.|\busa\b/.test(t)) return {status:'PASS', reason:'United States'};
+  for(const s of US_STATE_NAMES){ if(t.includes(s)) return {status:'PASS', reason:'U.S. state: '+s}; }
+  const toks=t.split(/[^a-z]+/).filter(Boolean);
+  for(const a of US_STATE_ABBR){ if(toks.includes(a)) return {status:'PASS', reason:'U.S. state: '+a.toUpperCase()}; }
+  // Only when NO U.S. state/indicator is present do foreign country / territory names fail.
+  for(const f of FOREIGN_MARKERS){ if(t.includes(f)) return {status:'FAIL', reason:'Place of performance appears outside the 50 states + DC ('+f.trim()+')'}; }
+  return {status:'UNKNOWN', reason:'Could not confirm a U.S. (50 states + DC) place of performance'};
+}
+// THE canonical gate. analysis may be null (batch/pre-analysis contexts).
+function evaluatePrimeEligibility(rfp, analysis, settings){
+  rfp=rfp||{}; const d=rfp.details||{}; const cfg=strategyCfg(settings);
+  const compliance = d.compliance || (analysis&&analysis.decision_record&&analysis.decision_record.compliance) || null;
+  const hard_gates = (analysis&&analysis.hard_gates) || d.hard_gates || [];
+  const rec = (analysis&&analysis.recommendation) || (d.analysis_summary&&d.analysis_summary.recommendation) || '';
+  let fit = (analysis&&analysis.fit_score!=null)?analysis.fit_score:((d.analysis_summary&&d.analysis_summary.fit)!=null?d.analysis_summary.fit:null);
+  const hard_failures=[], unresolved_items=[], warnings=[], strategic_penalties=[], evidence=[], checks={};
+
+  // 1) Set-aside eligibility (deterministic)
+  const sa=classifySetAside(rfp.set_aside || (compliance&&compliance.competition_type), settings);
+  checks.set_aside=sa.status;
+  if(sa.status==='FAIL') hard_failures.push({gate:'Set-aside', reason:sa.reason});
+  else if(sa.status==='UNKNOWN') unresolved_items.push({gate:'Set-aside', reason:sa.reason});
+
+  // 2) U.S. place of performance
+  if(cfg.usa_only){
+    const geo=classifyUSA(rfp.place_of_performance_raw || d.place_of_performance || rfp.location);
+    checks.usa=geo.status;
+    if(geo.status==='FAIL') hard_failures.push({gate:'Place of performance', reason:geo.reason});
+    else if(geo.status==='UNKNOWN') unresolved_items.push({gate:'Place of performance', reason:geo.reason});
+  } else checks.usa='PASS';
+
+  // 3) Total contract value ≤ current target
+  const v=(rfp.estimated_value!=null&&rfp.estimated_value!=='')?+rfp.estimated_value:null;
+  if(v==null||!(v>0)){ checks.value='UNKNOWN'; unresolved_items.push({gate:'Contract value', reason:'Total contract value unknown — not auto-promoted'}); }
+  else if(v>cfg.max_total_value){ checks.value='FAIL'; hard_failures.push({gate:'Contract value', reason:`Estimated $${(+v).toLocaleString()} exceeds current target of $${cfg.max_total_value.toLocaleString()}`}); }
+  else checks.value='PASS';
+
+  // 4) Bonding
+  let bondStatus='UNKNOWN', bondReason='Bonding requirement not yet determined';
+  if(compliance){
+    const bs=String(compliance.bonding_status||'').toLowerCase();
+    const br=String(compliance.bond_requirement||'').toLowerCase();
+    if(/none|not required|no bond/.test(br) || bs==='not required' || bs==='none'){ bondStatus='PASS'; bondReason='No bond required'; }
+    else if((/required|yes/.test(br) && !/none|not required|no bond/.test(br)) || /required|blocker|unobtainable|action required/.test(bs)){ bondStatus='FAIL'; bondReason='Bond required: '+(compliance.bond_requirement||compliance.bonding_status); }
+  }
+  const bondGate=(hard_gates||[]).find(g=>/bond/i.test(g.gate||'') && (g.status==='fail'||g.status==='blocked'));
+  if(bondGate){ bondStatus='FAIL'; bondReason=bondGate.reason||'Bond required'; }
+  checks.bonding=bondStatus;
+  if(cfg.bonding_hard_fail && bondStatus==='FAIL') hard_failures.push({gate:'Bonding', reason:bondReason});
+  else if(bondStatus==='UNKNOWN' && (analysis||d.analysis_summary)) unresolved_items.push({gate:'Bonding', reason:bondReason});
+
+  // 5) Reuse server hard gates (prime licenses, self-performance, FAR 52.219-14, ostensible risk)
+  (hard_gates||[]).forEach(g=>{
+    if(/bond/i.test(g.gate||'')) return; // handled above
+    if(g.status==='fail'||g.status==='blocked') hard_failures.push({gate:g.gate||'Hard gate', reason:g.reason||g.action||'Failed hard gate'});
+    else if(g.status==='warning') warnings.push({gate:g.gate||'Gate', reason:g.reason||''});
+  });
+
+  // 6) Compliance-engine final eligibility
+  if(compliance){
+    const fe=String(compliance.final_eligibility||'').toUpperCase();
+    checks.compliance=fe||'UNKNOWN';
+    if(fe==='INELIGIBLE') hard_failures.push({gate:'Compliance engine', reason:'Eligibility engine returned INELIGIBLE'});
+    else if(fe==='MANUAL_REVIEW') unresolved_items.push({gate:'Compliance engine', reason:'Eligibility engine returned MANUAL_REVIEW'});
+    (compliance.source_documents||[]).forEach(s=>evidence.push({document:s.document, page:s.page, rule:s.rule, exact_language:s.exact_language}));
+    if(String(compliance.ostensible_subcontractor_risk||'').toLowerCase()==='high') warnings.push({gate:'Ostensible subcontractor', reason:'High ostensible-subcontractor risk — confirm the prime performs the required limitation-on-subcontracting share'});
+  } else checks.compliance='UNKNOWN';
+
+  // Not analyzed at all → cannot confirm eligibility for the Pipeline
+  if(!analysis && !d.analysis_summary) unresolved_items.push({gate:'Analysis', reason:'Not analyzed yet — run analysis before auto-promotion'});
+
+  // Strategic penalties (soft — never a hard fail; high sub-dependency is NOT penalized, spec §26)
+  const hay=[rfp.title, rfp.description].filter(Boolean).join(' ').toLowerCase();
+  [[/\bidiq\b/,'IDIQ vehicle'],[/\bmatoc\b/,'MATOC'],[/\bmac\b/,'Multiple-Award Contract'],[/blanket purchase|\bbpa\b/,'BPA'],[/multiple states|nationwide|various locations/,'Geographically dispersed']].forEach(([re,lbl])=>{ if(re.test(hay)) strategic_penalties.push(lbl); });
+  const days=rfp.deadline?Math.ceil((new Date(rfp.deadline+'T23:59:59').getTime()-Date.now())/86400000):null;
+  if(days!=null && days<cfg.min_days_remaining) strategic_penalties.push(`Only ${days} day(s) to respond`);
+
+  const eligible = hard_failures.length ? 'FAIL' : (unresolved_items.length ? 'UNKNOWN' : 'PASS');
+  return { eligible, pipeline_eligible: eligible==='PASS', hard_failures, unresolved_items, warnings,
+    strategic_penalties, checks, strategic_fit:(fit!=null?+fit:null), recommendation:rec, evidence, evaluated_at:new Date().toISOString() };
+}
+// Auto-add is stricter than pipeline_eligible: it also requires a Pursue-level
+// recommendation (spec §17 — Monitor / Team / No-Bid never auto-add).
+const AUTOADD_RECS=new Set(['Strong Pursue','Pursue','Conditional Pursue']);
+function autoAddQualifies(elig, rec){ return !!(elig&&elig.pipeline_eligible===true&&AUTOADD_RECS.has(rec)); }
+// Cached automation settings for the eligibility panel (invalidated on save).
+async function getApSettings(){ if(!window._AP_SETTINGS){ try{ window._AP_SETTINGS=(await api(`govcon_autopilot_settings?owner=eq.${SESSION.user.id}&select=automation_rules`).catch(()=>[]))[0]||{}; }catch(_){ window._AP_SETTINGS={}; } } return window._AP_SETTINGS; }
+function primeEligibilityCard(e, rfp){
+  const c={PASS:'#0b6b34',FAIL:'#b3261e',UNKNOWN:'#7a5b00'}[e.eligible]||'#555';
+  const finalLbl = e.eligible==='FAIL'?'NO-BID (hard gate)':e.eligible==='UNKNOWN'?'RESEARCH REQUIRED':'PIPELINE-ELIGIBLE';
+  const mark=(v)=>v==='PASS'?'✓':v==='FAIL'?'✕':v==='UNKNOWN'?'?':'·';
+  const mc=(v)=>({PASS:'#0b6b34',FAIL:'#b3261e',UNKNOWN:'#7a5b00'}[v]||'var(--muted)');
+  const chip=(l,v)=>`<span style="display:inline-flex;gap:5px;align-items:center;margin:2px 14px 2px 0"><b style="color:${mc(v)}">${mark(v)}</b> ${l}</span>`;
+  const ov=(rfp&&rfp.details&&rfp.details.eligibility_override);
+  return `<div class="card" style="margin:10px 0;border-left:4px solid ${c}">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      <b>🛡 Prime Eligibility</b>
+      <span class="pill" style="background:${c};color:#fff">Eligibility: ${esc(e.eligible)}</span>
+      <span class="pill" style="background:${c};color:#fff">Final: ${esc(finalLbl)}</span>
+      <span class="pill">Pipeline eligible: ${e.pipeline_eligible?'YES':'NO'}</span>
+      ${e.strategic_fit!=null?`<span class="pill">Strategic fit: ${e.strategic_fit}/100</span>`:''}
+      ${ov?`<span class="pill" style="background:#7a5b00;color:#fff" title="Added to Pipeline despite a failed/unresolved gate">MANUAL OVERRIDE</span>`:''}
+    </div>
+    <div style="font-size:12px;margin:4px 0">${chip('Set-aside',e.checks.set_aside)}${chip('U.S. performance',e.checks.usa)}${chip('Contract value',e.checks.value)}${chip('Bonding',e.checks.bonding)}${chip('Compliance engine',e.checks.compliance)}</div>
+    ${e.hard_failures.length?`<div class="banner" style="background:#fdecea;color:#611;margin:6px 0"><b>Hard gate failed → NO-BID</b><br>• ${e.hard_failures.map(f=>esc(f.gate+': '+f.reason)).join('<br>• ')}</div>`:''}
+    ${e.unresolved_items.length?`<div class="banner warn" style="margin:6px 0"><b>Research required — kept out of Pipeline until resolved</b><br>• ${e.unresolved_items.map(u=>esc(u.gate+': '+u.reason)).join('<br>• ')}</div>`:''}
+    ${e.warnings.length?`<div class="m" style="font-size:12px;color:var(--muted)">Warnings: ${e.warnings.map(w=>esc(w.gate+' — '+w.reason)).join('; ')}</div>`:''}
+    ${e.strategic_penalties.length?`<div class="m" style="font-size:12px;color:var(--muted)">Strategic penalties: ${e.strategic_penalties.map(esc).join(', ')}</div>`:''}
+    <div class="muted" style="font-size:11px;margin-top:4px">Deterministic gate — an AI fit score or recommendation can never override a confirmed hard gate. High subcontractor dependency is expected under your prime / project-management model and is not penalized.</div>
+  </div>`;
+}
 async function rvRenderAnalysis(){
   const host=$('#rvAnalysis'); if(!host) return;
   const a=window._RV.analysis;
   if(typeof rvUpdateApprove==='function') rvUpdateApprove();
   if(!a){ host.innerHTML='<div class="muted" style="font-size:13px">No analysis yet — select documents above and click Analyze.</div>'; return; }
   const warn=(a.completeness_warnings||[]);
+  let _eligCard=''; try{ const _s=await getApSettings(); _eligCard=primeEligibilityCard(evaluatePrimeEligibility(window._RV.rfp, a, _s), window._RV.rfp); }catch(_){}
   host.innerHTML=`
     <div class="scores" style="margin-bottom:8px">
       <span class="pill" style="background:${REC_COLOR[a.recommendation]||'#555'};color:#fff;font-size:13px">${esc(a.recommendation)}</span>
@@ -1185,6 +1356,7 @@ async function rvRenderAnalysis(){
     <div class="m" style="margin-bottom:8px">${esc(a.recommendation_reason||'')}</div>
     ${recOverrideControl(a.recommendation, "rvSetRec(this.value)", 'rvRecStatus')}
     <div class="scores" style="margin-bottom:8px">${(a.hard_gates||[]).map(gateChip).join(' ')}</div>
+    ${_eligCard}
     ${complianceCard((window._RV.rfp.details||{}).compliance || (a.decision_record||{}).compliance)}
     ${siteVisitCard((window._RV.rfp.details||{}).site_visit || (a.decision_record||{}).site_visit)}
     ${warn.length?`<div class="banner warn" style="margin:8px 0">Analysis may be incomplete:<br>${warn.map(esc).join('<br>')}</div>`:''}
@@ -1684,12 +1856,35 @@ async function saveRfp() {
 }
 async function addToPipeline(rfpId) {
   try {
+    // Spec §18: recheck eligibility before ANY Lead. A hard-gate failure or an
+    // unresolved critical unknown does not silently pass — it warns and, if the
+    // user proceeds, records ELIGIBILITY FAILED / MANUAL OVERRIDE on the record.
+    let elig=null;
+    try{
+      const settings=await getApSettings();
+      const rows=await api(`govcon_rfps?id=eq.${rfpId}&owner=eq.${SESSION.user.id}&select=id,deadline,review_stage,details,set_aside,place_of_performance_raw,estimated_value,category,location,title,description`);
+      const r=(rows||[])[0];
+      const aRows=await api(`govcon_opportunity_analysis?rfp_id=eq.${rfpId}&owner=eq.${SESSION.user.id}&select=recommendation,fit_score,hard_gates,decision_record&order=version.desc&limit=1`).catch(()=>[]);
+      if(r) elig=evaluatePrimeEligibility(r, (aRows||[])[0]||null, settings);
+    }catch(_){}
+    if(elig && (elig.hard_failures.length || elig.unresolved_items.length)){
+      const isFail=elig.hard_failures.length>0;
+      const lines=[...elig.hard_failures.map(f=>'✕ '+f.gate+': '+f.reason), ...elig.unresolved_items.map(u=>'? '+u.gate+': '+u.reason)];
+      const msg=(isFail?'⚠ PRIME ELIGIBILITY FAILED\n\n':'⚠ ELIGIBILITY UNRESOLVED\n\n')+lines.join('\n')+'\n\nAdd to Pipeline anyway? This records a manual override on the opportunity.';
+      if(!confirm(msg)){ toast('Not added — eligibility '+(isFail?'failed':'unresolved')); return; }
+      try{
+        const dr=await api(`govcon_rfps?id=eq.${rfpId}&owner=eq.${SESSION.user.id}&select=details`).catch(()=>[]);
+        const details=Object.assign({}, (dr[0]||{}).details||{});
+        details.eligibility_override={ overridden_at:new Date().toISOString(), result:elig.eligible, hard_failures:elig.hard_failures, unresolved_items:elig.unresolved_items };
+        await api(`govcon_rfps?id=eq.${rfpId}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({details})});
+      }catch(_){}
+    }
     await api('govcon_pipeline_items?on_conflict=owner,rfp_id', {method:'POST',
       prefer:'resolution=ignore-duplicates,return=minimal',
       body:JSON.stringify({owner:SESSION.user.id, rfp_id:rfpId, stage:'lead'})});
     // manual add clears any prior "removed" exclusion so it behaves normally again
     try{ await apiPatchTolerant(`govcon_rfps?id=eq.${rfpId}`,{pipeline_excluded:false}); }catch(_){}
-    toast('Added to pipeline');
+    toast(elig&&(elig.hard_failures.length||elig.unresolved_items.length)?'Added with manual override ⚠':'Added to pipeline');
   } catch(e){ if(/23505|duplicate/i.test(e.message)) toast('Already in pipeline'); else alert(e.message); }
 }
 async function addToPipelineSilent(rfpId){
@@ -1807,6 +2002,21 @@ async function autoRunCandidates(){
     ids=[...new Set((docRows||[]).map(d=>d.rfp_id).filter(Boolean))];
     if(!ids.length) why='No downloaded documents yet — run Autopilot or download an opportunity first.';
   }
+  // Spec §13/§17/§30: NO item auto-adds without passing the canonical Prime
+  // Eligibility gate AND a Pursue-level recommendation — regardless of mode.
+  // "all" therefore means all ELIGIBLE opportunities, not every downloaded doc.
+  if(ids.length){
+    try{
+      const settings=(await api(`govcon_autopilot_settings?owner=eq.${uid}&select=automation_rules`).catch(()=>[]))[0]||{};
+      const sel='id,deadline,review_stage,details,set_aside,place_of_performance_raw,estimated_value,category,location,title,description';
+      const rfpMap={}; (await api(`govcon_rfps?owner=eq.${uid}&select=${sel}&limit=2000`).catch(()=>[])).forEach(r=>{ rfpMap[r.id]=r; });
+      const before=ids.length;
+      ids=ids.filter(id=>{ const r=rfpMap[id]; if(!r) return false;
+        const rec=(r.details&&r.details.analysis_summary&&r.details.analysis_summary.recommendation)||'';
+        return autoAddQualifies(evaluatePrimeEligibility(r, null, settings), rec); });
+      if(!ids.length) why=`0 of ${before} candidate(s) passed the Prime Eligibility gate — they need an eligible set-aside, U.S. place of performance, value ≤ your target, no bonding/hard-gate failure, all critical unknowns resolved, and a Pursue-level recommendation. They stay in Research.`;
+    }catch(_){}
+  }
   return {mode, ids, genScript, why};
 }
 async function autoRunPipeline(){
@@ -1841,26 +2051,20 @@ async function autoRunPipeline(){
     }catch(e){ failed++; }
     done++; draw('');
   }
-  // 2) hand pipeline-add + call-script generation to the govcon-pipeline-sync
-  //    edge function — the SAME code path the 15-minute cron uses, so the button
-  //    and the background sync always agree. Falls back to client-side if the
-  //    function isn't deployed yet.
-  draw('Adding to pipeline + writing call scripts…');
-  let piped=0, scripted=0, via='govcon-pipeline-sync';
-  try{
-    const r=await callFn('govcon-pipeline-sync',{action:'sync'});
-    piped=r.added||0; scripted=r.scripts||0;
-  }catch(e){
-    via='browser (function not deployed)';
-    for(const id of ids){
-      try{
-        await addToPipelineSilent(id); piped++;
-        if(genScript){ const rr=await api(`govcon_rfps?id=eq.${id}&owner=eq.${SESSION.user.id}&select=details`).catch(()=>[]);
-          if(!((rr[0]||{}).details||{}).call_script_edited){ await genCallScriptFor(id); scripted++; } }
-      }catch(_){}
-    }
+  // 2) Add only the gated `ids` (already filtered through evaluatePrimeEligibility
+  //    in autoRunCandidates) + generate call scripts — client-side, so the
+  //    eligibility gate is authoritative and no ineligible opportunity can be
+  //    promoted here even in "all" mode.
+  draw('Adding eligible opportunities to pipeline + writing call scripts…');
+  let piped=0, scripted=0, via='browser (eligibility-gated)';
+  for(const id of ids){
+    try{
+      await addToPipelineSilent(id); piped++;
+      if(genScript){ const rr=await api(`govcon_rfps?id=eq.${id}&owner=eq.${SESSION.user.id}&select=details`).catch(()=>[]);
+        if(!((rr[0]||{}).details||{}).call_script_edited){ await genCallScriptFor(id); scripted++; } }
+    }catch(_){}
   }
-  if(host) host.innerHTML=`<div class="banner info" style="margin-top:10px">✓ Done — ${piped} in pipeline, ${analyzed} matrices run, ${scripted} call scripts ready${failed?`, ${failed} had an issue`:''}. <span class="muted">via ${esc(via)}.</span> Open a card → the <b>Partner call script</b> sits under the Capability matrix; it shows on the Auto Dialer once a partner is linked to the contract.</div>`;
+  if(host) host.innerHTML=`<div class="banner info" style="margin-top:10px">✓ Done — ${piped} eligible in pipeline, ${analyzed} matrices run, ${scripted} call scripts ready${failed?`, ${failed} had an issue`:''}. <span class="muted">via ${esc(via)}.</span> Open a card → the <b>Partner call script</b> sits under the Capability matrix; it shows on the Auto Dialer once a partner is linked to the contract. <b>Note:</b> the background <code>govcon-pipeline-sync</code> cron is separate server-side code (not in this build) and still needs the same gate applied to it.</div>`;
   renderPipeline();
 }
 let AP_POLL=null;
@@ -2547,6 +2751,19 @@ function automationRulesCard(s){
     </div>
     <label class="toggle"><input type="checkbox" id="ct_bondunavail" ${R.bonding_unavailable?'checked':''}> A surety has DENIED coverage / bonds confirmed unobtainable <span class="muted" style="font-weight:normal;font-size:12px">— only this makes a required bond a hard blocker; otherwise required bonds are "Bonding Action Required" (commercial surety or SBA Surety Bond Guarantee Program)</span></label>`;})()}
 
+    <h2 class="section" style="color:#0054d1">Current strategy gate <span class="muted" style="font-weight:normal;font-size:12px">— low-hanging-fruit limits enforced by the Prime Eligibility gate before ANY Pipeline auto-add</span></h2>
+    ${(()=>{const stg=R.strategy||{};return `
+    <label class="toggle"><input type="checkbox" id="stg_enabled" ${stg.enabled!==false?'checked':''}> Enable the strategy gate</label>
+    <div class="row3" style="margin-top:6px">
+      ${numf('stg_maxval','Max total contract value ($)', stg.max_total_value??250000, '250000')}
+      ${numf('stg_mindays','Prefer ≥ days to respond', stg.min_days_remaining??14, '14')}
+      <div class="field"><label>Options</label>
+        <label class="toggle" style="margin-top:4px"><input type="checkbox" id="stg_usa" ${stg.usa_only!==false?'checked':''}> U.S. place of performance only (50 states + DC)</label>
+        <label class="toggle"><input type="checkbox" id="stg_bond" ${stg.bonding_hard_fail!==false?'checked':''}> Any required bond = hard No-Bid</label>
+      </div>
+    </div>
+    <div class="muted" style="font-size:12px;margin:2px 0 2px">Unknown set-aside, contract value, place of performance, or bonding keeps an opportunity in <b>Research</b> and OUT of the auto-Pipeline until resolved — it is never auto-promoted on a guess. Ineligible set-asides and over-target/foreign/bonded contracts become <b>NO-BID</b> and can only enter the Pipeline via a recorded manual override.</div>`;})()}
+
     <h2 class="section">Document auto-selection <span class="muted" style="font-weight:normal;font-size:12px">— which docs get analyzed</span></h2>
     <div style="display:flex;gap:14px;flex-wrap:wrap">
       <label class="toggle"><input type="checkbox" id="ds_p1" ${chk(ds.auto_priority_1!==false)}> Priority 1 (scope/main)</label>
@@ -2614,6 +2831,9 @@ async function saveAutomationRules(){
       skip_download_after_auto_decline:true, skip_analysis_after_auto_decline:true, skip_partner_research_after_auto_decline:true },
     certifications:{ has_8a:$('#ct_8a').checked, has_hubzone:$('#ct_hub').checked, has_wosb:$('#ct_wosb').checked,
       has_edwosb:$('#ct_edwosb').checked, has_sdvosb:$('#ct_sdvosb').checked, has_vosb:$('#ct_vosb').checked },
+    strategy:{ enabled:$('#stg_enabled')?$('#stg_enabled').checked:true,
+      max_total_value:ni('stg_maxval')??250000, min_days_remaining:ni('stg_mindays')??14,
+      usa_only:$('#stg_usa')?$('#stg_usa').checked:true, bonding_hard_fail:$('#stg_bond')?$('#stg_bond').checked:true },
     bonding_unavailable:$('#ct_bondunavail').checked,
     doc_selection:{ auto_priority_1:$('#ds_p1').checked, auto_priority_2:$('#ds_p2').checked, auto_priority_3:$('#ds_p3').checked,
       analyze_all_when_low_confidence:$('#ds_lowconf').checked, max_docs:ni('ds_maxdocs')??12, min_relevance:ni('ds_minrel')??0, min_confidence:ni('ds_minconf')??0,
@@ -2638,6 +2858,7 @@ async function saveAutomationRules(){
     notify_on_complete:$('#ar_notifycomplete').checked, notify_on_failure:$('#ar_notifyfail').checked, notify_high_score:$('#ar_notifyhigh').checked,
     updated_at:new Date().toISOString() };
   try{ await api('govcon_autopilot_settings',{method:'POST',prefer:'resolution=merge-duplicates',body:JSON.stringify(body)});
+    window._AP_SETTINGS=null; // refresh eligibility gate with the new strategy/policy
     st.textContent='✓ Automation rules saved.';
   }catch(e){ st.textContent='Save failed: '+e.message; }
 }
@@ -2961,30 +3182,25 @@ function rfpSiteVisitDate(r){
   return r.site_visit_date || d.site_visit_date || ((sv.dates||[])[0]||{}).date || '';
 }
 async function backfillMonitorLeads(inPipe){
+  // Spec §16/§18/§30: opening the Pipeline may ONLY auto-add opportunities that
+  // pass the canonical Prime Eligibility gate AND carry a Pursue-level
+  // recommendation. Monitor stays in Research. Deadline/site-visit timing can no
+  // longer, by itself, create a Lead.
   try{
-    // pipeline_excluded is tolerated if the column isn't there yet (select falls back)
-    let rfps=await api(`govcon_rfps?owner=eq.${SESSION.user.id}&select=id,deadline,review_stage,details,site_visit_date,pipeline_excluded&limit=1000`).catch(()=>null);
-    if(rfps===null) rfps=await api(`govcon_rfps?owner=eq.${SESSION.user.id}&select=id,deadline,review_stage,details,site_visit_date&limit=1000`).catch(()=>[]);
-    // site-visit auto-add settings
-    let svEnabled=false, svDays=5;
-    try{ const sset=await api(`govcon_autopilot_settings?owner=eq.${SESSION.user.id}&select=pipeline_monitor_sitevisit_enabled,pipeline_monitor_sitevisit_days`); const S=(sset||[])[0]||{}; svEnabled=!!S.pipeline_monitor_sitevisit_enabled; svDays=S.pipeline_monitor_sitevisit_days??5; }catch(_){}
-    const today=Date.now(); const toAdd=[];
+    const uid=SESSION.user.id;
+    const sel='id,deadline,review_stage,details,site_visit_date,pipeline_excluded,set_aside,place_of_performance_raw,estimated_value,category,location,title,description';
+    let rfps=await api(`govcon_rfps?owner=eq.${uid}&select=${sel}&limit=1000`).catch(()=>null);
+    if(rfps===null) rfps=await api(`govcon_rfps?owner=eq.${uid}&select=id,deadline,review_stage,details,site_visit_date,set_aside,place_of_performance_raw,estimated_value,category,location,title,description&limit=1000`).catch(()=>[]);
+    const settings=await getApSettings();
+    const toAdd=[];
     for(const r of rfps){
       if(r.pipeline_excluded) continue;                     // removed → never auto re-add
-      const rec=(r.details&&r.details.analysis_summary&&r.details.analysis_summary.recommendation)||'';
-      if(rec!=='Monitor') continue;
       if(['Archived','Rejected / No-Bid'].includes(r.review_stage||'')) continue;
       if(inPipe.has(r.id)) continue;
-      const days=r.deadline?Math.ceil((new Date(r.deadline+'T23:59:59').getTime()-today)/86400000):null;
-      // Rule A: deadline still 14+ days out. Rule B (optional): a site visit is
-      // within the configured window (0..X days away).
-      let ok = (days!=null && days>=14);
-      if(!ok && svEnabled){
-        const svd=rfpSiteVisitDate(r);
-        if(svd){ const sdays=Math.ceil((new Date(svd+'T23:59:59').getTime()-today)/86400000); if(sdays!=null && sdays>=0 && sdays<=svDays) ok=true; }
-      }
-      if(!ok) continue;
-      toAdd.push({owner:SESSION.user.id, rfp_id:r.id, stage:'lead'});
+      const rec=(r.details&&r.details.analysis_summary&&r.details.analysis_summary.recommendation)||'';
+      const elig=evaluatePrimeEligibility(r, null, settings);
+      if(!autoAddQualifies(elig, rec)) continue;            // hard gate / unknown / non-Pursue → stays in Research
+      toAdd.push({owner:uid, rfp_id:r.id, stage:'lead'});
     }
     if(toAdd.length) await api('govcon_pipeline_items?on_conflict=owner,rfp_id',{method:'POST',prefer:'resolution=ignore-duplicates,return=minimal',body:JSON.stringify(toAdd)});
     return toAdd.length;
@@ -2996,7 +3212,7 @@ async function renderPipeline() {
   PIPE_ITEMS = await api(`govcon_pipeline_items?owner=eq.${SESSION.user.id}&select=*,govcon_rfps(id,title,agency,deadline,win_probability,url,description)&order=stage_updated_at.desc`);
   // auto-add any already-scored "Monitor" (≥14 days out) opportunities as Leads
   const added=await backfillMonitorLeads(new Set((PIPE_ITEMS||[]).map(i=>i.rfp_id)));
-  if(added){ PIPE_ITEMS = await api(`govcon_pipeline_items?owner=eq.${SESSION.user.id}&select=*,govcon_rfps(id,title,agency,deadline,win_probability,url,description)&order=stage_updated_at.desc`); toast(`Added ${added} "Monitor" opportunit${added===1?'y':'ies'} as Leads`); }
+  if(added){ PIPE_ITEMS = await api(`govcon_pipeline_items?owner=eq.${SESSION.user.id}&select=*,govcon_rfps(id,title,agency,deadline,win_probability,url,description)&order=stage_updated_at.desc`); toast(`Added ${added} eligible opportunit${added===1?'y':'ies'} as Leads`); }
   // pull downloaded documents for every opportunity in the pipeline so the
   // cards can show a clickable doc count and the side viewer can list them.
   PIPE_DOCS = {};
