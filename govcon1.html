@@ -187,7 +187,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r60-prime-eligibility-gate-2026-08-14';
+const GOVCON_BUILD = 'r61-gemini-rerun-manual-partners-2026-08-14';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -692,7 +692,7 @@ const CHECKLIST_LABELS = [
   ['documents_reviewed','Documents Reviewed'],['requirements_extracted','Requirements Extracted'],
   ['incumbent_research','Incumbent Research'],['award_history','Award History'],
   ['competition_analysis','Competition Analysis'],['capability_matrix','Capability Matrix'],
-  ['pricing_intelligence','Pricing Intelligence'],['partner_research','Partner Research'],
+  ['pricing_intelligence','Pricing Intelligence'],
   ['risk_assessment','Risk Assessment'],['win_probability','Win Probability'],
   ['ai_recommendation','AI Recommendation'],['human_review','Human Review Completed'],
 ];
@@ -799,7 +799,7 @@ function researchCard(r){
 
 /* ═══════════ RFP DISCOVERY REVIEW WORKSPACE ═══════════
    Discovery is the qualification workspace: enrich → download documents →
-   read them → SELECT which ones Claude may scan → analyze → review scores,
+   read them → SELECT which ones Gemini should analyze → analyze → review scores,
    gates, matrices → explicitly Approve for Pipeline / No-Bid / Archive.   */
 const DOC_TYPES = ['Solicitation','RFQ','RFP','SOW','PWS','SOO','Amendment','Pricing Schedule','Wage Determination','Instructions to Offerors','Evaluation Criteria','Required Form','Site Visit Information','Questions and Answers','Technical Attachment','Drawing','Specification','Past Performance Form','Insurance Requirement','Bonding Requirement','License Requirement','Safety Requirement','Quality-Control Requirement','Other'];
 const DOC_REVIEW = ['Unreviewed','Reviewed','Relevant','Irrelevant','Needs Follow-Up'];
@@ -858,10 +858,11 @@ async function openReview(id){
         <button class="btn sm" id="rvEnrich">↻ Pull latest full detail</button>
         <button class="btn sm" id="rvDownload">⬇ Download from SAM.gov</button>
         <label class="btn sm" style="cursor:pointer">⬆ Upload documents<input id="rvUpload" type="file" multiple accept=".pdf,.docx,.doc,.txt,.xlsx,.csv" hidden></label>
+        <button class="btn sm" id="rvRerun" title="TESTING: re-run ONLY this solicitation through Gemini analysis + the eligibility/strategy gate. Creates a new analysis version. No pipeline side effects, no partner research.">🧪 Re-run Solicitation</button>
         <span id="rvActStatus" class="muted" style="font-size:12px"></span>
       </div>
 
-      <h2 class="section">Documents <span class="muted" style="font-weight:normal;font-size:13px">— open and read each one, then tick the ones Claude may scan</span></h2>
+      <h2 class="section">Documents <span class="muted" style="font-weight:normal;font-size:13px">— open and read each one, then tick the ones Gemini should analyze</span></h2>
       <div id="rvDocs" style="overflow-x:auto"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0">
         <button class="btn sm" id="rvSelAll">Select all</button>
@@ -874,13 +875,14 @@ async function openReview(id){
       <h2 class="section">Analysis</h2>
       <div id="rvAnalysis"><div class="muted" style="font-size:13px">No analysis yet — select documents above and click Analyze.</div></div>
 
-      <h2 class="section">Partners for this contract</h2>
-      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Researches subcontractors near the place of performance for every capability gap. Finding a company never marks a requirement Met — verification is a separate, human step.</div>
+      <h2 class="section">Subcontractors for this contract</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Attach subcontractors you have sourced and verified yourself. No automated web/AI research runs here — the system never invents or discovers vendors. Attaching a company never marks a requirement Met; verification is a separate, human step.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
-        <button class="btn primary" id="rvFindPartners">🔎 Find Partners for This Contract</button>
+        <button class="btn" id="rvAddExistingPartner">+ Add Existing Partner</button>
+        <button class="btn" id="rvAddPartnerManual">+ Add Partner Manually</button>
         <span class="muted" style="font-size:12px" id="rvPartnerStatus"></span>
       </div>
-      <div id="rvPartners"><div class="muted" style="font-size:13px">No partner research yet.</div></div>
+      <div id="rvPartners"><div class="muted" style="font-size:13px">No subcontractors attached yet.</div></div>
 
       <h2 class="section">Partner call script</h2>
       <div class="muted" style="font-size:12px;margin:-6px 0 10px">Auto-written from this opportunity — site visit date, number of units, contract length, start date, and the work to be done — so you can call partners for a quote. Edit it freely; it saves to the contract and shows on the Auto Dialer whenever a partner is linked to this solicitation.</div>
@@ -921,7 +923,9 @@ async function openReview(id){
   $('#rvCopyScript').onclick = ()=>{ const t=$('#rvScript'); t.select(); document.execCommand('copy'); toast('Call script copied'); };
   $('#rvPushPartners').onclick = rvPushPartners;
   $('#rvGenIntel').onclick = rvGenIntel;
-  $('#rvFindPartners').onclick = rvFindPartners;
+  $('#rvAddExistingPartner').onclick = rvAddExistingPartner;
+  $('#rvAddPartnerManual').onclick = rvAddPartnerManual;
+  $('#rvRerun').onclick = rvRerunSolicitation;
   $('#rvEnrich').onclick = rvEnrich;
   $('#rvDownload').onclick = rvDownload;
   $('#rvUpload').onchange = e=>{ if(e.target.files.length) rvUploadDocs([...e.target.files]); };
@@ -1075,7 +1079,7 @@ async function rvAnalyze(){
     st.innerHTML=`<div class="banner info">✓ Analysis v${r.version} complete — ${esc(r.recommendation)} (fit ${r.fit_score}, confidence ${r.analysis_confidence}${r.status==='preliminary'?' · <b>Preliminary</b>':''}).</div>`;
     await rvReload();
   } catch(e){
-    st.innerHTML=`<div class="banner bad">${/credit balance|billing/i.test(e.message)?'Claude could not run: your Anthropic account is out of credit (console.anthropic.com → Plans & Billing).':'Analysis failed: '+esc(e.message)}</div>`;
+    st.innerHTML=`<div class="banner bad">${/credit balance|billing|quota/i.test(e.message)?'Gemini analysis failed — the configured AI provider is out of credit or quota. Check Settings → AI provider.':'Gemini analysis failed: '+esc(e.message)}</div>`;
   }
   btn.textContent='✦ Analyze Selected Documents'; rvSyncAnalyzeBtn();
 }
@@ -1181,7 +1185,11 @@ function complianceCard(c){
 const US_STATE_NAMES=['alabama','alaska','arizona','arkansas','california','colorado','connecticut','delaware','florida','georgia','hawaii','idaho','illinois','indiana','iowa','kansas','kentucky','louisiana','maine','maryland','massachusetts','michigan','minnesota','mississippi','missouri','montana','nebraska','nevada','new hampshire','new jersey','new mexico','new york','north carolina','north dakota','ohio','oklahoma','oregon','pennsylvania','rhode island','south carolina','south dakota','tennessee','texas','utah','vermont','virginia','washington','west virginia','wisconsin','wyoming','district of columbia'];
 const US_STATE_ABBR=['al','ak','az','ar','ca','co','ct','de','fl','ga','hi','id','il','in','ia','ks','ky','la','me','md','ma','mi','mn','ms','mo','mt','ne','nv','nh','nj','nm','ny','nc','nd','oh','ok','or','pa','ri','sc','sd','tn','tx','ut','vt','va','wa','wv','wi','wy','dc'];
 // Foreign / out-of-target markers (target = 50 states + DC only; territories excluded).
-const FOREIGN_MARKERS=['germany','japan','south korea',' korea','italy','united kingdom',' u.k.','england','scotland','iraq','afghanistan','kuwait','qatar','bahrain','saudi','uae','united arab','okinawa','spain','portugal','poland','romania','belgium','netherlands','turkey','greece','djibouti','honduras','panama','colombia','philippines','singapore','australia','new zealand','canada','mexico','guam','puerto rico','virgin islands','american samoa','northern mariana','overseas','outside the united states','oconus','outside conus'];
+// Foreign country / territory markers. Checked ONLY after U.S. indicators fail
+// (see classifyUSA), so U.S. places whose names embed a country substring —
+// "China Lake, California", "Indiana", "Jordan, Minnesota" — resolve to PASS
+// first and never reach this list.
+const FOREIGN_MARKERS=['germany','japan','south korea',' korea','china',' prc','hong kong','macau','macao','taiwan','india','thailand','vietnam','indonesia','malaysia','singapore','philippines','pakistan','bangladesh','italy','united kingdom',' u.k.','england','scotland','wales','ireland','france','spain','portugal','poland','romania','belgium','netherlands','turkey','greece','austria','switzerland','sweden','norway','denmark','finland','ukraine','hungary','czech','bulgaria','croatia','serbia','iraq','afghanistan','kuwait','qatar','bahrain','saudi','uae','united arab','oman','israel','jordan','lebanon','egypt','morocco','tunisia','kenya','nigeria','ghana','ethiopia','tanzania','uganda','south africa','djibouti','honduras','panama','colombia','brazil','argentina','chile','peru','ecuador','venezuela','cuba','okinawa','australia','new zealand','canada','mexico','guam','puerto rico','virgin islands','american samoa','northern mariana','micronesia','marshall islands','palau','overseas','outside the united states','oconus','outside conus'];
 function strategyCfg(settings){
   const st=((settings||{}).automation_rules||{}).strategy||{};
   return {
@@ -1455,10 +1463,139 @@ async function rvFindPartners(){
   }catch(e){ st.textContent='Failed: '+e.message; }
   btn.disabled=false; btn.textContent='🔎 Find Partners for This Contract';
 }
+// ── MANUAL subcontractor attach (no automated web/AI research) ──────────────
+async function partnerInsertTolerant(obj){
+  const payload={...obj};
+  for(let i=0;i<12;i++){
+    try{ return await api('govcon_partners',{method:'POST',prefer:'return=representation',body:JSON.stringify(payload)}); }
+    catch(e){ const msg=e.message||'';
+      let m=/Could not find the '([^']+)' column/.exec(msg);
+      if(!m && /violates check constraint|invalid input|column/.test(msg)) m=/"([a-zA-Z0-9_]+)"/.exec(msg);
+      if(m && Object.prototype.hasOwnProperty.call(payload,m[1])){ delete payload[m[1]]; continue; }
+      throw e; }
+  }
+  throw new Error('insert failed');
+}
+async function rvAttachPartner(partnerId, role){
+  try{
+    await api('govcon_opportunity_partners',{method:'POST',prefer:'return=minimal',
+      body:JSON.stringify({owner:SESSION.user.id, rfp_id:window._RV.rfp.id, partner_id:partnerId, primary_or_backup:role||'primary'})});
+    toast('Subcontractor attached'); if($('#rvExPickList')||$('#rvmp_go')) closeModal(); rvRenderPartners();
+  }catch(e){ if(/23505|duplicate/i.test(e.message)){ toast('Already attached'); if($('#rvExPickList')||$('#rvmp_go')) closeModal(); } else alert(e.message); }
+}
+async function rvAddExistingPartner(){
+  const parts=await api(`govcon_partners?owner=eq.${SESSION.user.id}&select=id,company_name,city,state,primary_phone&order=company_name&limit=1000`).catch(()=>[]);
+  window._RV_EXPARTS=parts;
+  openModal(`<div class="shd"><h3>Attach existing partner</h3><button class="sclose" onclick="closeModal()">×</button></div>
+    <div class="sbd">
+      <div class="muted" style="font-size:12px;margin-bottom:8px">Pick a company from your Partner Network to attach to this solicitation. No research runs.</div>
+      <input id="rvExSearch" placeholder="Search company…" style="width:100%;margin-bottom:8px" oninput="rvExFilter()">
+      <div id="rvExPickList" style="max-height:50vh;overflow:auto"></div>
+    </div>`);
+  rvExFilter();
+}
+function rvExFilter(){
+  const q=($('#rvExSearch')&&$('#rvExSearch').value||'').toLowerCase();
+  const list=(window._RV_EXPARTS||[]).filter(p=>!q||(p.company_name||'').toLowerCase().includes(q)).slice(0,300);
+  const host=$('#rvExPickList'); if(!host) return;
+  host.innerHTML=list.length?list.map(p=>`<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)">
+    <span style="flex:1">${esc(p.company_name||'—')}<span class="muted" style="font-size:11px"> ${esc([p.city,p.state].filter(Boolean).join(', '))}${p.primary_phone?' · '+esc(p.primary_phone):''}</span></span>
+    <button class="btn sm" onclick="rvAttachPartner('${p.id}','primary')">Attach</button>
+    <button class="btn sm" onclick="rvAttachPartner('${p.id}','backup')">Backup</button>
+  </div>`).join(''):'<div class="muted" style="font-size:13px">No partners found. Use “+ Add Partner Manually”.</div>';
+}
+function rvAddPartnerManual(){
+  openModal(`<div class="shd"><h3>Add subcontractor manually</h3><button class="sclose" onclick="closeModal()">×</button></div>
+    <div class="sbd">
+      <div class="muted" style="font-size:12px;margin-bottom:8px">Entered exactly as you provide it — no automated research or enrichment. Saved to your Partner Network and attached to this solicitation.</div>
+      <div class="field"><label>Company name *</label><input id="rvmp_name"></div>
+      <div class="row2"><div class="field"><label>Phone</label><input id="rvmp_phone"></div><div class="field"><label>Email</label><input id="rvmp_email"></div></div>
+      <div class="row2"><div class="field"><label>City</label><input id="rvmp_city"></div><div class="field"><label>State</label><input id="rvmp_state"></div></div>
+      <div class="field"><label>Website</label><input id="rvmp_web"></div>
+      <div class="field"><label>Service / notes</label><input id="rvmp_notes"></div>
+      <button class="btn primary" id="rvmp_go">Add &amp; attach</button>
+      <div id="rvmp_out" class="muted" style="font-size:12px;margin-top:6px"></div>
+    </div>`);
+  $('#rvmp_go').onclick=async ()=>{
+    const name=$('#rvmp_name').value.trim(); if(!name){ $('#rvmp_out').textContent='Company name is required.'; return; }
+    $('#rvmp_go').disabled=true; $('#rvmp_out').textContent='Saving…';
+    const rec={owner:SESSION.user.id, company_name:name, primary_phone:$('#rvmp_phone').value.trim()||null, general_email:$('#rvmp_email').value.trim()||null,
+      city:$('#rvmp_city').value.trim()||null, state:$('#rvmp_state').value.trim()||null, website:$('#rvmp_web').value.trim()||null,
+      notes:$('#rvmp_notes').value.trim()||null, partner_status:'Manual', research_status:'skipped', source:'manual_entry'};
+    try{
+      const ins=await partnerInsertTolerant(rec);
+      const pid=(ins&&ins[0]&&ins[0].id); if(!pid) throw new Error('Insert returned no id');
+      await rvAttachPartner(pid,'primary');
+    }catch(e){ $('#rvmp_out').textContent='Failed: '+e.message; if($('#rvmp_go')) $('#rvmp_go').disabled=false; }
+  };
+}
+// ── 🧪 Re-run ONE solicitation (TEST MODE — no pipeline/email/partner side effects) ──
+async function rvRerunSolicitation(){
+  const rfp=window._RV.rfp; if(!rfp||!rfp.id) return;
+  const btn=$('#rvRerun'), st=$('#rvActStatus'); if(btn) btn.disabled=true;
+  const stage=(m)=>{ if($('#rvActStatus')) $('#rvActStatus').textContent=m; };
+  try{
+    const settings=await getApSettings();
+    // capture PREVIOUS (recommendation, fit, eligibility) for the comparison
+    const prevA=window._RV.analysis||null;
+    const prevElig=evaluatePrimeEligibility(rfp, prevA, settings);
+    const prev={ version: prevA?prevA.version:null,
+      recommendation: prevA?prevA.recommendation:((rfp.details&&rfp.details.analysis_summary&&rfp.details.analysis_summary.recommendation)||null),
+      fit_score: prevA?prevA.fit_score:null, eligibility: prevElig.eligible, pipeline_eligible: prevElig.pipeline_eligible };
+    stage('Loading solicitation…');
+    const docs=await api(`govcon_source_documents?rfp_id=eq.${rfp.id}&owner=eq.${SESSION.user.id}&select=id&limit=300`).catch(()=>[]);
+    if(!(docs||[]).length){ stage(''); if(btn) btn.disabled=false; alert('No downloaded documents for this solicitation. Download or upload documents first, then re-run.'); return; }
+    stage('Reading documents…');
+    const dids=docs.map(d=>d.id);
+    try{ await api(`govcon_source_documents?rfp_id=eq.${rfp.id}&owner=eq.${SESSION.user.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({include_in_analysis:true})}); }catch(_){}
+    stage('Running Gemini…');
+    let resp;
+    try{
+      resp=await callFn('govcon-analyze-selected-documents',{ rfp_id:rfp.id, document_ids:dids,
+        analysis_mode:'rerun', force_reprocess:true, test_mode:true, skip_partner_research:true, preserve_human_edits:false });
+    }catch(e){ stage(''); if(btn) btn.disabled=false; alert('Gemini re-run failed: '+e.message); return; }
+    stage('Checking geography, set-aside, value, bonding…');
+    // load NEW analysis + refreshed RFP (compliance/analysis_summary may have changed)
+    const na=await api(`govcon_opportunity_analysis?rfp_id=eq.${rfp.id}&owner=eq.${SESSION.user.id}&select=*&order=version.desc&limit=1`).catch(()=>[]);
+    const newA=(na||[])[0]||null;
+    const rr=await api(`govcon_rfps?id=eq.${rfp.id}&owner=eq.${SESSION.user.id}&select=*`).catch(()=>[]);
+    const freshRfp=(rr||[])[0]||rfp;
+    const newElig=evaluatePrimeEligibility(freshRfp, newA, settings);
+    const cur={ version:newA?newA.version:null, recommendation:newA?newA.recommendation:null, fit_score:newA?newA.fit_score:null, eligibility:newElig.eligible, pipeline_eligible:newElig.pipeline_eligible };
+    // store the rerun comparison (benign metadata — not a pipeline/email/partner side effect)
+    try{
+      const details=Object.assign({}, freshRfp.details||{});
+      const log=Array.isArray(details.rerun_log)?details.rerun_log.slice(-9):[];
+      log.push({ at:new Date().toISOString(), run_type:'manual_test_rerun', ai_provider:'gemini',
+        ai_model:(resp&&(resp.ai_model||resp.model))||settings.gemini_model||null, rfp_id:rfp.id,
+        prev, current:cur, hard_failures:newElig.hard_failures.map(f=>f.gate+': '+f.reason), unresolved_items:newElig.unresolved_items.map(u=>u.gate+': '+u.reason) });
+      details.rerun_log=log;
+      await api(`govcon_rfps?id=eq.${rfp.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({details})});
+      freshRfp.details=details;
+    }catch(_){}
+    stage('Complete.');
+    // refresh the modal, THEN write the comparison banner (survives the reload)
+    if(typeof rvReload==='function'){ try{ await rvReload(); }catch(_){} } else { if(newA) window._RV.analysis=newA; window._RV.rfp=freshRfp; rvRenderAnalysis(); }
+    const arrow=(a,b)=>`${a==null?'—':a} → ${b==null?'—':b}`;
+    const hf=newElig.hard_failures.length?newElig.hard_failures.map(f=>f.gate+': '+f.reason).join('; '):'none';
+    const box=$('#rvAnalyzeStatus');
+    if(box) box.innerHTML=`<div class="banner info" style="margin:8px 0">
+      <b>✓ Re-run complete</b> <span class="muted">(test mode — no pipeline, email, dialer, or partner side effects)</span><br>
+      Analysis version: ${esc(String(arrow(prev.version, cur.version)))}<br>
+      Recommendation: ${esc(String(arrow(prev.recommendation, cur.recommendation)))}<br>
+      Fit: ${esc(String(arrow(prev.fit_score, cur.fit_score)))}<br>
+      Prime Eligibility: ${esc(String(arrow(prev.eligibility, cur.eligibility)))}<br>
+      Pipeline eligible: ${esc(String(arrow(prev.pipeline_eligible?'YES':'NO', cur.pipeline_eligible?'YES':'NO')))}<br>
+      Hard failure: ${esc(hf)}<br>
+      <span class="muted" style="font-size:11px">AI provider: gemini${resp&&(resp.ai_model||resp.model)?' · '+esc(resp.ai_model||resp.model):''}. Note: full test-mode isolation and forced reprocessing require the server function to honor test_mode/force_reprocess/skip_partner_research.</span></div>`;
+    if($('#rvActStatus')) $('#rvActStatus').textContent='';
+  }catch(e){ alert('Re-run error: '+e.message); }
+  finally{ if($('#rvRerun')) $('#rvRerun').disabled=false; }
+}
 async function rvRenderPartners(){
   const host=$('#rvPartners'); if(!host) return;
   const links=await api(`govcon_opportunity_partners?rfp_id=eq.${window._RV.rfp.id}&owner=eq.${SESSION.user.id}&select=*,govcon_partners(id,company_name,website,city,state,primary_phone,general_email,contact_emails,research_confidence,partner_status)&order=fit_score.desc.nullslast&limit=60`);
-  if(!links.length){ host.innerHTML='<div class="muted" style="font-size:13px">No partner research yet.</div>'; return; }
+  if(!links.length){ host.innerHTML='<div class="muted" style="font-size:13px">No subcontractors attached yet.</div>'; return; }
   const row=(l)=>{ const p=l.govcon_partners||{};
     return `<tr>
       <td style="padding:7px 8px"><a href="#" onclick="openPartner('${p.id}');return false"><b>${esc(p.company_name||'?')}</b></a>
@@ -1534,7 +1671,7 @@ async function rvGenIntel(){
     const r=await callFn('govcon-research-intelligence',{rfp_id:window._RV.rfp.id});
     st.textContent=`✓ Intelligence generated${r.awards_found?` · ${r.awards_found} award(s) found`:''}.`;
     await rvReload();
-  }catch(e){ st.textContent = /credit balance|billing/i.test(e.message)?'Claude is out of credit (console.anthropic.com → Plans & Billing).':'Failed: '+e.message; }
+  }catch(e){ st.textContent = /credit balance|billing|quota/i.test(e.message)?'AI provider is out of credit or quota — check Settings → AI provider.':'Failed: '+e.message; }
   btn.disabled=false; btn.textContent='🔬 Generate research intelligence';
 }
 function intelBlock(title, rows){
@@ -1587,7 +1724,6 @@ function rvChecklistState(){
     competition_analysis: stored.competition_analysis ?? !!(R&&R.competition&&Object.keys(R.competition).length),
     capability_matrix: stored.capability_matrix ?? !!a,
     pricing_intelligence: stored.pricing_intelligence ?? !!(R&&R.pricing&&Object.keys(R.pricing).length),
-    partner_research: stored.partner_research ?? true,
     risk_assessment: stored.risk_assessment ?? !!(R&&R.risk&&Object.keys(R.risk).length),
     win_probability: stored.win_probability ?? !!(R&&R.win_probability&&Object.keys(R.win_probability).length),
     ai_recommendation: stored.ai_recommendation ?? !!(R&&R.recommendation&&R.recommendation.decision),
@@ -3570,7 +3706,7 @@ async function openLead(itemId) {
       <div class="field"><label>Stage notes (risks, owners, next actions)</label><textarea id="ld_notes">${esc(item.notes||'')}</textarea></div>
 
       <h2 class="section">Contract documents</h2>
-      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Upload the solicitation, SOW/PWS, and attachments. Claude reads them and fills the <b>Submission</b> and <b>Capability</b> matrices below. Files are saved to this opportunity's folder in the Document Editor — add more anytime and re-read.</div>
+      <div class="muted" style="font-size:12px;margin:-6px 0 10px">Upload the solicitation, SOW/PWS, and attachments. Gemini reads them and fills the <b>Submission</b> and <b>Capability</b> matrices below. Files are saved to this opportunity's folder in the Document Editor — add more anytime and re-read.</div>
       <div class="row2">
         <div class="field"><label>Solicitation / Notice #</label><input id="ld_solnum" value="${esc(leadSolNum(r))}" placeholder="e.g. 140P8626Q0042"></div>
         <div class="field"><label>Folder name <span class="muted" style="font-weight:normal">— rename anytime; applies on Save</span></label><input id="ld_folder_name" value="${esc(leadFolder(r))}"></div>
@@ -4184,7 +4320,7 @@ async function extractMatrices(r){
         text += `\n===== ${f.name} =====\n` + await extractFileText(f.name, blob); }
       catch(_){}
     }
-    st.innerHTML='<div class="muted">Claude is reading the documents and building the matrices…</div>';
+    st.innerHTML='<div class="muted">Gemini is reading the documents and building the matrices…</div>';
     const res = await callFn('govcon-ai', {tool:'extract', rfp_id:r.id, text: text.slice(0,180000)});
     const sub = res.submission||[], req = res.requirements||[];
     if (sub.length) MATRICES.submatrixHost = { columns:['Submission Requirement','Location in RFP','Format / Limit','Due','Status'],
@@ -4196,7 +4332,7 @@ async function extractMatrices(r){
   } catch(e){
     const msg=e.message||'';
     st.innerHTML = /credit balance|insufficient|billing|quota/i.test(msg)
-      ? `<div class="banner bad">Claude couldn't run: your Anthropic account is out of credit. Add credits at console.anthropic.com → Plans &amp; Billing, then try again.<br><span class="muted" style="font-size:12px">(${esc(msg)})</span></div>`
+      ? `<div class="banner bad">Gemini analysis failed — the configured AI provider is out of credit or quota. Check Settings → AI provider, then try again.<br><span class="muted" style="font-size:12px">(${esc(msg)})</span></div>`
       : `<div class="banner bad">Extraction failed: ${esc(msg)}</div>`;
   }
   btn.disabled=false; btn.textContent='✦ Read documents & build matrices';
