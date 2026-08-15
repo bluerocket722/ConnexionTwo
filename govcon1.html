@@ -187,7 +187,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r62-contract-value-filters-2026-08-14';
+const GOVCON_BUILD = 'r63-pipeline-doc-upload-2026-08-14';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -1064,6 +1064,43 @@ async function rvUploadDocs(files){
   if(window._RV.rfp.review_stage==='Discovered') await api(`govcon_rfps?id=eq.${r.id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({review_stage:'Documents Downloaded', documents_downloaded_at:new Date().toISOString()})});
   st.textContent=`✓ Uploaded ${n} document(s). Tick the ones to analyze below.`;
   await rvReload();
+}
+// Canonical single-document upload used by BOTH the review modal and the Pipeline
+// upload control — same Storage bucket, folder scheme, and govcon_source_documents
+// record (no parallel document system, spec §11).
+async function uploadDocToRfp(rfp, f){
+  const folder=leadFolder(rfp);
+  const name=safeName(f.name);
+  const path=`${edDir()}/${folder}/source_documents/${name}`;
+  const { error }=await sb.storage.from(DOCS_BUCKET).upload(path, f, {upsert:true, contentType:f.type||undefined});
+  if(error && !/exists/i.test(error.message)) throw error;
+  const low=name.toLowerCase();
+  const dtype=/amend/.test(low)?'Amendment':/sow|statement of work/.test(low)?'SOW':/pws/.test(low)?'PWS':/pric|schedule/.test(low)?'Pricing Schedule':/instruction/.test(low)?'Instructions to Offerors':/evaluat/.test(low)?'Evaluation Criteria':/wage/.test(low)?'Wage Determination':/solicit|rfq|rfp/.test(low)?'Solicitation':'Other';
+  const existing=await api(`govcon_source_documents?rfp_id=eq.${rfp.id}&owner=eq.${SESSION.user.id}&stored_path=eq.${encodeURIComponent(path)}&select=id`);
+  if(!existing.length){
+    await api('govcon_source_documents',{method:'POST',prefer:'return=minimal',body:JSON.stringify({
+      owner:SESSION.user.id, rfp_id:rfp.id, original_filename:name, stored_path:path,
+      document_type:dtype, source_category:'source_documents', mime_type:f.type||null,
+      file_size:f.size, downloaded_at:new Date().toISOString(), extraction_status:'pending',
+    })});
+  }
+  return {name, dtype};
+}
+// Upload documents to a Pipeline opportunity (spec §11/§12). Reuses the canonical
+// infra above; after upload the opportunity has valid documents so it can be
+// analyzed and (re)qualified. Does NOT trigger emails/partner research/dialer.
+async function pipeUploadDocs(rfpId, files){
+  toast('Uploading…', true);
+  const rows=await api(`govcon_rfps?id=eq.${rfpId}&owner=eq.${SESSION.user.id}&select=id,title,details,review_stage`).catch(()=>[]);
+  const rfp=(rows[0])||{id:rfpId};
+  let n=0;
+  for(const f of files){
+    try{ await uploadDocToRfp(rfp, f); n++; }
+    catch(e){ toast('Upload failed: '+e.message); return; }
+  }
+  if(rfp.review_stage==='Discovered') { try{ await api(`govcon_rfps?id=eq.${rfpId}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({review_stage:'Documents Downloaded', documents_downloaded_at:new Date().toISOString()})}); }catch(_){}}
+  toast(`✓ Uploaded ${n} document(s). Open the card and Analyze to (re)qualify.`);
+  renderPipeline();
 }
 async function rvAnalyze(){
   const ids=rvChecked(); if(!ids.length) return;
@@ -3587,7 +3624,7 @@ function pipeCard(i) {
     <div style="margin:3px 0">${valueChip(r)}${(()=>{const v=oppValue(r);return v.term?`<span class="pill" title="Contract duration">${esc(String(v.term).slice(0,24))}</span>`:'';})()}</div>
     <span class="pill ${i.priority}">${i.priority}</span>
     ${r.win_probability!=null?`<span class="pill">Win ${r.win_probability}%</span>`:''}
-    ${nDocs?`<span class="pill" style="cursor:pointer;background:var(--blue-100);color:var(--blue-900)" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')" title="View downloaded documents & research">📎 ${nDocs} doc${nDocs!==1?'s':''}</span>`:`<span class="pill" style="cursor:pointer" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')" title="View / research">🔬 view</span>`}
+    ${nDocs?`<span class="pill" style="cursor:pointer;background:var(--blue-100);color:var(--blue-900)" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')" title="View downloaded documents & research">📎 ${nDocs} doc${nDocs!==1?'s':''}</span>`:`<span class="pill" style="background:#b3261e;color:#fff" title="No solicitation documents — required before analysis / auto-qualification">⚠ Documents required</span>`}
     ${(()=>{ const cs=pipeCorStatus(i.rfp_id); return cs.label==='—'?'':`<span class="pill" title="COR email status — ${esc(cs.title)}" style="background:${cs.color};color:#fff">✉ ${esc(cs.label)}</span>`; })()}
     <div class="pcard-edit" style="display:flex;gap:4px;align-items:center;margin-top:6px" onclick="event.stopPropagation()">
       <select class="pstage" data-id="${i.id}" title="Change stage" style="flex:1;font-size:11px;padding:2px 4px" onchange="pipeSetStage('${i.id}', this.value)">${STAGES.map(([k,l])=>`<option value="${k}" ${k===i.stage?'selected':''}>${esc(stageLabel(k))}</option>`).join('')}</select>
@@ -3596,6 +3633,9 @@ function pipeCard(i) {
     </div>
     <div style="margin-top:5px" onclick="event.stopPropagation()">
       <button class="btn sm" style="width:100%;padding:3px 8px" title="Push this contract's researched partners into the Auto Dialer" onclick="pipeToDialer('${i.id}')">📞 Upload partners to dialer</button>
+    </div>
+    <div style="margin-top:5px" onclick="event.stopPropagation()">
+      <label class="btn sm" style="width:100%;padding:3px 8px;cursor:pointer;display:block;text-align:center" title="Upload solicitation documents (PDF/DOCX/…) to this opportunity — reuses the canonical document store, then Analyze to (re)qualify">⬆ Upload documents<input type="file" multiple accept=".pdf,.docx,.doc,.txt,.xlsx,.csv" hidden onchange="if(this.files.length)pipeUploadDocs('${i.rfp_id}',[...this.files])"></label>
     </div>
     <div class="pcard-notes" id="note-box-${i.id}" style="margin-top:6px" onclick="event.stopPropagation()">
       <div class="muted" style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">📝 Quick note</div>
@@ -3658,7 +3698,7 @@ function pipeGrid() {
       <td><span class="pill ${i.priority}">${i.priority}</span></td>
       <td>${r.win_probability!=null?r.win_probability+'%':'—'}</td>
       <td>${esc(stageLabel(i.stage))}</td>
-      <td><span class="pill" style="cursor:pointer;${nDocs?'background:var(--blue-100);color:var(--blue-900)':''}" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')">${nDocs?`📎 ${nDocs}`:'🔬 view'}</span></td>
+      <td>${nDocs?`<span class="pill" style="cursor:pointer;background:var(--blue-100);color:var(--blue-900)" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')">📎 ${nDocs}</span>`:`<label class="pill" style="cursor:pointer;background:#b3261e;color:#fff" title="Upload solicitation documents" onclick="event.stopPropagation()">⚠ upload<input type="file" multiple accept=".pdf,.docx,.doc,.txt,.xlsx,.csv" hidden onchange="if(this.files.length)pipeUploadDocs('${i.rfp_id}',[...this.files])"></label>`}</td>
       ${(()=>{ const cs=pipeCorStatus(i.rfp_id); return `<td title="${esc(cs.title)}"><span class="pill" style="font-size:11px;background:${cs.color};color:#fff">${esc(cs.label)}</span></td>`; })()}
       <td style="max-width:220px" title="${i.notes?esc(i.notes):''}" onclick="event.stopPropagation();openLead('${i.id}')">${i.notes&&i.notes.trim()?`<span style="font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:210px;vertical-align:bottom">📝 ${esc(i.notes.replace(/\s+/g,' ').slice(0,60))}${i.notes.length>60?'…':''}</span>`:'<span class="muted" style="font-size:12px">＋ add</span>'}</td>
     </tr>`;
