@@ -3598,9 +3598,10 @@ function pipeCard(i) {
       <button class="btn sm" style="width:100%;padding:3px 8px" title="Push this contract's researched partners into the Auto Dialer" onclick="pipeToDialer('${i.id}')">📞 Upload partners to dialer</button>
     </div>
     <div class="pcard-notes" id="note-box-${i.id}" style="margin-top:6px" onclick="event.stopPropagation()">
+      <div class="muted" style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">📝 Quick note</div>
       ${i.notes && i.notes.trim() ? `<div class="note-preview" title="Click to edit" onclick="pipeNoteEdit('${i.id}')" style="cursor:text;font-size:11px;background:var(--amber-50,#fff8e6);border-left:3px solid #f0a500;padding:5px 7px;border-radius:3px;white-space:pre-wrap;max-height:72px;overflow:auto">${esc(i.notes)}</div>
       <button class="btn sm" style="width:100%;padding:3px 8px;margin-top:4px" onclick="pipeNoteEdit('${i.id}')">📝 Edit note</button>`
-      : `<button class="btn sm" style="width:100%;padding:3px 8px" onclick="pipeNoteEdit('${i.id}')">📝 Add note</button>`}
+      : `<div title="Click to add a quick note" onclick="pipeNoteEdit('${i.id}')" style="cursor:text;font-size:11px;color:var(--muted);background:var(--amber-50,#fff8e6);border:1px dashed #f0a500;border-radius:3px;padding:6px 7px">＋ Add a quick note…</div>`}
     </div>
   </div>`;
 }
