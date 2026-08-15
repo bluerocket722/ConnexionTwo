@@ -187,7 +187,7 @@
 /* ═══════════════ CONFIG ═══════════════
    Same project as intake.html. On replication, the Replicator's find/replace
    swaps these for the customer's own Supabase project + anon key. */
-const GOVCON_BUILD = 'r61-gemini-rerun-manual-partners-2026-08-14';
+const GOVCON_BUILD = 'r62-contract-value-filters-2026-08-14';
 // YOUR deployed autopilot function slug — govcon-auto-pilot-run (with hyphens).
 // Every call below uses this constant, so the name is set in ONE place.
 const AUTOPILOT_FN = 'govcon-auto-pilot-run';
@@ -591,8 +591,10 @@ async function renderRfps() {
       const rec = (r.details && r.details.analysis_summary && r.details.analysis_summary.recommendation) || '';
       if (rec !== RFP_REC_F) return false;
     }
+    if (!passesValueFilter(r, VAL_ST.rfps)) return false;
     return true;
   });
+  const shownSorted = sortByValue(shown, VAL_ST.rfps.vsort);
   const shownIds = new Set(shown.map(r=>r.id));
   for (const id of [...RFP_SEL]) if (!rfps.some(r=>r.id===id)) RFP_SEL.delete(id); // prune stale
   const allShownSelected = shown.length>0 && shown.every(r=>RFP_SEL.has(r.id));
@@ -608,6 +610,7 @@ async function renderRfps() {
         <button class="btn primary" onclick="runAutopilotNow()">✈ Run Autopilot</button>
         <button class="btn" onclick="showAddRfp()">+ Add RFP</button>
       </div>
+      ${valueFilterBar(VAL_ST.rfps,'rfps')}
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
         <label class="toggle" style="margin:0"><input type="checkbox" id="selAllRfps" ${allShownSelected?'checked':''}> Select all shown (${shown.length})</label>
         <b id="rfpSelCount" class="muted">${RFP_SEL.size} selected</b>
@@ -621,7 +624,7 @@ async function renderRfps() {
     </div>
     <div id="addRfpBox"></div>
     <div class="muted" style="margin-bottom:10px">${shown.length} of ${rfps.length} opportunities · sorted by due date</div>
-    <div id="rfpList">${shown.map(rfpCard).join('') || '<div class="card center muted">Nothing matches these filters.</div>'}</div>`;
+    <div id="rfpList">${shownSorted.map(rfpCard).join('') || '<div class="card center muted">Nothing matches these filters.</div>'}</div>`;
   $('#rfpSearch').oninput = (e) => { RFP_FILTER = e.target.value; clearTimeout(window._rt); window._rt = setTimeout(renderRfps, 250); };
   $('#rfpDueFrom').onchange = (e) => { RFP_DUE_FROM = e.target.value; renderRfps(); };
   $('#rfpDueTo').onchange = (e) => { RFP_DUE_TO = e.target.value; renderRfps(); };
@@ -712,8 +715,10 @@ async function renderResearch(){
     if(q && !`${r.title} ${r.agency} ${r.category}`.toLowerCase().includes(q)) return false;
     if(RS_FROM && (!r.deadline || r.deadline < RS_FROM)) return false;   // deadline within timeframe
     if(RS_TO && (!r.deadline || r.deadline > RS_TO)) return false;
+    if(!passesValueFilter(r, VAL_ST.research)) return false;
     return true;
   });
+  const shownSorted=sortByValue(shown, VAL_ST.research.vsort);
   const shownIds=new Set(shown.map(r=>r.id));
   for(const id of [...RS_SEL]) if(!inResearch.some(r=>r.id===id)) RS_SEL.delete(id);
   const allSel=shown.length>0 && shown.every(r=>RS_SEL.has(r.id));
@@ -741,6 +746,7 @@ async function renderResearch(){
         <button class="btn sm" id="rsClear">Clear</button>
         <span class="muted">${shown.length} in research · ${rows.filter(r=>r.review_stage==='Approved for Pipeline').length} approved</span>
       </div>
+      ${valueFilterBar(VAL_ST.research,'research')}
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
         <label class="toggle" style="margin:0"><input type="checkbox" id="rsAll" ${allSel?'checked':''}> Select all shown (${shown.length})</label>
         <b id="rsCount" class="muted">${RS_SEL.size} selected</b>
@@ -751,7 +757,7 @@ async function renderResearch(){
         <button class="btn sm" id="rsBulkClear" ${RS_SEL.size?'':'disabled'}>Clear</button>
       </div>
     </div>
-    <div id="rsList">${shown.map(researchCard).join('')||'<div class="card center muted">Nothing matches these filters.</div>'}</div>`;
+    <div id="rsList">${shownSorted.map(researchCard).join('')||'<div class="card center muted">Nothing matches these filters.</div>'}</div>`;
   $('#rsQ').oninput=e=>{ RESEARCH_Q=e.target.value; clearTimeout(window._rst); window._rst=setTimeout(renderResearch,250); };
   $('#rsFrom').onchange=e=>{ RS_FROM=e.target.value; renderResearch(); };
   $('#rsTo').onchange=e=>{ RS_TO=e.target.value; renderResearch(); };
@@ -792,9 +798,10 @@ function researchCard(r){
     </div>
     <div class="m">${esc(r.agency||'—')} · deadline ${fmtDate(r.deadline)}${r.category?` · NAICS ${esc(r.category)}`:''}${r.place_of_performance_raw?` · ${esc(String(r.place_of_performance_raw).slice(0,40))}`:''}</div>
     <div class="scores">
+      ${valueChip(r)}
       ${sum?`<span class="pill" style="background:${REC_COLOR[sum.recommendation]||'#555'};color:#fff">${esc(sum.recommendation||'')}</span><span class="pill">Fit ${sum.fit}</span><span class="pill">Conf ${sum.confidence}</span>`:'<span class="pill">not analyzed</span>'}
     </div>
-    <div class="acts"><button class="btn sm primary" onclick="openReview('${r.id}')">Open research →</button></div></div>`;
+    <div class="acts"><button class="btn sm primary" onclick="openReview('${r.id}')">Open research →</button><button class="btn sm" onclick="editOppValue('${r.id}')" title="Enter / correct contract value">💲 Value</button></div></div>`;
 }
 
 /* ═══════════ RFP DISCOVERY REVIEW WORKSPACE ═══════════
@@ -859,7 +866,10 @@ async function openReview(id){
         <button class="btn sm" id="rvDownload">⬇ Download from SAM.gov</button>
         <label class="btn sm" style="cursor:pointer">⬆ Upload documents<input id="rvUpload" type="file" multiple accept=".pdf,.docx,.doc,.txt,.xlsx,.csv" hidden></label>
         <button class="btn sm" id="rvRerun" title="TESTING: re-run ONLY this solicitation through Gemini analysis + the eligibility/strategy gate. Creates a new analysis version. No pipeline side effects, no partner research.">🧪 Re-run Solicitation</button>
+        <button class="btn sm" onclick="editOppValue('${r.id}')" title="Enter / correct contract value (base, options, total potential)">💲 Contract value</button>
         <span id="rvActStatus" class="muted" style="font-size:12px"></span>
+      </div>
+      <div style="margin:2px 0 8px">${valueChip(r)}${(()=>{const v=oppValue(r);const bits=[];if(v.base!=null)bits.push('Base '+fmtMoney(v.base));if(v.term)bits.push(esc(String(v.term)));if(v.source)bits.push('src: '+esc(v.source));if(v.sourceUrl)bits.push(`<a href="${esc(v.sourceUrl)}" target="_blank">pricing source ↗</a>`);return bits.length?` <span class="muted" style="font-size:12px">· ${bits.join(' · ')}</span>`:'';})()}
       </div>
 
       <h2 class="section">Documents <span class="muted" style="font-weight:normal;font-size:13px">— open and read each one, then tick the ones Gemini should analyze</span></h2>
@@ -1863,6 +1873,104 @@ async function ldSetRec(rfpId, rec){
     if(rec==='Team') maybeAutoCorVerify(rfpId, 'team');
   }catch(e){ if(st) st.textContent='Failed: '+e.message; }
 }
+/* ═══════════════ CONTRACT VALUE — canonical client model (spec §11–§30) ═══════════════
+   ONE helper read by Dashboard, Research and Pipeline so all three show the SAME
+   number (no drift, §27). Canonical store is details.value (JSON — no migration).
+   Falls back to the legacy estimated_value column. UNKNOWN is never 0: a missing
+   value stays null so sort/filter/scoring treat it as unknown (§13/§24). */
+function num(x){ if(x==null||x==='') return null; const n=Number(String(x).replace(/[$,\s]/g,'')); return isFinite(n)?n:null; }
+function fmtMoney(n){ if(n==null) return 'UNKNOWN'; if(n>=1000000) return '$'+(n/1000000).toFixed(n%1000000?1:0)+'M'; if(n>=1000) return '$'+Math.round(n/1000)+'K'; return '$'+Number(n).toLocaleString(); }
+function oppValue(r){
+  const d=(r&&r.details)||{}; const v=d.value||{};
+  let total=num(v.total_potential_contract_value);
+  if(total==null) total=num(d.analysis_summary&&d.analysis_summary.total_potential_contract_value);
+  if(total==null && v.total_potential_contract_value==null && !v.status) total=num(r&&r.estimated_value);
+  const status=v.status || (total!=null?'ESTIMATED':'UNKNOWN');
+  const gate=total==null?'UNKNOWN':(total<=250000?'PASS':'FAIL');
+  return { total, base:num(v.estimated_base_value), annual:num(v.estimated_annual_value), ceiling:num(v.contract_ceiling),
+    optionValue:num(v.estimated_option_value), term:v.contract_duration||v.term||null, status, gate,
+    confidence:num(v.value_confidence), source:v.value_source||null, evidence:v.value_evidence||null,
+    calculation:v.value_calculation||null, sourceUrl:v.value_source_url||(r&&r.url)||null, manual:!!v.manual_override, updatedAt:v.updated_at||null };
+}
+const VALUE_GATE_COLOR={PASS:'#0b6b34',FAIL:'#b3261e',UNKNOWN:'#7a5b00'};
+function valueChip(r){
+  const v=oppValue(r); const gc=VALUE_GATE_COLOR[v.gate];
+  const label=v.total==null?'Value UNKNOWN':`${fmtMoney(v.total)}${v.status==='ESTIMATED'?' est.':''}`;
+  const gateTxt=v.gate==='PASS'?'≤$250K ✓':v.gate==='FAIL'?'>$250K ✕':'value ?';
+  return `<span class="pill" style="background:${gc};color:#fff" title="Total potential contract value · ${esc(v.status)}${v.source?' · '+esc(v.source):''}${v.manual?' · MANUAL':''}">💲 ${esc(label)} · ${gateTxt}${v.manual?' · M':''}</span>`;
+}
+const VALUE_BANDS={
+  'u50':['Under $50K',(t)=>t!=null&&t<50000], '50-100':['$50K–$100K',(t)=>t!=null&&t>=50000&&t<100000],
+  '100-150':['$100K–$150K',(t)=>t!=null&&t>=100000&&t<150000], '150-250':['$150K–$250K',(t)=>t!=null&&t>=150000&&t<=250000],
+  'u250':['Under $250K',(t)=>t!=null&&t<=250000], 'over250':['Over $250K',(t)=>t!=null&&t>250000], 'unknown':['Unknown value',(t)=>t==null],
+};
+function passesValueFilter(r, st){
+  const t=oppValue(r).total;
+  if(st.vmin!=null && (t==null||t<st.vmin)) return false;
+  if(st.vmax!=null && (t==null||t>st.vmax)) return false;
+  if(st.vband && VALUE_BANDS[st.vband] && !VALUE_BANDS[st.vband][1](t)) return false;
+  return true;
+}
+function sortByValue(arr, dir){ if(!dir) return arr; return [...arr].sort((a,b)=>{ const ta=oppValue(a).total, tb=oppValue(b).total;
+  if(ta==null&&tb==null) return 0; if(ta==null) return 1; if(tb==null) return -1; return dir==='asc'?ta-tb:tb-ta; }); }
+const VAL_ST={ rfps:{}, research:{}, pipe:{} };
+function valueFilterBar(st, key){
+  const band=(k)=>`<button class="btn sm ${st.vband===k?'primary':''}" onclick="${key}_vband('${k}')">${VALUE_BANDS[k][0]}</button>`;
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
+    <b class="muted" style="font-size:12px">💲 Total value</b>
+    <input type="number" placeholder="Min $" value="${st.vmin??''}" style="width:100px" onchange="${key}_vmin(this.value)">
+    <input type="number" placeholder="Max $" value="${st.vmax??''}" style="width:100px" onchange="${key}_vmax(this.value)">
+    ${['u50','50-100','100-150','150-250','u250','over250','unknown'].map(band).join('')}
+    <select style="width:auto" onchange="${key}_vsort(this.value)">
+      <option value="" ${!st.vsort?'selected':''}>Sort: default</option>
+      <option value="asc" ${st.vsort==='asc'?'selected':''}>Value: Low → High</option>
+      <option value="desc" ${st.vsort==='desc'?'selected':''}>Value: High → Low</option></select>
+    ${(st.vmin!=null||st.vmax!=null||st.vband||st.vsort)?`<button class="btn sm" onclick="${key}_vclear()">Clear value</button>`:''}
+  </div>`;
+}
+function _mkValHandlers(key, rerender){
+  window[key+'_vmin']=(v)=>{ VAL_ST[key].vmin=v===''?null:num(v); rerender(); };
+  window[key+'_vmax']=(v)=>{ VAL_ST[key].vmax=v===''?null:num(v); rerender(); };
+  window[key+'_vband']=(k)=>{ VAL_ST[key].vband=VAL_ST[key].vband===k?null:k; rerender(); };
+  window[key+'_vsort']=(d)=>{ VAL_ST[key].vsort=d||null; rerender(); };
+  window[key+'_vclear']=()=>{ VAL_ST[key]={}; rerender(); };
+}
+_mkValHandlers('rfps', ()=>renderRfps());
+_mkValHandlers('research', ()=>renderResearch());
+_mkValHandlers('pipe', ()=>renderPipeline());
+// Manual contract-value entry / override (spec §28). Stored in details.value; MANUAL is never overwritten by a Gemini rerun unless cleared.
+async function editOppValue(rfpId){
+  const rows=await api(`govcon_rfps?id=eq.${rfpId}&owner=eq.${SESSION.user.id}&select=id,details,estimated_value,url`).catch(()=>[]);
+  const r=(rows||[])[0]; if(!r) return toast('Not found');
+  const cur=(r.details||{}).value||{};
+  openModal(`<div class="shd"><h3>Contract value (manual)</h3><button class="sclose" onclick="closeModal()">×</button></div>
+    <div class="sbd">
+      <div class="muted" style="font-size:12px;margin-bottom:8px">Enter what the solicitation establishes. Leave blank for UNKNOWN — blanks are never treated as $0. Saved values are labeled <b>MANUAL</b> and are not overwritten by a Gemini re-run unless you clear them.</div>
+      <div class="row2"><div class="field"><label>Base period value ($)</label><input id="ov_base" type="number" value="${cur.estimated_base_value??''}"></div>
+        <div class="field"><label>Option value ($ total)</label><input id="ov_opt" type="number" value="${cur.estimated_option_value??''}"></div></div>
+      <div class="row2"><div class="field"><label>Total potential contract value ($)</label><input id="ov_total" type="number" value="${cur.total_potential_contract_value??''}"></div>
+        <div class="field"><label>Ceiling ($)</label><input id="ov_ceil" type="number" value="${cur.contract_ceiling??''}"></div></div>
+      <div class="row2"><div class="field"><label>Contract duration / term</label><input id="ov_term" value="${esc(cur.contract_duration||'')}" placeholder="e.g. 1 base + 4 option years"></div>
+        <div class="field"><label>Value status</label><select id="ov_status">${['','KNOWN','ESTIMATED','UNKNOWN','CEILING','RANGE'].map(s=>`<option ${s===(cur.status||'')?'selected':''}>${s||'(auto)'}</option>`).join('')}</select></div></div>
+      <div class="field"><label>Value source (where the price came from)</label><input id="ov_src" value="${esc(cur.value_source||'')}" placeholder="e.g. Solicitation.pdf p.6 — base + 4 options"></div>
+      <div class="field"><label>Pricing source link (URL)</label><input id="ov_url" value="${esc(cur.value_source_url||r.url||'')}" placeholder="https://sam.gov/opp/..."></div>
+      <div class="field"><label>Calculation / notes</label><input id="ov_calc" value="${esc(cur.value_calculation||'')}" placeholder="e.g. $42K x 5 years = $210K"></div>
+      <div style="display:flex;gap:8px;margin-top:8px"><button class="btn primary" id="ov_save">Save value</button><button class="btn" onclick="closeModal()">Cancel</button><span id="ov_out" class="muted" style="font-size:12px"></span></div>
+    </div>`);
+  $('#ov_save').onclick=async ()=>{
+    const val=Object.assign({}, cur, {
+      estimated_base_value:num($('#ov_base').value), estimated_option_value:num($('#ov_opt').value),
+      total_potential_contract_value:num($('#ov_total').value), contract_ceiling:num($('#ov_ceil').value),
+      contract_duration:$('#ov_term').value.trim()||null, status:$('#ov_status').value||null,
+      value_source:$('#ov_src').value.trim()||null, value_source_url:$('#ov_url').value.trim()||null, value_calculation:$('#ov_calc').value.trim()||null,
+      manual_override:true, updated_by:(SESSION.user&&SESSION.user.email)||SESSION.user.id, updated_at:new Date().toISOString() });
+    const details=Object.assign({}, r.details||{}, {value:val});
+    try{ await api(`govcon_rfps?id=eq.${rfpId}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({details})});
+      toast('Contract value saved (MANUAL)'); closeModal();
+      if($('#rfpList')) renderRfps(); if($('#rsList')) renderResearch(); if($('#pipeCols')||$('#pipeWrap')) renderPipeline();
+    }catch(e){ $('#ov_out').textContent='Failed: '+e.message; }
+  };
+}
 function rfpCard(r) {
   const aa=(window.ANALYSIS_BY_RFP||{})[r.id];
   const sum = (r.details && r.details.analysis_summary) || (aa?{fit:aa.fit_score,readiness:'—',dependency:'—',confidence:aa.analysis_confidence,recommendation:aa.recommendation,version:aa.version}:null);
@@ -1876,6 +1984,7 @@ function rfpCard(r) {
     <div class="m">${esc(r.agency||'—')} · ${esc(r.source)} · deadline ${fmtDate(r.deadline)}${r.set_aside?` · ${esc(r.set_aside)}`:''}${r.category?` · NAICS ${esc(r.category)}`:''}</div>
     ${r.description?`<div class="m">${esc(String(r.description).slice(0,200))}${r.description.length>200?'…':''}</div>`:''}
     <div class="scores">
+      ${valueChip(r)}
       ${sum?`<span class="pill" style="background:${REC_COLOR[sum.recommendation]||'#555'};color:#fff">${esc(sum.recommendation||'')}</span>
         <span class="pill">Fit ${sum.fit}</span><span class="pill">Ready ${sum.readiness}</span>
         <span class="pill">Sub-dep ${sum.dependency}</span><span class="pill">Conf ${sum.confidence}${sum.confidence<70?' · Preliminary':''}</span>
@@ -1887,8 +1996,9 @@ function rfpCard(r) {
     </div>
     <div class="acts">
       <button class="btn sm primary" onclick="openReview('${r.id}')">Review</button>
-      <button class="btn sm ${r.monitored?'primary':''}" title="${r.monitored?'Monitoring — auto-adds to the pipeline':'Monitor this opportunity so it auto-adds to the pipeline'}" onclick="toggleMonitor('${r.id}',${!r.monitored})">${r.monitored?'👁 Monitoring':'👁 Monitor'}</button>
+      <button class="btn sm ${r.monitored?'primary':''}" title="${r.monitored?'Monitoring — flagged to track in Research (only auto-adds to Pipeline if it passes the eligibility + strategy gate and is Pursue-level)':'Flag to track in Research (does not force a Pipeline lead — the eligibility/strategy gate still applies)'}" onclick="toggleMonitor('${r.id}',${!r.monitored})">${r.monitored?'👁 Monitoring':'👁 Monitor'}</button>
       <button class="btn sm" onclick="openRfp('${r.id}')">Edit</button>
+      <button class="btn sm" onclick="editOppValue('${r.id}')" title="Enter / correct contract value">💲 Value</button>
       ${r.url?`<a class="btn sm" href="${esc(r.url)}" target="_blank">Source ↗</a>`:''}
       <button class="btn sm" style="color:var(--bad)" onclick="deleteRfp('${r.id}')">Delete</button>
     </div></div>`;
@@ -1898,7 +2008,7 @@ function rfpCard(r) {
 async function toggleMonitor(id, on){
   try{
     await api(`govcon_rfps?id=eq.${id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({monitored:on, monitored_at:on?new Date().toISOString():null})});
-    toast(on?'Monitoring on — this will auto-add to the pipeline':'Monitoring off');
+    toast(on?'Monitoring on — tracked in Research (Pipeline still requires passing the eligibility + strategy gate)':'Monitoring off');
     if(window._RV&&window._RV.rfp&&window._RV.rfp.id===id){ window._RV.rfp.monitored=on; const b=$('#rvMonitorBtn'); if(b){ b.textContent=on?'👁 Monitoring':'👁 Monitor'; b.className='btn sm'+(on?' primary':''); } }
     if($('#rfpList')) renderRfps();
   }catch(e){ toast(/monitored/.test(e.message)?'Run govcon_migration_17.sql to enable Monitor.':'Could not update monitor: '+e.message); }
@@ -3345,10 +3455,10 @@ async function backfillMonitorLeads(inPipe){
 async function renderPipeline() {
   loading();
   await loadStageLabels();
-  PIPE_ITEMS = await api(`govcon_pipeline_items?owner=eq.${SESSION.user.id}&select=*,govcon_rfps(id,title,agency,deadline,win_probability,url,description)&order=stage_updated_at.desc`);
+  PIPE_ITEMS = await api(`govcon_pipeline_items?owner=eq.${SESSION.user.id}&select=*,govcon_rfps(id,title,agency,deadline,win_probability,url,description,details,estimated_value,set_aside,place_of_performance_raw,category)&order=stage_updated_at.desc`);
   // auto-add any already-scored "Monitor" (≥14 days out) opportunities as Leads
   const added=await backfillMonitorLeads(new Set((PIPE_ITEMS||[]).map(i=>i.rfp_id)));
-  if(added){ PIPE_ITEMS = await api(`govcon_pipeline_items?owner=eq.${SESSION.user.id}&select=*,govcon_rfps(id,title,agency,deadline,win_probability,url,description)&order=stage_updated_at.desc`); toast(`Added ${added} eligible opportunit${added===1?'y':'ies'} as Leads`); }
+  if(added){ PIPE_ITEMS = await api(`govcon_pipeline_items?owner=eq.${SESSION.user.id}&select=*,govcon_rfps(id,title,agency,deadline,win_probability,url,description,details,estimated_value,set_aside,place_of_performance_raw,category)&order=stage_updated_at.desc`); toast(`Added ${added} eligible opportunit${added===1?'y':'ies'} as Leads`); }
   // pull downloaded documents for every opportunity in the pipeline so the
   // cards can show a clickable doc count and the side viewer can list them.
   PIPE_DOCS = {};
@@ -3373,6 +3483,7 @@ async function renderPipeline() {
       <button class="btn sm ${PIPE_VIEW==='grid'?'primary':''}" onclick="setPipeView('grid')">▤ Grid</button>
     </div>
     <div class="muted" style="font-size:12px;margin-top:6px">Auto-run only adds the opportunities allowed by <b>Settings → Autopilot → Pipeline auto-add</b> (default: only ones you mark 👁 Monitor). It runs their qualification matrices and generates an editable partner call script (site visit, units, contract length, start date, scope) that appears on the Auto Dialer once a partner is linked to the contract.</div>
+    ${valueFilterBar(VAL_ST.pipe,'pipe')}
     <div id="autoRunBox"></div>
   </div>`;
   V().innerHTML = toggle + (PIPE_VIEW==='board' ? pipeBoard() : pipeGrid()) + `<div id="leadBox"></div>` + pipeViewerMarkup();
@@ -3441,12 +3552,21 @@ async function openDocSigned(storedPath){
 }
 function setPipeView(v){ PIPE_VIEW=v; renderPipeline(); }
 
+// value filter + sort applied to pipeline items (reads the joined govcon_rfps)
+function pipeVisible(){
+  let items=(PIPE_ITEMS||[]).filter(i=>passesValueFilter(i.govcon_rfps||{}, VAL_ST.pipe));
+  const dir=VAL_ST.pipe.vsort;
+  if(dir) items=[...items].sort((a,b)=>{ const ta=oppValue(a.govcon_rfps||{}).total, tb=oppValue(b.govcon_rfps||{}).total;
+    if(ta==null&&tb==null) return 0; if(ta==null) return 1; if(tb==null) return -1; return dir==='asc'?ta-tb:tb-ta; });
+  return items;
+}
 function pipeBoard() {
   const known = new Set(STAGES.map(s=>s[0]));
+  const VIS = pipeVisible();
   // any card sitting on a stage that no longer exists → catch-all "Unassigned"
-  const orphans = PIPE_ITEMS.filter(i=>!known.has(i.stage));
+  const orphans = VIS.filter(i=>!known.has(i.stage));
   const cols = STAGES.map(([key])=>{
-    const col = PIPE_ITEMS.filter(i=>i.stage===key);
+    const col = VIS.filter(i=>i.stage===key);
     return `<div class="col" data-stage="${key}" ondragover="event.preventDefault()">
       <h4>${esc(stageLabel(key))}<span class="n">${col.length}</span></h4>
       ${col.map(pipeCard).join('')}</div>`;
@@ -3463,7 +3583,8 @@ function pipeCard(i) {
   const nDocs = (PIPE_DOCS[i.rfp_id]||[]).length;
   return `<div class="pcard" draggable="true" data-id="${i.id}">
     <div class="pt" style="cursor:pointer" onclick="openLead('${i.id}')">${esc(r.title||'RFP')}</div>
-    <div class="muted" style="font-size:11px">${esc(r.agency||'')} · ${fmtDate(r.deadline)}</div>
+    <div class="muted" style="font-size:11px">${esc(r.agency||'')} · ${fmtDate(r.deadline)}${r.set_aside?` · ${esc(r.set_aside)}`:''}${r.place_of_performance_raw?` · ${esc(String(r.place_of_performance_raw).slice(0,28))}`:''}</div>
+    <div style="margin:3px 0">${valueChip(r)}${(()=>{const v=oppValue(r);return v.term?`<span class="pill" title="Contract duration">${esc(String(v.term).slice(0,24))}</span>`:'';})()}</div>
     <span class="pill ${i.priority}">${i.priority}</span>
     ${r.win_probability!=null?`<span class="pill">Win ${r.win_probability}%</span>`:''}
     ${nDocs?`<span class="pill" style="cursor:pointer;background:var(--blue-100);color:var(--blue-900)" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')" title="View downloaded documents & research">📎 ${nDocs} doc${nDocs!==1?'s':''}</span>`:`<span class="pill" style="cursor:pointer" onclick="event.stopPropagation();openPipeViewer('${i.rfp_id}')" title="View / research">🔬 view</span>`}
@@ -3525,11 +3646,12 @@ async function pipeRemove(itemId){
   toast('Removed — won’t auto re-add'); renderPipeline();
 }
 function pipeGrid() {
-  const rows = PIPE_ITEMS.map(i=>{
+  const rows = pipeVisible().map(i=>{
     const r = i.govcon_rfps || {};
     const nDocs=(PIPE_DOCS[i.rfp_id]||[]).length;
     return `<tr style="cursor:pointer" onclick="openLead('${i.id}')">
       <td style="font-weight:600;color:var(--blue-900)">${esc(r.title||'RFP')}</td>
+      <td onclick="event.stopPropagation();editOppValue('${i.rfp_id}')" title="Click to edit contract value">${valueChip(r)}</td>
       <td>${esc(r.agency||'—')}</td>
       <td>${fmtDate(r.deadline)}</td>
       <td><span class="pill ${i.priority}">${i.priority}</span></td>
@@ -3543,9 +3665,9 @@ function pipeGrid() {
   return `<div class="card" style="padding:0;overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:13.5px">
       <thead><tr style="text-align:left;background:var(--blue-050)">
-        ${['Title','Agency','Deadline','Priority','Win %','Stage','Docs','COR email','Notes'].map(h=>`<th style="padding:10px 12px;border-bottom:1px solid var(--line);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">${h}</th>`).join('')}
+        ${['Title','Value','Agency','Deadline','Priority','Win %','Stage','Docs','COR email','Notes'].map(h=>`<th style="padding:10px 12px;border-bottom:1px solid var(--line);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">${h}</th>`).join('')}
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--muted)">Pipeline is empty.</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="10" style="padding:20px;text-align:center;color:var(--muted)">Pipeline is empty.</td></tr>'}</tbody>
     </table></div>`;
 }
 // HTML5 drag-and-drop between stage columns
